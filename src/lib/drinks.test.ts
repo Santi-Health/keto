@@ -50,14 +50,14 @@ describe('teas', () => {
   })
 })
 
-describe('button order and Kazar', () => {
-  it('starts with the everyday drinks, with Kazar where the single espresso was', () => {
+describe('button order and Kazaar', () => {
+  it('starts with the everyday drinks, with Kazaar where the single espresso was', () => {
     expect(DRINKS.slice(0, 5).map((d) => d.key)).toEqual(['water', 'coke_zero', 'espresso_double', 'mate_cocido', 'kazar'])
     expect(DRINKS.some((d) => d.key === 'espresso_single')).toBe(false)
     expect(drinkByKey('espresso_single')).toBeDefined() // still reachable from the Single/Double switch
   })
 
-  it('logs Kazar as one pod and asks about milk', async () => {
+  it('logs Kazaar as one pod and asks about milk', async () => {
     const { asksForMilk } = await import('./drinks')
     const k = drinkByKey('kazar')!
     expect(drinkPortion(k)).toEqual({ amount: 1, unit: 'pod' })
