@@ -35,3 +35,17 @@ describe('milk in espresso', () => {
     expect(n.netCarbs).toBeCloseTo(3, 0)
   })
 })
+
+describe('teas', () => {
+  it('logs mate cocido and té con leche as 10 fl oz with 2 oz Fairlife, rooibos alone', () => {
+    const mate = drinkByKey('mate_cocido')!
+    expect(drinkPortion(mate)).toEqual({ amount: 10, unit: 'fl oz' })
+    expect(mate.milk).toEqual({ key: 'fairlife_fat_free', oz: 2 })
+    expect(drinkByKey('te_con_leche')!.milk?.oz).toBe(2)
+    expect(drinkByKey('rooibos')!.milk).toBeUndefined()
+    const f = drinkFood(drinkByKey('te_con_leche')!)
+    const n = portionNutrients({ ...f, id: 't', favorite: false, use_count: 0, last_used_at: null, updated_at: '', deleted_at: null }, 10 * 29.6)
+    expect(n.caffeineMg).toBeCloseTo(59, 0)
+    expect(portionNutrients({ ...drinkFood(drinkByKey('rooibos')!), id: 'r', favorite: false, use_count: 0, last_used_at: null, updated_at: '', deleted_at: null }, 296).caffeineMg).toBe(0)
+  })
+})

@@ -65,8 +65,11 @@ export function DrinksCard({ days, waterTargetOz }: Props) {
       setEspresso(d)
       return
     }
-    const entry = logDrinkFood(d, now)
-    setUndo({ kind: 'log', ids: [entry.id], label: label(d) })
+    const ids = [logDrinkFood(d, now).id]
+    // Teas that always take milk log it in the same tap, as its own entry.
+    const milk = d.milk && MILKS.find((m) => m.key === d.milk!.key)
+    if (milk) ids.push(logFood(findOrSave(milkFood(milk)), d.milk!.oz, 'fl oz', mealForTime(now), now).id)
+    setUndo({ kind: 'log', ids, label: label(d) })
   }
 
   const findOrSave = (template: ReturnType<typeof drinkFood>): Food =>

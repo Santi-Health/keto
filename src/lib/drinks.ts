@@ -3,8 +3,9 @@ import type { Nutrients } from './nutrients'
 
 /**
  * One-tap drinks. Water and sparkling water count toward the water goal (logged as water readings);
- * sodas and espresso are logged as foods so caffeine, sodium and sweeteners reach the watch list.
- * Values are per serving from US labels (12 oz can) and USDA espresso.
+ * sodas, espresso and teas are logged as foods so caffeine, sodium and sweeteners reach the watch list.
+ * Teas with milk log the milk as its own entry, the same as espresso with milk.
+ * Values are per serving from US labels (12 oz can) and USDA (espresso, brewed tea).
  */
 export type DrinkKey =
   | 'water'
@@ -17,6 +18,9 @@ export type DrinkKey =
   | 'sprite_zero'
   | 'espresso_single'
   | 'espresso_double'
+  | 'mate_cocido'
+  | 'te_con_leche'
+  | 'rooibos'
 
 export interface Drink {
   key: DrinkKey
@@ -32,10 +36,16 @@ export interface Drink {
   sweeteners?: string[]
   /** Nutrients not on the label, filled from similar drinks. */
   estimated?: string[]
+  /** Logged by the fluid ounce (teas) instead of by the can or shot. */
+  flOz?: number
+  /** Milk that always goes in, logged as its own entry in the same tap. */
+  milk?: { key: MilkKey; oz: number }
 }
 
 const CAN_G = 355
 const SHOT_G = 30
+/** Brewed tea weighs about the same as water. */
+const FL_OZ_G = 29.6
 
 const soda = (caffeineMg: number, sodiumMg: number, potassiumMg = 0): Nutrients => ({
   kcal: 0,
@@ -62,6 +72,10 @@ const espresso = (shots: number): Nutrients => ({
   caffeineMg: 64 * shots,
 })
 
+// Brewed teas, per 10 fl oz (296 g). Black and rooibos from USDA brewed tea; mate cocido from published
+// brewed yerba mate values (no USDA entry), so its caffeine and minerals are estimates.
+const tea = (n: Partial<Nutrients>): Nutrients => ({ kcal: 0, protein: 0, fat: 0, carbs: 0, netCarbs: 0, sugars: 0, ...n })
+
 export const DRINKS: Drink[] = [
   { key: 'water', label: 'Water', serving: '1 cup (8 oz)', oz: 8, hydration: true, color: 'var(--water)', perServing: null },
   { key: 'sparkling_water', label: 'Sparkling water', serving: '1 cup (8 oz)', oz: 8, hydration: true, color: 'var(--water)', perServing: null },
@@ -73,6 +87,40 @@ export const DRINKS: Drink[] = [
   { key: 'sprite_zero', label: 'Sprite Zero', serving: '12 oz can', oz: 12, hydration: false, color: '#00a651', perServing: soda(0, 35), sweeteners: ['aspartame', 'acesulfame K'], estimated: ['sodiumMg'] },
   { key: 'espresso_single', label: 'Espresso', serving: 'single shot', oz: 1, hydration: false, color: '#6f4e37', perServing: espresso(1) },
   { key: 'espresso_double', label: 'Espresso', serving: 'double shot', oz: 2, hydration: false, color: '#6f4e37', perServing: espresso(2) },
+  {
+    key: 'mate_cocido',
+    label: 'Mate cocido',
+    serving: '10 oz + 2 oz Fairlife',
+    oz: 12,
+    hydration: false,
+    color: '#7a8b3a',
+    perServing: tea({ kcal: 2, carbs: 0.4, netCarbs: 0.4, potassiumMg: 60, magnesiumMg: 6, sodiumMg: 3, caffeineMg: 55 }),
+    estimated: ['caffeineMg', 'potassiumMg', 'magnesiumMg'],
+    flOz: 10,
+    milk: { key: 'fairlife_fat_free', oz: 2 },
+  },
+  {
+    key: 'te_con_leche',
+    label: 'Té con leche',
+    serving: '10 oz + 2 oz Fairlife',
+    oz: 12,
+    hydration: false,
+    color: '#8b4a2b',
+    perServing: tea({ kcal: 3, carbs: 0.9, netCarbs: 0.9, potassiumMg: 110, magnesiumMg: 9, sodiumMg: 9, caffeineMg: 59 }),
+    flOz: 10,
+    milk: { key: 'fairlife_fat_free', oz: 2 },
+  },
+  {
+    key: 'rooibos',
+    label: 'Rooibos',
+    serving: '10 oz, no caffeine',
+    oz: 10,
+    hydration: false,
+    color: '#b5452b',
+    perServing: tea({ kcal: 3, carbs: 0.6, netCarbs: 0.6, potassiumMg: 27, magnesiumMg: 3, sodiumMg: 3, caffeineMg: 0 }),
+    estimated: ['potassiumMg', 'magnesiumMg'],
+    flOz: 10,
+  },
 ]
 
 export const drinkByKey = (key: string) => DRINKS.find((d) => d.key === key)
@@ -80,7 +128,7 @@ export const drinkByKey = (key: string) => DRINKS.find((d) => d.key === key)
 /** Food row for a soda or espresso (single and double share one food): nutrients per 100 g plus a serving unit. */
 export function drinkFood(d: Drink): NewFood {
   const isEspresso = d.key.startsWith('espresso')
-  const grams = isEspresso ? SHOT_G * (d.key === 'espresso_double' ? 2 : 1) : CAN_G
+  const grams = d.flOz ? d.flOz * FL_OZ_G : isEspresso ? SHOT_G * (d.key === 'espresso_double' ? 2 : 1) : CAN_G
   const per100: Nutrients = {}
   for (const [k, v] of Object.entries(d.perServing ?? {})) per100[k as keyof Nutrients] = Math.round((v * 100 * 1000) / grams) / 1000
   return {
@@ -88,7 +136,7 @@ export function drinkFood(d: Drink): NewFood {
     brand: null,
     barcode: null,
     per_100g: per100,
-    unit_conversions: [{ unit: isEspresso ? 'shot' : 'can', grams: isEspresso ? SHOT_G : CAN_G }],
+    unit_conversions: [d.flOz ? { unit: 'fl oz', grams: FL_OZ_G } : { unit: isEspresso ? 'shot' : 'can', grams: isEspresso ? SHOT_G : CAN_G }],
     ingredients_text: null,
     keto_notes: d.sweeteners?.length ? `Zero sugar; sweetened with ${d.sweeteners.join(' and ')}.` : null,
     carbs_exclude_fiber: false,
@@ -101,7 +149,13 @@ export function drinkFood(d: Drink): NewFood {
 
 /** Amount and unit to log for one tap. */
 export const drinkPortion = (d: Drink) =>
-  d.key === 'espresso_double' ? { amount: 2, unit: 'shot' } : d.key === 'espresso_single' ? { amount: 1, unit: 'shot' } : { amount: 1, unit: 'can' }
+  d.flOz
+    ? { amount: d.flOz, unit: 'fl oz' }
+    : d.key === 'espresso_double'
+      ? { amount: 2, unit: 'shot' }
+      : d.key === 'espresso_single'
+        ? { amount: 1, unit: 'shot' }
+        : { amount: 1, unit: 'can' }
 
 /** Milks added to espresso, per 100 g. Fairlife from its US labels (per 1 cup = 240 ml); non-fat from USDA. */
 export type MilkKey = 'fairlife_chocolate' | 'fairlife_fat_free' | 'nonfat'
