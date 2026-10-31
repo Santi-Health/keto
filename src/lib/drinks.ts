@@ -21,6 +21,7 @@ export type DrinkKey =
   | 'mate_cocido'
   | 'te_con_leche'
   | 'rooibos'
+  | 'kazar'
 
 export interface Drink {
   key: DrinkKey
@@ -46,6 +47,8 @@ const CAN_G = 355
 const SHOT_G = 30
 /** Brewed tea weighs about the same as water. */
 const FL_OZ_G = 29.6
+/** A Nespresso OriginalLine pod brewed as an espresso (40 ml). */
+const POD_G = 40
 
 const soda = (caffeineMg: number, sodiumMg: number, potassiumMg = 0): Nutrients => ({
   kcal: 0,
@@ -76,7 +79,7 @@ const espresso = (shots: number): Nutrients => ({
 // brewed yerba mate values (no USDA entry), so its caffeine and minerals are estimates.
 const tea = (n: Partial<Nutrients>): Nutrients => ({ kcal: 0, protein: 0, fat: 0, carbs: 0, netCarbs: 0, sugars: 0, ...n })
 
-export const DRINKS: Drink[] = [
+const ALL: Drink[] = [
   { key: 'water', label: 'Water', serving: '1 cup (8 oz)', oz: 8, hydration: true, color: 'var(--water)', perServing: null },
   { key: 'sparkling_water', label: 'Sparkling water', serving: '1 cup (8 oz)', oz: 8, hydration: true, color: 'var(--water)', perServing: null },
   { key: 'diet_coke', label: 'Diet Coke', serving: '12 oz can', oz: 12, hydration: false, color: '#b8b8b8', perServing: soda(46, 40), sweeteners: ['aspartame'] },
@@ -121,14 +124,51 @@ export const DRINKS: Drink[] = [
     estimated: ['potassiumMg', 'magnesiumMg'],
     flOz: 10,
   },
+  {
+    key: 'kazar',
+    label: 'Kazar',
+    serving: 'Nespresso pod',
+    oz: 1.4,
+    hydration: false,
+    color: '#3b2a4a',
+    // Nespresso doesn't publish per-pod caffeine; Kazaar is a robusta-heavy intensity-12 blend, so ~100 mg is an estimate.
+    perServing: { kcal: 2, protein: 0.1, fat: 0, carbs: 0.3, netCarbs: 0.3, sodiumMg: 3, potassiumMg: 45, magnesiumMg: 30, caffeineMg: 100 },
+    estimated: ['caffeineMg', 'potassiumMg', 'magnesiumMg'],
+  },
 ]
 
-export const drinkByKey = (key: string) => DRINKS.find((d) => d.key === key)
+/** Button order: the everyday drinks first. */
+const ORDER: DrinkKey[] = [
+  'water',
+  'coke_zero',
+  'espresso_double',
+  'mate_cocido',
+  'kazar',
+  'sparkling_water',
+  'diet_coke',
+  'diet_pepsi',
+  'squirt_zero',
+  'fanta_zero',
+  'sprite_zero',
+  'te_con_leche',
+  'rooibos',
+]
+
+/** The buttons, in order. Single espresso isn't a button; it's the Single/Double switch in the espresso sheet. */
+export const DRINKS: Drink[] = ORDER.map((k) => ALL.find((d) => d.key === k)!)
+
+/** Every drink the app knows, including ones without a button (single espresso). */
+export const ALL_DRINKS = ALL
+
+/** Drinks that ask which milk went in before logging. */
+export const asksForMilk = (d: Drink) => d.key.startsWith('espresso') || d.key === 'kazar'
+
+export const drinkByKey = (key: string) => ALL.find((d) => d.key === key)
 
 /** Food row for a soda or espresso (single and double share one food): nutrients per 100 g plus a serving unit. */
 export function drinkFood(d: Drink): NewFood {
   const isEspresso = d.key.startsWith('espresso')
-  const grams = d.flOz ? d.flOz * FL_OZ_G : isEspresso ? SHOT_G * (d.key === 'espresso_double' ? 2 : 1) : CAN_G
+  const grams = d.flOz ? d.flOz * FL_OZ_G : d.key === 'kazar' ? POD_G : isEspresso ? SHOT_G * (d.key === 'espresso_double' ? 2 : 1) : CAN_G
   const per100: Nutrients = {}
   for (const [k, v] of Object.entries(d.perServing ?? {})) per100[k as keyof Nutrients] = Math.round((v * 100 * 1000) / grams) / 1000
   return {
@@ -136,7 +176,9 @@ export function drinkFood(d: Drink): NewFood {
     brand: null,
     barcode: null,
     per_100g: per100,
-    unit_conversions: [d.flOz ? { unit: 'fl oz', grams: FL_OZ_G } : { unit: isEspresso ? 'shot' : 'can', grams: isEspresso ? SHOT_G : CAN_G }],
+    unit_conversions: [
+      d.flOz ? { unit: 'fl oz', grams: FL_OZ_G } : d.key === 'kazar' ? { unit: 'pod', grams: POD_G } : { unit: isEspresso ? 'shot' : 'can', grams: isEspresso ? SHOT_G : CAN_G },
+    ],
     ingredients_text: null,
     keto_notes: d.sweeteners?.length ? `Zero sugar; sweetened with ${d.sweeteners.join(' and ')}.` : null,
     carbs_exclude_fiber: false,
@@ -151,7 +193,9 @@ export function drinkFood(d: Drink): NewFood {
 export const drinkPortion = (d: Drink) =>
   d.flOz
     ? { amount: d.flOz, unit: 'fl oz' }
-    : d.key === 'espresso_double'
+    : d.key === 'kazar'
+      ? { amount: 1, unit: 'pod' }
+      : d.key === 'espresso_double'
       ? { amount: 2, unit: 'shot' }
       : d.key === 'espresso_single'
         ? { amount: 1, unit: 'shot' }

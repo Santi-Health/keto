@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useData } from '../lib/data'
-import { DRINKS, MILKS, drinkFood, drinkPortion, milkFood, type Drink, type DrinkKey, type MilkKey } from '../lib/drinks'
+import { ALL_DRINKS, DRINKS, MILKS, asksForMilk, drinkFood, drinkPortion, milkFood, type Drink, type DrinkKey, type MilkKey } from '../lib/drinks'
 import { portionNutrients, type Food } from '../lib/foods'
 import { mealForTime } from '../lib/foods'
 import { localDate } from '../lib/targets'
@@ -61,7 +61,7 @@ export function DrinksCard({ days, waterTargetOz }: Props) {
       setUndo({ kind: 'reading', ids: [id], label: label(d) })
       return
     }
-    if (d.key.startsWith('espresso')) {
+    if (asksForMilk(d)) {
       setEspresso(d)
       return
     }
@@ -89,7 +89,7 @@ export function DrinksCard({ days, waterTargetOz }: Props) {
     setEspresso(null)
   }
 
-  const tally = DRINKS.filter((d) => !d.hydration && counts[d.key]).map((d) => `${counts[d.key]} ${label(d)}`)
+  const tally = ALL_DRINKS.filter((d) => !d.hydration && counts[d.key]).map((d) => `${counts[d.key]} ${label(d)}`)
 
   return (
     <section className="card">
@@ -149,25 +149,29 @@ function EspressoSheet({
 }) {
   const milkFoods = MILKS.map((m) => ({ m, food: foods.find((f) => f.meta.externalId === `drink:milk_${m.key}`) }))
   const last = milkFoods.filter((x) => x.food?.last_used_at).sort((a, b) => b.food!.last_used_at!.localeCompare(a.food!.last_used_at!))[0]
-  const [shots, setShots] = useState<'espresso_single' | 'espresso_double'>(drink.key as 'espresso_single')
+  // Espresso has a Single/Double switch; a pod (Kazar) is always one.
+  const isEspresso = drink.key.startsWith('espresso')
+  const [shots, setShots] = useState<'espresso_single' | 'espresso_double'>(isEspresso ? (drink.key as 'espresso_single') : 'espresso_single')
   const [milk, setMilk] = useState<MilkKey | 'none'>(last?.m.key ?? 'fairlife_fat_free')
   const [ozText, setOzText] = useState(String(last?.food?.meta.lastAmount ?? 4))
   const oz = Number(ozText)
   const chosen = MILKS.find((m) => m.key === milk)
   const n = chosen && oz > 0 ? portionNutrients({ ...milkFood(chosen), id: '', favorite: false, use_count: 0, last_used_at: null, updated_at: '', deleted_at: null }, oz * 30.5) : null
-  const d = DRINKS.find((x) => x.key === shots)!
+  const d = isEspresso ? ALL_DRINKS.find((x) => x.key === shots)! : drink
 
   return (
-    <Sheet title="Espresso" subtitle="Which milk did you add?" onClose={onClose}>
-      <Segmented
-        label="Shots"
-        value={shots}
-        options={[
-          { value: 'espresso_single', label: 'Single' },
-          { value: 'espresso_double', label: 'Double' },
-        ]}
-        onChange={setShots}
-      />
+    <Sheet title={isEspresso ? 'Espresso' : drink.label} subtitle="Which milk did you add?" onClose={onClose}>
+      {isEspresso && (
+        <Segmented
+          label="Shots"
+          value={shots}
+          options={[
+            { value: 'espresso_single', label: 'Single' },
+            { value: 'espresso_double', label: 'Double' },
+          ]}
+          onChange={setShots}
+        />
+      )}
       <div className="field">
         <span className="label">Milk</span>
         <div className="chips">
@@ -203,7 +207,8 @@ function EspressoSheet({
         </div>
       )}
       <button type="button" className="btn" disabled={milk !== 'none' && !(oz > 0)} onClick={() => onLog(d, milk === 'none' ? null : milk, milk === 'none' ? 0 : oz)}>
-        Log {d.serving} espresso{milk !== 'none' && oz > 0 ? ` + ${oz} oz milk` : ''}
+        Log {isEspresso ? `${d.serving} espresso` : d.label}
+        {milk !== 'none' && oz > 0 ? ` + ${oz} oz milk` : ''}
       </button>
     </Sheet>
   )

@@ -49,3 +49,20 @@ describe('teas', () => {
     expect(portionNutrients({ ...drinkFood(drinkByKey('rooibos')!), id: 'r', favorite: false, use_count: 0, last_used_at: null, updated_at: '', deleted_at: null }, 296).caffeineMg).toBe(0)
   })
 })
+
+describe('button order and Kazar', () => {
+  it('starts with the everyday drinks, with Kazar where the single espresso was', () => {
+    expect(DRINKS.slice(0, 5).map((d) => d.key)).toEqual(['water', 'coke_zero', 'espresso_double', 'mate_cocido', 'kazar'])
+    expect(DRINKS.some((d) => d.key === 'espresso_single')).toBe(false)
+    expect(drinkByKey('espresso_single')).toBeDefined() // still reachable from the Single/Double switch
+  })
+
+  it('logs Kazar as one pod and asks about milk', async () => {
+    const { asksForMilk } = await import('./drinks')
+    const k = drinkByKey('kazar')!
+    expect(drinkPortion(k)).toEqual({ amount: 1, unit: 'pod' })
+    expect(asksForMilk(k)).toBe(true)
+    const n = portionNutrients({ ...drinkFood(k), id: 'k', favorite: false, use_count: 0, last_used_at: null, updated_at: '', deleted_at: null }, 40)
+    expect(n.caffeineMg).toBeCloseTo(100, 0)
+  })
+})
