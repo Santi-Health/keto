@@ -49,15 +49,22 @@ describe('suggestions from your usual foods', () => {
     expect(carbs.kind).toBe('trim')
     expect(carbs.text).toMatch(/^Have 2 × 1 slice of Keto bread instead of 4 × 1 slice$/)
   })
-  it('never suggests seasonings, and adds at most one more usual portion', () => {
+  it('suggests a seasoning only when a couple of grams closes the gap, and adds at most one more usual portion', () => {
     const pepper = food('pep', 'Black pepper', { kcal: 251, protein: 10, potassiumMg: 1329, magnesiumMg: 171, netCarbs: 39 }, 'g', 1)
-    const h = [...history, log(pepper, 1, 'g', 'dinner', 19), log(pepper, 1, 'g', 'lunch', 12)]
-    const u = usualFoods([...foods, pepper], h)
-    expect(u.find((x) => x.food.id === 'pep')).toMatchObject({ step: 1, usualGrams: 1 })
-    expect(u.find((x) => x.food.id === 'egg')).toMatchObject({ maxSteps: 2 })
+    const nusalt = food('nu', 'NuSalt', { potassiumMg: 52000 }, 'g', 1)
+    const h = [...history, log(pepper, 1, 'g', 'dinner', 19), log(pepper, 1, 'g', 'lunch', 12), log(nusalt, 1, 'g', 'dinner', 19)]
+    const all = [...foods, pepper, nusalt]
+    const u = usualFoods(all, h)
+    expect(u.find((x) => x.food.id === 'pep')).toMatchObject({ step: 1, seasoning: true, maxSteps: 3 })
+    expect(u.find((x) => x.food.id === 'egg')).toMatchObject({ seasoning: false, maxSteps: 2 })
     const day = [log(eggs, 2, '1 egg', 'breakfast', 7)]
-    const tips = suggestFixes({ dayLogs: day, history: h, foods: [...foods, pepper], targets, muscleGoal: 'build', fatBudget: null, past: false })
+    // Potassium 1,000 mg short: 2 g of NuSalt closes it; pepper can't, so it's never offered as a partial fix.
+    const tips = suggestFixes({ dayLogs: day, history: h, foods: all, targets: { ...targets, potassiumMg: 138 + 1000 }, muscleGoal: 'build', fatBudget: null, past: false })
+    expect(tips.find((t) => t.goal === 'potassium')?.text).toBe('Add 2 g NuSalt')
     expect(tips.some((t) => t.text.includes('pepper'))).toBe(false)
+    // 4,000 mg short is more than a couple of grams of NuSalt.
+    const big = suggestFixes({ dayLogs: day, history: h, foods: all, targets: { ...targets, potassiumMg: 5000 }, muscleGoal: 'build', fatBudget: null, past: false })
+    expect(big.some((t) => t.text.includes('NuSalt'))).toBe(false)
     for (const t of tips.filter((x) => x.text.includes('Eggs'))) expect(Number(t.text.match(/(\d+(\.\d+)?) ?×? ?1 egg/)?.[1] ?? 0)).toBeLessThanOrEqual(2)
   })
 })

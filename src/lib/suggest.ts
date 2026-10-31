@@ -23,8 +23,10 @@ export interface UsualFood {
   usualSteps: number
   /** The most to suggest adding, in steps: about one more usual portion. */
   maxSteps: number
-  /** Your usual portion in grams; seasonings (a pinch of salt or pepper) are never suggested. */
+  /** Your usual portion in grams. */
   usualGrams: number
+  /** A pinch of something (salt, NuSalt, turmeric): suggested only when a couple of grams fully closes a gap. */
+  seasoning: boolean
   /** Meals you've eaten it at. */
   meals: Set<Meal>
   timesLogged: number
@@ -48,6 +50,8 @@ const round1 = (n: number) => Math.round(n * 10) / 10
 const WEIGHED = new Set(['g', 'oz', 'ml', 'fl oz', 'cup', 'tbsp', 'tsp'])
 /** Below this, a food is a seasoning (a pinch of salt or pepper), not something to eat more of. */
 const SEASONING_G = 5
+/** The most of a seasoning to suggest: a pinch to a couple of grams. */
+const MAX_SEASONING_G = 3
 
 /** Step size in your unit, small enough to fit your usual portion (1 g of pepper isn't stepped by 15 g). */
 function stepFor(unit: string, usual: number) {
@@ -63,8 +67,11 @@ function usualFood(food: Food, unit: string, usual: number, meals: Set<Meal>, ti
   const stepGrams = toGrams({ unitConversions: food.unit_conversions }, step, unit).grams
   if (!(stepGrams > 0)) return null
   const usualSteps = Math.max(1, Math.round(usual / step))
-  // Up to one more of your usual portion: 2 eggs → up to 2 more, 6 oz → up to 6 oz more.
-  return { food, unit, step, stepGrams, usualSteps, maxSteps: usualSteps, usualGrams: usualSteps * stepGrams, meals, timesLogged }
+  const usualGrams = usualSteps * stepGrams
+  const seasoning = usualGrams < SEASONING_G
+  // Up to one more of your usual portion (2 eggs → up to 2 more, 6 oz → up to 6 oz more); seasonings up to ~3 g.
+  const maxSteps = seasoning ? Math.max(1, Math.floor(MAX_SEASONING_G / stepGrams + 1e-9)) : usualSteps
+  return { food, unit, step, stepGrams, usualSteps, maxSteps, usualGrams, seasoning, meals, timesLogged }
 }
 
 /** The ingredients you eat (anything you've logged, plus starred favorites), with your usual portion. */
@@ -103,7 +110,7 @@ const MAX_ADD_KCAL = 200
 
 /**
  * The cheapest (in calories, with net carbs counting extra) addition from your usual foods that covers
- * `need` of a nutrient, within one more of your usual portion and about 200 kcal (never seasonings). Prefers foods
+ * `need` of a nutrient, within one more of your usual portion and about 200 kcal (seasonings: a couple of grams, full fixes only). Prefers foods
  * you eat at `meal`. When nothing covers all of it, the best one that covers at least half (`partial`).
  */
 function bestAddition(usual: UsualFood[], key: keyof Nutrients, need: number, meal?: Meal) {
@@ -111,7 +118,6 @@ function bestAddition(usual: UsualFood[], key: keyof Nutrients, need: number, me
   let best: Pick | null = null
   let bestPartial: Pick | null = null
   for (const u of usual) {
-    if (u.usualGrams < SEASONING_G) continue
     const one = per(u, 1)[key] ?? 0
     if (one <= 0) continue
     const full = Math.ceil(need / one - 1e-9)
@@ -125,7 +131,7 @@ function bestAddition(usual: UsualFood[], key: keyof Nutrients, need: number, me
     const score = kcal + carbs * 20 - (meal && u.meals.has(meal) ? 15 : 0) - Math.min(u.timesLogged, 10)
     if (steps === full) {
       if (!best || score < best.score) best = { u, steps, gain, kcal, carbs, score, partial: false }
-    } else if (gain >= need * 0.5) {
+    } else if (gain >= need * 0.5 && !u.seasoning) {
       // Partial: rank by how much of the gap it closes per calorie.
       const pscore = score / (gain / need)
       if (!bestPartial || pscore < bestPartial.score) bestPartial = { u, steps, gain, kcal, carbs, score: pscore, partial: true }
@@ -180,6 +186,7 @@ export function suggestFixes({ dayLogs, history, foods, targets, muscleGoal, fat
   const shortfalls: { key: keyof Nutrients; goal: string; name: string; unit: string; target: number }[] = [
     { key: 'protein', goal: 'protein', name: 'protein', unit: 'g', target: targets.proteinG },
     { key: 'fiber', goal: 'fiber', name: 'fiber', unit: 'g', target: targets.fiberG },
+    { key: 'sodiumMg', goal: 'sodium', name: 'sodium', unit: 'mg', target: targets.sodiumMg },
     { key: 'potassiumMg', goal: 'potassium', name: 'potassium', unit: 'mg', target: targets.potassiumMg },
     { key: 'magnesiumMg', goal: 'magnesium', name: 'magnesium', unit: 'mg', target: targets.magnesiumMg },
   ]
