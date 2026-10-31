@@ -1,4 +1,4 @@
-import type { ActivityLevel, Profile, Sex } from './types'
+import { DEFAULT_PROFILE, type ActivityLevel, type Profile, type Sex } from './types'
 
 export const KG_PER_LB = 0.45359237
 export const CM_PER_IN = 2.54
@@ -118,7 +118,7 @@ export function computeTargets(
 
   // Refeed days eat at maintenance (no deficit, no ceiling); carbs stay at the keto limit.
   const isRefeed = profile.refeedDate === localDate(today)
-  const deficit = isRefeed ? 0 : Math.min(Math.max(profile.deficitPct, 0), MAX_DEFICIT)
+  const deficit = isRefeed || !burn ? 0 : Math.min(Math.max(profile.deficitKcal ?? DEFAULT_PROFILE.deficitKcal, 0) / burn, MAX_DEFICIT)
   let calories = burn != null ? burn * (1 - deficit) : null
   const cap = isRefeed ? null : profile.calorieCapKcal
   let capped = false

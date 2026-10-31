@@ -1,7 +1,8 @@
-import { createContext, useCallback, useContext, useMemo, type ReactNode } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, type ReactNode } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import type { CgmDay } from './cgm'
 import type { Exercise } from './exercise'
+import { duplicateExercises } from './googleHealth'
 import type { ActivityDay } from './activity'
 import type { ReadingRow } from './readings'
 import type { SavedMeal } from './savedMeals'
@@ -122,12 +123,18 @@ export function DataProvider({ session, children }: { session: Session | null; c
     [logsTable.rows],
   )
 
+  // The phone and the background sync can both import the same Fitbit workout; keep one.
+  const exerciseDupes = useMemo(() => duplicateExercises(exerciseTable.rows), [exerciseTable.rows])
+  useEffect(() => {
+    for (const id of exerciseDupes) exerciseTable.remove(id)
+  }, [exerciseDupes]) // eslint-disable-line react-hooks/exhaustive-deps
+
   const exercisesOn = useCallback(
     (date: string) =>
       exerciseTable.rows
-        .filter((e) => entryDay(e.started_at, e.meta?.tz) === date)
+        .filter((e) => !exerciseDupes.includes(e.id) && entryDay(e.started_at, e.meta?.tz) === date)
         .sort((a, b) => a.started_at.localeCompare(b.started_at)),
-    [exerciseTable.rows],
+    [exerciseTable.rows, exerciseDupes],
   )
 
   const readingsOn = useCallback(

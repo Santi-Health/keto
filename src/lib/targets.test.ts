@@ -41,7 +41,7 @@ describe('computeTargets', () => {
   })
 
   it('prefers the Fitbit burn over the estimate', () => {
-    const t = computeTargets(profile({ heightCm: 175, deficitPct: 0.1, calorieCapKcal: null }), oct30, 3000)
+    const t = computeTargets(profile({ heightCm: 175, deficitKcal: 300, calorieCapKcal: null }), oct30, 3000)
     expect(t.burnSource).toBe('fitbit')
     expect(t.calories).toBe(2700)
     // (2700 − 150×4 − 25×4) / 9 = 222.2
@@ -49,12 +49,12 @@ describe('computeTargets', () => {
   })
 
   it('caps the deficit at 20%', () => {
-    const t = computeTargets(profile({ heightCm: 175, deficitPct: 0.5, calorieCapKcal: null }), oct30, 3000)
+    const t = computeTargets(profile({ heightCm: 175, deficitKcal: 1500, calorieCapKcal: null }), oct30, 3000)
     expect(t.calories).toBe(2400)
   })
 
   it('never goes above the calorie ceiling', () => {
-    const t = computeTargets(profile({ heightCm: 175, deficitPct: 0.1, calorieCapKcal: 2000 }), oct30, 3000)
+    const t = computeTargets(profile({ heightCm: 175, deficitKcal: 300, calorieCapKcal: 2000 }), oct30, 3000)
     expect(t.calories).toBe(2000)
     expect(t.capped).toBe(true)
     // (2000 − 150×4 − 25×4) / 9 = 144.4
@@ -68,7 +68,7 @@ describe('computeTargets', () => {
   })
 
   it('does not warn on a moderate deficit or a refeed day', () => {
-    expect(computeTargets(profile({ heightCm: 175, calorieCapKcal: 2500, deficitPct: 0.12 }), oct30, 2700).muscleWarning).toBeNull()
+    expect(computeTargets(profile({ heightCm: 175, calorieCapKcal: 2500, deficitKcal: 300 }), oct30, 2700).muscleWarning).toBeNull()
     expect(
       computeTargets(profile({ heightCm: 175, calorieCapKcal: 2000, refeedDate: '2026-10-30' }), oct30, 3000).muscleWarning,
     ).toBeNull()
@@ -81,7 +81,7 @@ describe('computeTargets', () => {
 
   it('eats at maintenance with no ceiling on a refeed day', () => {
     const t = computeTargets(
-      profile({ heightCm: 175, deficitPct: 0.1, calorieCapKcal: 2000, refeedDate: '2026-10-30' }),
+      profile({ heightCm: 175, deficitKcal: 300, calorieCapKcal: 2000, refeedDate: '2026-10-30' }),
       oct30,
       3000,
     )

@@ -315,7 +315,8 @@ export function Today({ profile, targets, onOpenSettings, onToggleRefeed, onNavi
               logs={dayLogs}
               exercises={sessionsToday}
               activity={Object.values(activity).find((a) => a.day === today && !a.deleted_at) ?? null}
-              goal={targets.burn != null && targets.calories != null ? Math.max(0, targets.burn - targets.calories) : null}
+              // The deficit you asked for; the calorie ceiling can make the real one bigger, never smaller.
+              goal={targets.isRefeed ? null : profile.deficitKcal}
             />
           )}
           <section className="card">

@@ -156,18 +156,18 @@ export function Settings({ profile, update, targets, session, sync, recovering, 
               onChange={(proteinPerLb) => update({ proteinPerLb })}
             />
             <div className="field">
-              <label htmlFor="deficit">Calorie deficit: {Math.round(profile.deficitPct * 100)}%</label>
+              <label htmlFor="deficit">Calorie deficit: {profile.deficitKcal.toLocaleString()} kcal a day</label>
               <input
                 id="deficit"
                 type="range"
                 min={0}
-                max={MAX_DEFICIT}
-                step={0.01}
-                value={profile.deficitPct}
-                onChange={(e) => update({ deficitPct: Number(e.target.value) })}
+                max={1000}
+                step={50}
+                value={profile.deficitKcal}
+                onChange={(e) => update({ deficitKcal: Number(e.target.value) })}
               />
               <div className="hint">
-                For losing fat while keeping muscle, 10–15% is a common range. Capped at {MAX_DEFICIT * 100}%.
+                500 kcal a day is about 1 lb of fat a week. Never more than {MAX_DEFICIT * 100}% of your burn, to protect muscle.
               </div>
             </div>
             <Segmented
@@ -358,13 +358,13 @@ function TargetMath({ profile, targets }: { profile: Profile; targets: Targets }
           </tr>
           <tr>
             <td>
-              {targets.isRefeed ? 'Refeed day: no deficit' : `− ${Math.round(profile.deficitPct * 100)}% deficit`}
+              {targets.isRefeed ? 'Refeed day: no deficit' : `− ${profile.deficitKcal.toLocaleString()} kcal deficit`}
               {targets.burnSource === 'fitbit' && <div className="muted small">using Fitbit burn {fmt(targets.burn)}</div>}
             </td>
             <td>
               {fmt(
                 targets.burn != null
-                  ? Math.round(targets.burn * (1 - (targets.isRefeed ? 0 : Math.min(profile.deficitPct, MAX_DEFICIT))))
+                  ? Math.round(targets.burn - (targets.isRefeed ? 0 : Math.min(profile.deficitKcal, targets.burn * MAX_DEFICIT)))
                   : null,
                 ' kcal',
               )}

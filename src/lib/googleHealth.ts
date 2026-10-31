@@ -542,6 +542,35 @@ export function toAppExercise(
   }
 }
 
+/**
+ * Copies of the same workout: rows with the same Fitbit id, or Fitbit rows of the same type that start
+ * the same minute and last as long (the phone and the background sync can both import a session before
+ * either sees the other's row). Returns the ids to remove, keeping the one you edited, else the oldest.
+ */
+export function duplicateExercises(rows: Exercise[]): string[] {
+  const live = rows.filter((e) => !e.deleted_at)
+  const groups = new Map<string, Exercise[]>()
+  const keyOf = (e: Exercise) =>
+    e.source === 'fitbit' ? `${e.kind}|${e.meta.cardioType ?? ''}|${e.started_at.slice(0, 16)}|${Math.round(e.duration_min)}` : null
+  for (const e of live) {
+    // Rows sharing a Fitbit id, or the same session by time, land in one group.
+    const keys = [e.external_id ? `id:${e.external_id}` : null, keyOf(e)].filter((k): k is string => !!k)
+    const found = keys.map((k) => groups.get(k)).find((g) => g)
+    const group = found ?? []
+    group.push(e)
+    for (const k of keys) groups.set(k, group)
+  }
+  const remove: string[] = []
+  for (const group of new Set(groups.values())) {
+    if (group.length < 2) continue
+    const keep = [...group].sort(
+      (a, b) => Number(!!b.meta.userEdited) - Number(!!a.meta.userEdited) || a.updated_at.localeCompare(b.updated_at) || a.id.localeCompare(b.id),
+    )[0]
+    for (const e of group) if (e.id !== keep.id) remove.push(e.id)
+  }
+  return remove
+}
+
 export interface ImportResult {
   added: Exercise[]
   updated: Exercise[]

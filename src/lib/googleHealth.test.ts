@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { Exercise } from './exercise'
-import { classifyExercise, learnTypes, mergeImported, toAppExercise, type HealthExercise } from './googleHealth'
+import { classifyExercise, duplicateExercises, learnTypes, mergeImported, toAppExercise, type HealthExercise } from './googleHealth'
 
 const point = (type: string, start: string, minutes: number, kcal: number, extra: Partial<NonNullable<HealthExercise['exercise']>['metricsSummary']> = {}): HealthExercise => ({
   name: `users/1/dataTypes/exercise/dataPoints/${type}-${start}`,
@@ -98,5 +98,20 @@ describe('your corrections', () => {
     // Re-importing the corrected session keeps your type.
     const again = mergeImported([{ ...bike, external_id: corrected.external_id }], [corrected])
     expect(again.updated[0].meta.cardioType).toBe('stairmaster')
+  })
+})
+
+describe('duplicate workouts', () => {
+  const row = (id: string, ext: string | null, start: string, extra: Partial<Exercise> = {}): Exercise => ({
+    id, started_at: start, kind: 'cardio', duration_min: 22, intensity: 'high', calories: 196, source: 'fitbit', external_id: ext,
+    note: null, meta: { cardioType: 'running' }, updated_at: `2026-10-31T2${id}:00:00Z`, deleted_at: null, ...extra,
+  })
+  it('keeps one copy of a session imported twice', () => {
+    const rows = [row('1', 'p/1', '2026-10-31T19:43:00Z'), row('2', 'p/1', '2026-10-31T19:43:00Z'), row('3', 'p/9', '2026-10-31T19:43:00Z')]
+    expect(duplicateExercises(rows).sort()).toEqual(['2', '3'])
+  })
+  it('keeps the copy you edited, and leaves different sessions alone', () => {
+    const rows = [row('1', 'p/1', '2026-10-31T19:43:00Z'), row('2', 'p/1', '2026-10-31T19:43:00Z', { meta: { cardioType: 'running', userEdited: true } }), row('3', 'p/2', '2026-10-31T17:41:00Z')]
+    expect(duplicateExercises(rows)).toEqual(['1'])
   })
 })

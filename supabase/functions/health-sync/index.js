@@ -656,7 +656,11 @@ function classifyExercise(type, displayName = "") {
 	if (/WEIGHT|STRENGTH|LIFT|RESISTANCE/.test(t)) return { kind: "strength" };
 	if (/WALK|HIKE/.test(t)) return { kind: "walking" };
 	if (/HIIT|INTERVAL|CIRCUIT/.test(t)) return { kind: "hiit" };
-	if (/BIKE|CYCL|SPIN|ELLIPTICAL|ROW|SWIM|CARDIO/.test(t)) return { kind: "cardio" };
+	if (/BIKE|BIKING|CYCL|SPIN/.test(t)) return {
+		kind: "cardio",
+		cardioType: "cycling"
+	};
+	if (/ELLIPTICAL|ROW|SWIM|CARDIO/.test(t)) return { kind: "cardio" };
 	if (/TENNIS|SOCCER|BASKETBALL|SPORT|GOLF|PADEL|PICKLEBALL/.test(t)) return { kind: "sport" };
 	return { kind: "other" };
 }
@@ -702,7 +706,7 @@ function toAppExercise(p, weightKg, restingKcalPerDay, learned = {}) {
 		meta: {
 			caloriesEstimated: total == null,
 			cardioType,
-			distanceMi: cardioType === "running" || kind === "walking" ? miles : void 0,
+			distanceMi: cardioType === "running" || cardioType === "cycling" || kind === "walking" ? miles : void 0,
 			yogaStyle: kind === "mobility" ? "flow" : void 0,
 			fitbitTotalKcal: total ?? void 0,
 			fitbitType: e.exerciseType,
@@ -710,6 +714,29 @@ function toAppExercise(p, weightKg, restingKcalPerDay, learned = {}) {
 			avgHr: e.metricsSummary?.averageHeartRateBeatsPerMinute
 		}
 	};
+}
+/**
+* Copies of the same workout: rows with the same Fitbit id, or Fitbit rows of the same type that start
+* the same minute and last as long (the phone and the background sync can both import a session before
+* either sees the other's row). Returns the ids to remove, keeping the one you edited, else the oldest.
+*/
+function duplicateExercises(rows) {
+	const live = rows.filter((e) => !e.deleted_at);
+	const groups = /* @__PURE__ */ new Map();
+	const keyOf = (e) => e.source === "fitbit" ? `${e.kind}|${e.meta.cardioType ?? ""}|${e.started_at.slice(0, 16)}|${Math.round(e.duration_min)}` : null;
+	for (const e of live) {
+		const keys = [e.external_id ? `id:${e.external_id}` : null, keyOf(e)].filter((k) => !!k);
+		const group = keys.map((k) => groups.get(k)).find((g) => g) ?? [];
+		group.push(e);
+		for (const k of keys) groups.set(k, group);
+	}
+	const remove = [];
+	for (const group of new Set(groups.values())) {
+		if (group.length < 2) continue;
+		const keep = [...group].sort((a, b) => Number(!!b.meta.userEdited) - Number(!!a.meta.userEdited) || a.updated_at.localeCompare(b.updated_at) || a.id.localeCompare(b.id))[0];
+		for (const e of group) if (e.id !== keep.id) remove.push(e.id);
+	}
+	return remove;
 }
 /**
 * Merges imported sessions with what's logged: same Fitbit id → update; a manual session of the
@@ -782,6 +809,31 @@ function mergeImported(imported, existing, now = (/* @__PURE__ */ new Date()).to
 	}
 	return result;
 }
+// src/lib/types.ts
+const DEFAULT_PROFILE = {
+	birthDate: "1984-06-02",
+	sex: "male",
+	heightCm: 173,
+	weightKg: 68.04,
+	activityLevel: "active",
+	proteinPerLb: 1,
+	deficitKcal: 500,
+	calorieCapKcal: 2e3,
+	refeedDate: null,
+	netCarbLimitG: 25,
+	sodiumMg: 4e3,
+	potassiumMg: 4e3,
+	magnesiumMg: 400,
+	fiberG: 25,
+	waterOz: 100,
+	weightUnit: "lb",
+	heightUnit: "cm",
+	theme: "system",
+	watchList: {},
+	muscleGoal: "build",
+	yogaRoutine: DEFAULT_YOGA_ROUTINE,
+	updatedAt: (/* @__PURE__ */ new Date(0)).toISOString()
+};
 // src/lib/targets.ts
 const KG_PER_LB = .45359237;
 const kgToLb = (kg) => kg / KG_PER_LB;
@@ -849,7 +901,7 @@ function computeTargets(profile, today = /* @__PURE__ */ new Date(), actualBurn)
 	const burn = actualBurn ?? estimatedBurn;
 	const burnSource = actualBurn != null ? "fitbit" : estimatedBurn != null ? "estimate" : "none";
 	const isRefeed = profile.refeedDate === localDate(today);
-	const deficit = isRefeed ? 0 : Math.min(Math.max(profile.deficitPct, 0), MAX_DEFICIT);
+	const deficit = isRefeed || !burn ? 0 : Math.min(Math.max(profile.deficitKcal ?? DEFAULT_PROFILE.deficitKcal, 0) / burn, MAX_DEFICIT);
 	let calories = burn != null ? burn * (1 - deficit) : null;
 	const cap = isRefeed ? null : profile.calorieCapKcal;
 	let capped = false;
@@ -885,31 +937,6 @@ function computeTargets(profile, today = /* @__PURE__ */ new Date(), actualBurn)
 		warnings
 	};
 }
-// src/lib/types.ts
-const DEFAULT_PROFILE = {
-	birthDate: "1984-06-02",
-	sex: "male",
-	heightCm: 173,
-	weightKg: 68.04,
-	activityLevel: "active",
-	proteinPerLb: 1,
-	deficitPct: .12,
-	calorieCapKcal: 2e3,
-	refeedDate: null,
-	netCarbLimitG: 25,
-	sodiumMg: 4e3,
-	potassiumMg: 4e3,
-	magnesiumMg: 400,
-	fiberG: 25,
-	waterOz: 100,
-	weightUnit: "lb",
-	heightUnit: "cm",
-	theme: "system",
-	watchList: {},
-	muscleGoal: "build",
-	yogaRoutine: DEFAULT_YOGA_ROUTINE,
-	updatedAt: (/* @__PURE__ */ new Date(0)).toISOString()
-};
 // src/server/sync.ts
 /**
 * Background sync, run by the Supabase Edge Function "health-sync" every 4 hours (and once right after linking).
@@ -1085,11 +1112,17 @@ async function syncUser(env, userId, tokens, tz) {
 			}
 		});
 	}
+	const dupes = new Set(duplicateExercises(exercises));
+	const removed = exercises.filter((e) => dupes.has(e.id)).map((e) => ({
+		...e,
+		deleted_at: (/* @__PURE__ */ new Date()).toISOString()
+	}));
 	await d.upsert("exercises", forUser(userId, [
 		...added,
 		...updated,
 		...matched,
-		...hrFixed
+		...hrFixed,
+		...removed
 	]), "id");
 	notes.push(`${added.length} new workouts`);
 	const activityRows = await d.select("daily_activity", `user_id=eq.${userId}&deleted_at=is.null`);

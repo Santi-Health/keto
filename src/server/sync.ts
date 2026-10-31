@@ -12,7 +12,7 @@ import { backupDue, backupToDrive } from '../lib/driveBackup'
 import type { Exercise } from '../lib/exercise'
 import type { ExportBundle } from '../lib/exportData'
 import type { Food, LogEntry } from '../lib/foods'
-import { fetchActivity, heartRateCalories, learnTypes, listExercises, listGlucose, mergeImported, toAppExercise } from '../lib/googleHealth'
+import { duplicateExercises, fetchActivity, heartRateCalories, learnTypes, listExercises, listGlucose, mergeImported, toAppExercise } from '../lib/googleHealth'
 import type { ReadingRow } from '../lib/readings'
 import type { SavedMeal } from '../lib/savedMeals'
 import { computeTargets } from '../lib/targets'
@@ -161,7 +161,10 @@ export async function syncUser(env: Env, userId: string, tokens: { health: strin
     const r = await heartRateCalories(token, new Date(e.started_at), e.duration_min, { age: targets.age, sex: profile.sex, bmrPerDay: targets.bmr, weightKg: profile.weightKg }).catch(() => null)
     if (r) hrFixed.push({ ...e, calories: r.kcal, meta: { ...e.meta, caloriesEstimated: false, caloriesSource: 'heart-rate', avgHr: r.avgHr, hrSamples: r.samples } })
   }
-  await d.upsert('exercises', forUser(userId, [...added, ...updated, ...matched, ...hrFixed]), 'id')
+  // Copies made when the phone imported the same session at the same time.
+  const dupes = new Set(duplicateExercises(exercises))
+  const removed = exercises.filter((e) => dupes.has(e.id)).map((e) => ({ ...e, deleted_at: new Date().toISOString() }))
+  await d.upsert('exercises', forUser(userId, [...added, ...updated, ...matched, ...hrFixed, ...removed]), 'id')
   notes.push(`${added.length} new workouts`)
 
   // Steps, burn, resting HR, HRV, sleep and weigh-ins since the last day here (at least a week).

@@ -18,8 +18,8 @@ export interface Profile {
   activityLevel: ActivityLevel
   /** Grams of protein per pound of body weight. */
   proteinPerLb: number
-  /** Calorie deficit applied to daily burn, 0–0.20. */
-  deficitPct: number
+  /** Calories a day to eat under your burn (a round number, e.g. 500); never more than 20% of burn. */
+  deficitKcal: number
   /** Daily calorie ceiling, lifted on refeed days. Null for no ceiling. */
   calorieCapKcal: number | null
   /** Local date (YYYY-MM-DD) marked as a refeed day. */
@@ -61,7 +61,7 @@ export const DEFAULT_PROFILE: Profile = {
   weightKg: 68.04, // 150 lb
   activityLevel: 'active',
   proteinPerLb: 1,
-  deficitPct: 0.12,
+  deficitKcal: 500,
   calorieCapKcal: 2000,
   refeedDate: null,
   netCarbLimitG: 25,
