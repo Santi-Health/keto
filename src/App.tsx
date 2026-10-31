@@ -110,6 +110,7 @@ function Tracker({ session, recovering = false, onPassphraseChanged = () => {} }
         {tab === 'log' && (
           <Log
             weightKg={profile.weightKg}
+            hr={{ age: targets.age, sex: profile.sex, bmrPerDay: targets.bmr }}
             weightUnit={profile.weightUnit}
             netCarbLimit={targets.netCarbsG}
             proteinTarget={targets.proteinG}

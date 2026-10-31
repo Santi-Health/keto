@@ -1,4 +1,4 @@
-import type { Exercise, ExerciseKind, Intensity } from './exercise'
+import { heartRateKcal, type Exercise, type ExerciseKind, type Intensity } from './exercise'
 
 /** OAuth client for the "Keto Tracker" Google Cloud project. Client IDs are public by design. */
 export const GOOGLE_CLIENT_ID =
@@ -342,6 +342,79 @@ export async function fetchActivity(token: string, fromDate: string, toDate: str
     }
   })
   return out
+}
+
+// --- Heart rate during a workout ----------------------------------------------------------
+
+export interface HrSample {
+  t: number
+  bpm: number
+}
+
+export function parseHeartRate(p: Record<string, unknown>): HrSample | null {
+  const h = p.heartRate as { beatsPerMinute?: string | number; sampleTime?: { physicalTime?: string } } | undefined
+  const t = Date.parse(h?.sampleTime?.physicalTime ?? '')
+  const bpm = Number(h?.beatsPerMinute)
+  return Number.isFinite(t) && bpm > 0 ? { t, bpm } : null
+}
+
+/** Heart-rate samples between two moments (Fitbit records one every few seconds during exercise). */
+export async function listHeartRate(token: string, from: Date, to: Date): Promise<HrSample[]> {
+  const utc = (d: Date) => d.toISOString().replace(/\.\d{3}Z$/, 'Z')
+  const field = 'heart_rate.sample_time.physical_time'
+  const out: HrSample[] = []
+  let pageToken: string | undefined
+  do {
+    const params = new URLSearchParams({ filter: `${field} >= "${utc(from)}" AND ${field} < "${utc(to)}"`, pageSize: '1000' })
+    if (pageToken) params.set('pageToken', pageToken)
+    const data = (await healthFetch(token, `${API}/dataTypes/heart-rate/dataPoints?${params}`)) as {
+      dataPoints?: Record<string, unknown>[]
+      nextPageToken?: string
+    }
+    for (const p of data.dataPoints ?? []) {
+      const h = parseHeartRate(p)
+      if (h) out.push(h)
+    }
+    pageToken = data.nextPageToken
+  } while (pageToken)
+  return out
+}
+
+/** Time-weighted average, so a burst of samples doesn't outweigh a quiet stretch. */
+export function averageHr(samples: HrSample[], from: number, to: number): number | null {
+  const s = samples.filter((x) => x.t >= from && x.t <= to).sort((a, b) => a.t - b.t)
+  if (s.length < 3) return null
+  let sum = 0
+  let span = 0
+  for (let i = 0; i < s.length; i++) {
+    // Each sample counts until the next one, capped at 60 s so gaps in the data don't dominate.
+    const next = i + 1 < s.length ? s[i + 1].t : Math.min(to, s[i].t + 5_000)
+    const w = Math.min(60_000, Math.max(1_000, next - s[i].t))
+    sum += s[i].bpm * w
+    span += w
+  }
+  return Math.round(sum / span)
+}
+
+export interface HrProfile {
+  weightKg: number
+  age: number
+  sex: 'male' | 'female' | 'unspecified'
+  bmrPerDay: number | null
+}
+
+/** Calories for a session from the Fitbit heart rate recorded during it, or null without enough data. */
+export async function heartRateCalories(
+  token: string,
+  start: Date,
+  minutes: number,
+  who: HrProfile,
+): Promise<{ kcal: number; avgHr: number; samples: number } | null> {
+  const end = new Date(start.getTime() + minutes * 60_000)
+  const samples = await listHeartRate(token, start, end)
+  const avgHr = averageHr(samples, start.getTime(), end.getTime())
+  if (avgHr == null) return null
+  return { kcal: heartRateKcal({ avgHr, minutes, ...who }), avgHr, samples: samples.length }
 }
 
 // --- Matching to the app's exercise types ----------------------------------------------

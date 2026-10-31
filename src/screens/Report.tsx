@@ -1,4 +1,5 @@
 import { useMemo } from 'react'
+import { estimateA1c } from '../lib/a1c'
 import { scanChanges, scansOf } from '../lib/bodyScan'
 import { formatSleep } from '../lib/activity'
 import { useData } from '../lib/data'
@@ -46,6 +47,7 @@ export function Report({ profile, targets, days, onRange, onBack }: Props) {
   const lows = fingerSticks.filter((r) => (r.value ?? 0) < 70).length
   const sessions = exercises.filter((e) => inRange(e.started_at))
   const kinds = [...new Set(sessions.map(sessionLabel))]
+  const a1c = useMemo(() => estimateA1c(cgmDays, readings), [cgmDays, readings])
 
   return (
     <div className="report">
@@ -84,6 +86,12 @@ export function Report({ profile, targets, days, onRange, onBack }: Props) {
           <table className="report-table">
             <tbody>
               <tr><td>CGM average</td><td>{v(s.glucoseAvg, ' mg/dL')}</td></tr>
+              <tr>
+                <td>Estimated A1C (GMI)</td>
+                <td>
+                  {a1c.estimate != null ? `${a1c.estimate.toFixed(1)}% (${a1c.basedOnDays} days of CGM${a1c.personalOffset != null ? ', lab-calibrated' : ''})` : '—'}
+                </td>
+              </tr>
               <tr><td>CGM 3–6 AM average</td><td>{v(s.glucoseOvernight, ' mg/dL')}</td></tr>
               <tr><td>CGM time in 70–140</td><td>{v(s.glucoseInRangePct, '%')}</td></tr>
               <tr><td>Finger-stick fasting avg</td><td>{v(s.fastingGlucose, ' mg/dL')}</td></tr>

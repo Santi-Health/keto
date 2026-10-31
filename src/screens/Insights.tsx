@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import { GlucoseChart } from '../components/GlucoseChart'
+import { A1cCard } from '../components/A1cCard'
 import { BodyScanCard } from '../components/BodyScan'
 import { KetoModelCard } from '../components/KetoModelCard'
 import { TrendsCard } from '../components/TrendsCard'
@@ -154,6 +155,8 @@ export function Insights({ targets, weightUnit, onApplyLimit, onOpenReport }: Pr
               </p>
             </section>
           )}
+
+          <A1cCard />
 
           {odd.length > 0 && (
             <section className="card">

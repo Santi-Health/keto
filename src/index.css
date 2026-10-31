@@ -1608,3 +1608,19 @@ input[type='time'] {
 .keto-day.deep {
   border-bottom-color: var(--ketone);
 }
+
+.a1c-big {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.a1c-big b {
+  font-size: 2rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.a1c-big span {
+  font-size: 0.8rem;
+  color: var(--text-2);
+}

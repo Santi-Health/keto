@@ -83,6 +83,27 @@ export function estimateExerciseKcal(
   return Math.round((sessionMet(kind, intensity, minutes, details) - 1) * weightKg * (minutes / 60))
 }
 
+/**
+ * Active calories from average heart rate (Keytel et al. 2005, without VO2max), minus resting burn
+ * for the same minutes so it matches how the app counts workouts. Most reliable above ~90 bpm;
+ * at lower heart rates (gentle yoga) the formula drifts toward resting, so very low results are floored at 0.
+ */
+export function heartRateKcal(opts: {
+  avgHr: number
+  minutes: number
+  weightKg: number
+  age: number
+  sex: 'male' | 'female' | 'unspecified'
+  bmrPerDay: number | null
+}): number {
+  const { avgHr, minutes, weightKg, age, sex, bmrPerDay } = opts
+  const male = (-55.0969 + 0.6309 * avgHr + 0.1988 * weightKg + 0.2017 * age) / 4.184
+  const female = (-20.4022 + 0.4472 * avgHr - 0.1263 * weightKg + 0.074 * age) / 4.184
+  const perMin = sex === 'male' ? male : sex === 'female' ? female : (male + female) / 2
+  const resting = (bmrPerDay ?? weightKg * 24) / 1440
+  return Math.max(0, Math.round((perMin - resting) * minutes))
+}
+
 export interface Lift {
   name: string
   weightLb: number | null
@@ -111,6 +132,10 @@ export interface Exercise {
     fitbitType?: string
     steps?: number
     avgHr?: number
+    /** "heart-rate" when calories came from Fitbit heart rate during a hand-logged session. */
+    caloriesSource?: 'heart-rate'
+    /** Heart-rate samples behind avgHr, to show how much data there was. */
+    hrSamples?: number
     /** Set when you change an imported session's type; re-imports keep your version. */
     userEdited?: boolean
   }

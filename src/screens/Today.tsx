@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { daysSinceStrength, routineDue, routineSession, sessionLabel, trainingWarnings } from '../lib/exercise'
 import { mergeActivity, weightReadings } from '../lib/activity'
-import { fetchActivity, getGoogleToken, learnTypes, listExercises, mergeImported, toAppExercise } from '../lib/googleHealth'
+import { fetchActivity, getGoogleToken, heartRateCalories, learnTypes, listExercises, mergeImported, toAppExercise } from '../lib/googleHealth'
 import { useInstall } from '../lib/install'
 import { STATUS_TEXT, estimateKetosis, tomorrowMorning } from '../lib/ketosis'
 import { AminoCard } from '../components/AminoCard'
@@ -53,6 +53,8 @@ export function Today({ profile, targets, onOpenSettings, onToggleRefeed, onNavi
   const [importing, setImporting] = useState(false)
   const [importMessage, setImportMessage] = useState<string | null>(null)
 
+  const hrProfile = { age: targets.age, sex: profile.sex, bmrPerDay: targets.bmr }
+
   /** Pulls the last 3 days of Fitbit workouts and merges them with what's logged. */
   async function importFitbit() {
     setImporting(true)
@@ -70,6 +72,21 @@ export function Today({ profile, targets, onOpenSettings, onToggleRefeed, onNavi
       const { added, updated, matched } = mergeImported(mapped, recent)
       for (const e of [...added, ...updated, ...matched]) saveExercise(e)
       const names = [...added, ...matched].map((e) => `${sessionLabel(e)} ${e.duration_min} min`)
+
+      // Hand-logged sessions still on an estimate get their calories from heart rate during the session.
+      const touched = new Set([...added, ...updated, ...matched].map((e) => e.id))
+      const estimated = recent.filter((e) => e.source === 'manual' && e.meta.caloriesEstimated && !touched.has(e.id))
+      let hrUpdated = 0
+      for (const e of estimated) {
+        try {
+          const r = await heartRateCalories(token, new Date(e.started_at), e.duration_min, { ...hrProfile, weightKg: profile.weightKg })
+          if (!r) continue
+          saveExercise({ ...e, calories: r.kcal, meta: { ...e.meta, caloriesEstimated: false, caloriesSource: 'heart-rate', avgHr: r.avgHr, hrSamples: r.samples } })
+          hrUpdated++
+        } catch {
+          // Leave the estimate; the session can still be updated from its edit screen.
+        }
+      }
 
       // Steps, calories burned, resting heart rate, sleep and weigh-ins: 30 days the first time, then the last week.
       const actFrom = new Date()
@@ -95,6 +112,7 @@ export function Today({ profile, targets, onOpenSettings, onToggleRefeed, onNavi
           points.length === 0
             ? 'No Fitbit workouts in the last 3 days.'
             : `Workouts: ${added.length} new, ${matched.length} matched, ${updated.length} refreshed.${names.length ? ` ${names.join(' · ')}` : ''}`,
+          hrUpdated ? `${hrUpdated} hand-logged workout${hrUpdated > 1 ? 's' : ''} now use${hrUpdated > 1 ? '' : 's'} your heart rate for calories.` : '',
           actMessage,
         ]
           .filter(Boolean)
@@ -429,7 +447,7 @@ export function Today({ profile, targets, onOpenSettings, onToggleRefeed, onNavi
           onClose={() => setReadingSheet(null)}
         />
       )}
-      {logExercise && <ExerciseSheet weightKg={profile.weightKg} onClose={() => setLogExercise(false)} />}
+      {logExercise && <ExerciseSheet weightKg={profile.weightKg} hr={hrProfile} onClose={() => setLogExercise(false)} />}
     </>
   )
 }

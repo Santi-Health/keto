@@ -8,6 +8,7 @@ import { RecipeBuilder } from '../components/RecipeBuilder'
 import { SaveMealSheet } from '../components/SavedMealSheets'
 import { BodyScanSheet } from '../components/BodyScan'
 import { useData } from '../lib/data'
+import type { HrProfile } from '../lib/googleHealth'
 import { sessionLabel, type Exercise } from '../lib/exercise'
 import { MEALS, type Food, type LogEntry, type Meal, type NewFood } from '../lib/foods'
 import { addNutrients, type NutrientKey, type Nutrients } from '../lib/nutrients'
@@ -18,6 +19,8 @@ import { formatAmount } from '../lib/units'
 
 interface Props {
   weightKg: number
+  /** For heart-rate calories on hand-logged workouts. */
+  hr?: Omit<HrProfile, 'weightKg'>
   weightUnit: WeightUnit
   netCarbLimit: number
   proteinTarget: number
@@ -80,7 +83,7 @@ function readingText(r: ReadingRow, unit: WeightUnit): string {
   }
 }
 
-export function Log({ weightKg, weightUnit, netCarbLimit, proteinTarget, date, onDateChange, onAdd }: Props) {
+export function Log({ weightKg, hr, weightUnit, netCarbLimit, proteinTarget, date, onDateChange, onAdd }: Props) {
   const { logsOn, foodById, exercisesOn, readingsOn } = useData()
   const [readingSheet, setReadingSheet] = useState<{ reading?: ReadingRow } | null>(null)
   const [savingMeal, setSavingMeal] = useState<{ meal: Meal; entries: LogEntry[] } | null>(null)
@@ -213,6 +216,7 @@ export function Log({ weightKg, weightUnit, netCarbLimit, proteinTarget, date, o
                         })}{' '}
                         · {e.intensity === 'low' ? 'easy' : e.intensity === 'high' ? 'hard' : 'moderate'}
                         {e.meta.fasted ? ' · fasted' : ''}
+                        {e.meta.caloriesSource === 'heart-rate' && e.meta.avgHr ? ` · ♥ ${e.meta.avgHr} bpm avg` : ''}
                         {e.meta.lifts?.length ? ` · ${e.meta.lifts.map((l) => l.name).join(', ')}` : ''}
                         {e.note ? ` · ${e.note}` : ''}
                       </span>
@@ -309,7 +313,7 @@ export function Log({ weightKg, weightUnit, netCarbLimit, proteinTarget, date, o
         />
       )}
       {exerciseSheet && (
-        <ExerciseSheet weightKg={weightKg} exercise={exerciseSheet.exercise} date={date} onClose={() => setExerciseSheet(null)} />
+        <ExerciseSheet weightKg={weightKg} hr={hr} exercise={exerciseSheet.exercise} date={date} onClose={() => setExerciseSheet(null)} />
       )}
       {editingFood &&
         ('id' in editingFood && editingFood.source === 'recipe' ? (

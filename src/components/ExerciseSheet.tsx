@@ -13,11 +13,14 @@ import {
   type Lift,
   type YogaStyle,
 } from '../lib/exercise'
+import { getGoogleToken, heartRateCalories, type HrProfile } from '../lib/googleHealth'
 import { Segmented } from './Fields'
 import { Sheet } from './Sheet'
 
 interface Props {
   weightKg: number
+  /** Age, sex and resting burn for heart-rate calories; without it the Fitbit button is hidden. */
+  hr?: Omit<HrProfile, 'weightKg'>
   /** Existing session to edit; omit to log a new one. */
   exercise?: Exercise
   /** Day to log on (YYYY-MM-DD); defaults to now. */
@@ -34,7 +37,7 @@ function defaultStart(date?: string): Date {
   return d.toDateString() === now.toDateString() ? now : d
 }
 
-export function ExerciseSheet({ weightKg, exercise, date, onClose }: Props) {
+export function ExerciseSheet({ weightKg, hr, exercise, date, onClose }: Props) {
   const { saveExercise, deleteExercise } = useData()
   const [kind, setKind] = useState<ExerciseKind>(exercise?.kind ?? 'strength')
   const [cardioType, setCardioType] = useState<CardioType>(exercise?.meta.cardioType ?? 'stairmaster')
@@ -50,6 +53,31 @@ export function ExerciseSheet({ weightKg, exercise, date, onClose }: Props) {
   const [lifts, setLifts] = useState<Lift[]>(exercise?.meta.lifts ?? [])
   // Calories follow the estimate until typed over.
   const [kcalText, setKcalText] = useState(exercise && !exercise.meta.caloriesEstimated ? String(exercise.calories ?? '') : '')
+  const [hrResult, setHrResult] = useState<{ avgHr: number; samples: number } | null>(
+    exercise?.meta.caloriesSource === 'heart-rate' && exercise.meta.avgHr ? { avgHr: exercise.meta.avgHr, samples: exercise.meta.hrSamples ?? 0 } : null,
+  )
+  const [hrBusy, setHrBusy] = useState(false)
+  const [hrMessage, setHrMessage] = useState<string | null>(null)
+
+  async function useHeartRate() {
+    if (!hr || !(Number(minutes) > 0)) return
+    setHrBusy(true)
+    setHrMessage(null)
+    try {
+      const token = await getGoogleToken()
+      const r = await heartRateCalories(token, new Date(start), Number(minutes), { ...hr, weightKg })
+      if (!r) {
+        setHrMessage('No Fitbit heart rate found for that time. Check the start time, or let the Fitbit app sync first.')
+        return
+      }
+      setKcalText(String(r.kcal))
+      setHrResult({ avgHr: r.avgHr, samples: r.samples })
+    } catch (e) {
+      setHrMessage(`Couldn't read heart rate: ${(e as Error).message}`)
+    } finally {
+      setHrBusy(false)
+    }
+  }
 
   const mins = Number(minutes)
   const details = {
@@ -85,6 +113,10 @@ export function ExerciseSheet({ weightKg, exercise, date, onClose }: Props) {
           undefined,
         lifts: kind === 'strength' ? lifts.filter((l) => l.name.trim()) : undefined,
         caloriesEstimated: kcalText === '',
+        // Heart-rate calories stay marked as such only while the number is the one it produced.
+        caloriesSource: hrResult && kcalText !== '' ? 'heart-rate' : undefined,
+        avgHr: hrResult?.avgHr ?? exercise?.meta.avgHr,
+        hrSamples: hrResult?.samples,
       },
       updated_at: new Date().toISOString(),
       deleted_at: null,
@@ -203,14 +235,27 @@ export function ExerciseSheet({ weightKg, exercise, date, onClose }: Props) {
             inputMode="numeric"
             value={kcalText}
             placeholder={String(estimate)}
-            onChange={(e) => setKcalText(e.target.value)}
+            onChange={(e) => {
+              setKcalText(e.target.value)
+              setHrResult(null)
+            }}
           />
           <span className="muted small" style={{ flex: 'none' }}>kcal</span>
         </div>
         <div className="hint">
-          {kcalText === '' ? `Estimated ${estimate} kcal from the activity type, intensity and your weight. ` : ''}
+          {hrResult
+            ? `From your Fitbit heart rate: average ${hrResult.avgHr} bpm over ${minutes} min, minus what you'd burn resting. `
+            : kcalText === ''
+              ? `Estimated ${estimate} kcal from the activity type, intensity and your weight. `
+              : ''}
           Type your watch's number to use it instead.
         </div>
+        {hr && exercise?.source !== 'fitbit' && (
+          <button type="button" className="btn secondary small-btn" style={{ marginTop: 6 }} disabled={hrBusy} onClick={() => void useHeartRate()}>
+            {hrBusy ? 'Reading heart rate…' : '♥ Use Fitbit heart rate'}
+          </button>
+        )}
+        {hrMessage && <div className="hint">{hrMessage}</div>}
       </div>
 
       <label className="check">
