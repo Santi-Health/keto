@@ -163,6 +163,15 @@ export function Settings({ profile, update, targets, session, sync, recovering, 
                 For losing fat while keeping muscle, 10–15% is a common range. Capped at {MAX_DEFICIT * 100}%.
               </div>
             </div>
+            <Segmented
+              label="Muscle goal (sets leucine per meal)"
+              value={profile.muscleGoal}
+              options={[
+                { value: 'maintain', label: 'Maintain (2.5 g)' },
+                { value: 'build', label: 'Build (3 g)' },
+              ]}
+              onChange={(muscleGoal) => update({ muscleGoal })}
+            />
             <NumberField
               label="Daily calorie ceiling"
               value={profile.calorieCapKcal}

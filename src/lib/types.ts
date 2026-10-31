@@ -33,6 +33,8 @@ export interface Profile {
   heightUnit: HeightUnit
   theme: Theme
   watchList: WatchSettings
+  /** Sets the leucine-per-meal target: 2.5 g to maintain muscle, 3 g to build. */
+  muscleGoal: 'maintain' | 'build'
   /** ISO timestamp of the last local edit, used to resolve sync conflicts. */
   updatedAt: string
 }
@@ -57,5 +59,6 @@ export const DEFAULT_PROFILE: Profile = {
   heightUnit: 'cm',
   theme: 'system',
   watchList: {},
+  muscleGoal: 'build',
   updatedAt: new Date(0).toISOString(),
 }

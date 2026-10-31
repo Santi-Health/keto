@@ -1,4 +1,5 @@
 import { netCarbs, type SugarAlcoholType } from './nutrition'
+import { estimateAminos } from './aminoAcids'
 import { kcalFromMacros, scaleNutrients, type Nutrients } from './nutrients'
 import { toGrams, type UnitConversion } from './units'
 import type { RecipeMeta } from './recipes'
@@ -92,7 +93,7 @@ export function completeNutrients(n: Nutrients, carbsExcludeFiber: boolean, suga
 
 /** Nutrients for a portion, including the watch-list amounts that depend on the food type. */
 export function portionNutrients(food: Food, grams: number): Nutrients {
-  const n = scaleNutrients(food.per_100g, grams)
+  const n = estimateAminos(scaleNutrients(food.per_100g, grams))
   const m = food.meta
   if (m.fishSpecies) n.mercuryUg = grams * MERCURY_PPM[m.fishSpecies].ppm
   if (m.processedMeat) n.processedMeatG = grams

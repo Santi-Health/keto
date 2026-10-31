@@ -60,6 +60,18 @@ const USDA_MAP: Partial<Record<string, keyof Nutrients>> = {
   '319': 'retinolUg',
   '262': 'caffeineMg',
   '221': 'alcohol',
+  // Amino acids (USDA Foundation and SR Legacy foods)
+  '501': 'trpG',
+  '502': 'thrG',
+  '503': 'ileG',
+  '504': 'leuG',
+  '505': 'lysG',
+  '506': 'metG',
+  '507': 'cysG',
+  '508': 'pheG',
+  '509': 'tyrG',
+  '510': 'valG',
+  '512': 'hisG',
 }
 const OMEGA3 = ['851', '629', '621', '631'] // ALA, EPA, DHA, DPA
 const OMEGA3_ALA_FALLBACK = '619' // 18:3 total, when n-3 ALA isn't split out

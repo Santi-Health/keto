@@ -816,3 +816,23 @@ input[type='date'] {
   font-weight: 600;
   overflow-wrap: anywhere;
 }
+
+/* Amino acid bars: fill to the muscle level, tick at the RDA */
+.amino-bar {
+  position: relative;
+  overflow: visible;
+}
+
+.amino-bar i {
+  position: absolute;
+  top: -3px;
+  width: 2px;
+  height: 14px;
+  background: var(--text-2);
+  border-radius: 1px;
+}
+
+.chip.ok {
+  background: var(--accent-soft);
+  color: var(--accent);
+}

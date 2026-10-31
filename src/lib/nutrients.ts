@@ -33,6 +33,20 @@ export interface Nutrients {
   sweetenerServings?: number
   ultraProcessedServings?: number
   heavyMetalServings?: number
+  // Essential amino acids, grams.
+  leuG?: number
+  ileG?: number
+  valG?: number
+  lysG?: number
+  metG?: number
+  cysG?: number
+  pheG?: number
+  tyrG?: number
+  thrG?: number
+  trpG?: number
+  hisG?: number
+  /** Protein whose amino acids were estimated from a typical profile (no data for that food). */
+  aminoEstimatedG?: number
 }
 
 export type NutrientKey = keyof Nutrients
@@ -65,6 +79,18 @@ export const NUTRIENT_INFO: Record<NutrientKey, { label: string; unit: string }>
   sweetenerServings: { label: 'Artificial sweeteners', unit: 'servings' },
   ultraProcessedServings: { label: 'Ultra-processed foods', unit: 'servings' },
   heavyMetalServings: { label: 'Lead/cadmium risk foods', unit: 'servings' },
+  leuG: { label: 'Leucine', unit: 'g' },
+  ileG: { label: 'Isoleucine', unit: 'g' },
+  valG: { label: 'Valine', unit: 'g' },
+  lysG: { label: 'Lysine', unit: 'g' },
+  metG: { label: 'Methionine', unit: 'g' },
+  cysG: { label: 'Cysteine', unit: 'g' },
+  pheG: { label: 'Phenylalanine', unit: 'g' },
+  tyrG: { label: 'Tyrosine', unit: 'g' },
+  thrG: { label: 'Threonine', unit: 'g' },
+  trpG: { label: 'Tryptophan', unit: 'g' },
+  hisG: { label: 'Histidine', unit: 'g' },
+  aminoEstimatedG: { label: 'Protein with estimated amino acids', unit: 'g' },
 }
 
 /** Nutrients that scale with portion size (everything except per-serving counts). */

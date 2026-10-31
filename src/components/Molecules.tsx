@@ -88,6 +88,37 @@ function alanine(): MoleculeDef {
   }
 }
 
+function leucine(): MoleculeDef {
+  // (CH3)2CH–CH2–CH(NH2)–COOH: the branched-chain amino acid that switches on muscle building.
+  const atoms: Atom[] = [
+    { x: 6, y: 15, el: 'C' },
+    { x: 6, y: 35, el: 'C' },
+    { x: 16, y: 25, el: 'C' },
+    { x: 28, y: 18, el: 'C' },
+    { x: 40, y: 25, el: 'C' },
+    { x: 40, y: 38, el: 'N' },
+    { x: 52, y: 18, el: 'C' },
+    { x: 52, y: 5, el: 'O' },
+    { x: 63, y: 25, el: 'O' },
+  ]
+  return {
+    name: 'Leucine (an essential amino acid)',
+    formula: 'C₆H₁₃NO₂',
+    atoms,
+    bonds: [
+      [0, 2, 1],
+      [1, 2, 1],
+      [2, 3, 1],
+      [3, 4, 1],
+      [4, 5, 1],
+      [4, 6, 1],
+      [6, 7, 2],
+      [6, 8, 1],
+    ],
+    viewBox: '0 0 70 44',
+  }
+}
+
 function fattyAcid(): MoleculeDef {
   // A saturated fatty acid tail (zigzag carbons) ending in a carboxyl head.
   const atoms: Atom[] = []
@@ -178,6 +209,7 @@ function ion(el: El, charge: string, name: string): MoleculeDef {
 export const MOLECULES = {
   glucose: glucose(),
   protein: alanine(),
+  leucine: leucine(),
   fat: fattyAcid(),
   energy: atpTail(),
   ketone: bhb(),

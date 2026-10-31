@@ -1,5 +1,6 @@
 import { useMemo } from 'react'
 import { useInstall } from '../lib/install'
+import { AminoCard } from '../components/AminoCard'
 import { InstallCard } from '../components/InstallCard'
 import { Molecule } from '../components/Molecules'
 import { Bar, Ring } from '../components/Progress'
@@ -172,6 +173,8 @@ export function Today({ profile, targets, onOpenSettings, onToggleRefeed, onNavi
             </div>
             <p className="muted small" style={{ marginBottom: 0 }}>The grayed-out buttons turn on in later phases.</p>
           </section>
+
+          <AminoCard logs={dayLogs} weightKg={profile.weightKg} goal={profile.muscleGoal} />
 
           <WatchListCard items={watch} />
 
