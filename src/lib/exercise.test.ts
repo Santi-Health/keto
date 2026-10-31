@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { daysSinceStrength, estimateExerciseKcal, trainingWarnings, type Exercise } from './exercise'
+import { DEFAULT_YOGA_ROUTINE, daysSinceStrength, estimateExerciseKcal, pace, routineDue, trainingWarnings, type Exercise } from './exercise'
 
 const ex = (overrides: Partial<Exercise>): Exercise => ({
   id: 'e',
@@ -46,5 +46,27 @@ describe('trainingWarnings', () => {
     const hard = [ex({ intensity: 'high' })]
     expect(trainingWarnings({ exercisesToday: hard, daysSinceStrength: 0, effectiveDeficit: 0.26, isRefeed: false })[0].text).toContain('26% deficit')
     expect(trainingWarnings({ exercisesToday: hard, daysSinceStrength: 0, effectiveDeficit: 0.26, isRefeed: true })).toEqual([])
+  })
+})
+
+describe('detailed estimates', () => {
+  it('uses running speed from distance and time', () => {
+    // 3 mi in 30 min = 6 mph → MET ≈ 9.75; (9.75 − 1) × 68 × 0.5 ≈ 298
+    expect(estimateExerciseKcal('cardio', 'moderate', 30, 68, { cardioType: 'running', distanceMi: 3 })).toBe(298)
+    expect(pace(3, 28.5)).toBe('9:30 /mi')
+  })
+  it('uses StairMaster and yoga style values', () => {
+    expect(estimateExerciseKcal('cardio', 'moderate', 30, 68, { cardioType: 'stairmaster' })).toBe(272)
+    expect(estimateExerciseKcal('mobility', 'moderate', 50, 68, { yogaStyle: 'flow' })).toBe(130)
+  })
+})
+
+describe('routineDue', () => {
+  it('is due on Mon/Wed/Fri until yoga is logged', () => {
+    const wed = new Date(2026, 9, 28, 9)
+    const thu = new Date(2026, 9, 29, 9)
+    expect(routineDue(DEFAULT_YOGA_ROUTINE, [], wed)).toBe(true)
+    expect(routineDue(DEFAULT_YOGA_ROUTINE, [ex({ kind: 'mobility' })], wed)).toBe(false)
+    expect(routineDue(DEFAULT_YOGA_ROUTINE, [], thu)).toBe(false)
   })
 })

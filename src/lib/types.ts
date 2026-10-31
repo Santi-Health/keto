@@ -1,3 +1,4 @@
+import { DEFAULT_YOGA_ROUTINE, type Routine } from './exercise'
 import type { WatchSettings } from './watchlist'
 
 export type Sex = 'male' | 'female' | 'unspecified'
@@ -35,6 +36,8 @@ export interface Profile {
   watchList: WatchSettings
   /** Sets the leucine-per-meal target: 2.5 g to maintain muscle, 3 g to build. */
   muscleGoal: 'maintain' | 'build'
+  /** Usual yoga days and time, for one-tap logging. Null turns the reminder off. */
+  yogaRoutine: Routine | null
   /** ISO timestamp of the last local edit, used to resolve sync conflicts. */
   updatedAt: string
 }
@@ -60,5 +63,6 @@ export const DEFAULT_PROFILE: Profile = {
   theme: 'system',
   watchList: {},
   muscleGoal: 'build',
+  yogaRoutine: DEFAULT_YOGA_ROUTINE,
   updatedAt: new Date(0).toISOString(),
 }

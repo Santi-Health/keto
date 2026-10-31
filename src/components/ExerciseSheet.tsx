@@ -1,6 +1,18 @@
 import { useState } from 'react'
 import { useData } from '../lib/data'
-import { EXERCISE_KINDS, estimateExerciseKcal, type Exercise, type ExerciseKind, type Intensity, type Lift } from '../lib/exercise'
+import {
+  CARDIO_TYPES,
+  EXERCISE_KINDS,
+  YOGA_STYLES,
+  estimateExerciseKcal,
+  pace,
+  type CardioType,
+  type Exercise,
+  type ExerciseKind,
+  type Intensity,
+  type Lift,
+  type YogaStyle,
+} from '../lib/exercise'
 import { Segmented } from './Fields'
 import { Sheet } from './Sheet'
 
@@ -25,6 +37,11 @@ function defaultStart(date?: string): Date {
 export function ExerciseSheet({ weightKg, exercise, date, onClose }: Props) {
   const { saveExercise, deleteExercise } = useData()
   const [kind, setKind] = useState<ExerciseKind>(exercise?.kind ?? 'strength')
+  const [cardioType, setCardioType] = useState<CardioType>(exercise?.meta.cardioType ?? 'stairmaster')
+  const [yogaStyle, setYogaStyle] = useState<YogaStyle>(exercise?.meta.yogaStyle ?? 'flow')
+  const [distance, setDistance] = useState(exercise?.meta.distanceMi != null ? String(exercise.meta.distanceMi) : '')
+  const [floors, setFloors] = useState(exercise?.meta.floors != null ? String(exercise.meta.floors) : '')
+  const [level, setLevel] = useState(exercise?.meta.level != null ? String(exercise.meta.level) : '')
   const [minutes, setMinutes] = useState(String(exercise?.duration_min ?? 45))
   const [intensity, setIntensity] = useState<Intensity>(exercise?.intensity ?? 'moderate')
   const [start, setStart] = useState(toLocalInput(exercise ? new Date(exercise.started_at) : defaultStart(date)))
@@ -35,7 +52,14 @@ export function ExerciseSheet({ weightKg, exercise, date, onClose }: Props) {
   const [kcalText, setKcalText] = useState(exercise && !exercise.meta.caloriesEstimated ? String(exercise.calories ?? '') : '')
 
   const mins = Number(minutes)
-  const estimate = mins > 0 ? estimateExerciseKcal(kind, intensity, mins, weightKg) : 0
+  const details = {
+    cardioType: kind === 'cardio' ? cardioType : undefined,
+    distanceMi: kind === 'cardio' && cardioType === 'running' && distance !== '' ? Number(distance) : null,
+    floors: kind === 'cardio' && cardioType === 'stairmaster' && floors !== '' ? Number(floors) : null,
+    level: kind === 'cardio' && cardioType === 'stairmaster' && level !== '' ? Number(level) : null,
+    yogaStyle: kind === 'mobility' ? yogaStyle : undefined,
+  }
+  const estimate = mins > 0 ? estimateExerciseKcal(kind, intensity, mins, weightKg, details) : 0
   const calories = kcalText !== '' ? Number(kcalText) : estimate
 
   function save() {
@@ -52,6 +76,7 @@ export function ExerciseSheet({ weightKg, exercise, date, onClose }: Props) {
       note: note.trim() || null,
       meta: {
         ...exercise?.meta,
+        ...details,
         fasted,
         lifts: kind === 'strength' ? lifts.filter((l) => l.name.trim()) : undefined,
         caloriesEstimated: kcalText === '',
@@ -70,7 +95,7 @@ export function ExerciseSheet({ weightKg, exercise, date, onClose }: Props) {
       <div className="field">
         <span className="label">Type</span>
         <div className="chips">
-          {EXERCISE_KINDS.map((k) => (
+          {EXERCISE_KINDS.filter((k) => k.shown || k.value === kind).map((k) => (
             <button
               key={k.value}
               type="button"
@@ -83,6 +108,31 @@ export function ExerciseSheet({ weightKg, exercise, date, onClose }: Props) {
           ))}
         </div>
       </div>
+
+      {kind === 'cardio' && (
+        <div className="field">
+          <span className="label">Cardio</span>
+          <div className="chips">
+            {CARDIO_TYPES.map((c) => (
+              <button key={c.value} type="button" className={`chip-btn ${cardioType === c.value ? 'on' : ''}`} aria-pressed={cardioType === c.value} onClick={() => setCardioType(c.value)}>
+                {c.emoji} {c.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+      {kind === 'mobility' && (
+        <div className="field">
+          <span className="label">Yoga style</span>
+          <div className="chips">
+            {YOGA_STYLES.map((y) => (
+              <button key={y.value} type="button" className={`chip-btn ${yogaStyle === y.value ? 'on' : ''}`} aria-pressed={yogaStyle === y.value} onClick={() => setYogaStyle(y.value)}>
+                {y.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="row">
         <div className="field">
@@ -108,6 +158,28 @@ export function ExerciseSheet({ weightKg, exercise, date, onClose }: Props) {
         ]}
         onChange={setIntensity}
       />
+
+      {kind === 'cardio' && cardioType === 'running' && (
+        <div className="field">
+          <label htmlFor="ex-dist">Distance (optional, sharpens the estimate)</label>
+          <div className="row">
+            <input id="ex-dist" type="number" inputMode="decimal" step="0.01" value={distance} onChange={(e) => setDistance(e.target.value)} />
+            <span className="muted small" style={{ flex: 'none' }}>mi{Number(distance) > 0 && mins > 0 ? ` · ${pace(Number(distance), mins)}` : ''}</span>
+          </div>
+        </div>
+      )}
+      {kind === 'cardio' && cardioType === 'stairmaster' && (
+        <div className="row">
+          <div className="field">
+            <label htmlFor="ex-level">Level (optional)</label>
+            <input id="ex-level" type="number" inputMode="numeric" value={level} onChange={(e) => setLevel(e.target.value)} />
+          </div>
+          <div className="field">
+            <label htmlFor="ex-floors">Floors (optional)</label>
+            <input id="ex-floors" type="number" inputMode="numeric" value={floors} onChange={(e) => setFloors(e.target.value)} />
+          </div>
+        </div>
+      )}
 
       <div className="field">
         <label htmlFor="ex-kcal">Active calories</label>

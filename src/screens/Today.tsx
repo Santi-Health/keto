@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { daysSinceStrength, trainingWarnings } from '../lib/exercise'
+import { daysSinceStrength, routineDue, routineSession, trainingWarnings } from '../lib/exercise'
 import { useInstall } from '../lib/install'
 import { AminoCard } from '../components/AminoCard'
 import { ExerciseSheet } from '../components/ExerciseSheet'
@@ -28,7 +28,7 @@ function useInstallOffer() {
 }
 
 export function Today({ profile, targets, onOpenSettings, onToggleRefeed, onNavigate }: Props) {
-  const { logsOn, logsWeekEnding, pending, syncError, exercises, exercisesOn } = useData()
+  const { logsOn, logsWeekEnding, pending, syncError, exercises, exercisesOn, saveExercise } = useData()
   const [logExercise, setLogExercise] = useState(false)
   const day = localDate()
   const dayLogs = logsOn(day)
@@ -189,7 +189,14 @@ export function Today({ profile, targets, onOpenSettings, onToggleRefeed, onNavi
             <p className="muted small" style={{ marginBottom: 0 }}>The grayed-out buttons turn on in later phases.</p>
           </section>
 
-          <TrainingCard today={sessionsToday} daysSinceStrength={sinceStrength} warnings={trainWarnings} onLog={() => setLogExercise(true)} />
+          <TrainingCard
+            today={sessionsToday}
+            daysSinceStrength={sinceStrength}
+            warnings={trainWarnings}
+            onLog={() => setLogExercise(true)}
+            routine={profile.yogaRoutine && routineDue(profile.yogaRoutine, sessionsToday) ? profile.yogaRoutine : null}
+            onLogRoutine={() => profile.yogaRoutine && saveExercise(routineSession(profile.yogaRoutine, profile.weightKg))}
+          />
 
           <AminoCard logs={dayLogs} weightKg={profile.weightKg} goal={profile.muscleGoal} />
 

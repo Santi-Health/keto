@@ -7,6 +7,7 @@ import { supabase } from '../lib/supabase'
 import { ACTIVITY_FACTORS, CM_PER_IN, MAX_DEFICIT, kgToLb, lbToKg, type Targets } from '../lib/targets'
 import type { ActivityLevel, Profile } from '../lib/types'
 import { WATCH_LIST, type WatchKey } from '../lib/watchlist'
+import { DEFAULT_YOGA_ROUTINE, YOGA_STYLES, type YogaStyle } from '../lib/exercise'
 
 interface Props {
   profile: Profile
@@ -199,6 +200,7 @@ export function Settings({ profile, update, targets, session, sync, recovering, 
 
         <div className="grid">
           <InstallCard />
+          <RoutineCard profile={profile} update={update} />
           <TargetMath profile={profile} targets={targets} />
           <WatchSettingsCard profile={profile} update={update} targets={targets} />
           <Account session={session} sync={sync} recovering={recovering} onPassphraseChanged={onPassphraseChanged} />
@@ -218,6 +220,60 @@ export function Settings({ profile, update, targets, session, sync, recovering, 
         </div>
       </div>
     </>
+  )
+}
+
+const DAYS = ['S', 'M', 'T', 'W', 'T', 'F', 'S']
+
+function RoutineCard({ profile, update }: Pick<Props, 'profile' | 'update'>) {
+  const r = profile.yogaRoutine
+  const set = (change: Partial<NonNullable<Profile['yogaRoutine']>>) => update({ yogaRoutine: { ...(r ?? DEFAULT_YOGA_ROUTINE), ...change } })
+  return (
+    <section className="card">
+      <h2>Yoga routine</h2>
+      <label className="check">
+        <input type="checkbox" checked={!!r} onChange={(e) => update({ yogaRoutine: e.target.checked ? DEFAULT_YOGA_ROUTINE : null })} />
+        Show a one-tap "Log usual yoga" button on these days
+      </label>
+      {r && (
+        <>
+          <div className="field">
+            <span className="label">Days</span>
+            <div className="chips">
+              {DAYS.map((d, i) => (
+                <button
+                  key={i}
+                  type="button"
+                  className={`chip-btn ${r.days.includes(i) ? 'on' : ''}`}
+                  aria-pressed={r.days.includes(i)}
+                  aria-label={['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][i]}
+                  onClick={() => set({ days: r.days.includes(i) ? r.days.filter((x) => x !== i) : [...r.days, i].sort() })}
+                >
+                  {d}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="row">
+            <div className="field">
+              <label htmlFor="yr-start">Starts</label>
+              <input id="yr-start" type="time" value={r.start} onChange={(e) => e.target.value && set({ start: e.target.value })} />
+            </div>
+            <NumberField label="Minutes" value={r.minutes} onChange={(minutes) => set({ minutes })} />
+          </div>
+          <div className="field">
+            <label htmlFor="yr-style">Style</label>
+            <select id="yr-style" value={r.yogaStyle ?? 'flow'} onChange={(e) => set({ yogaStyle: e.target.value as YogaStyle })}>
+              {YOGA_STYLES.map((y) => (
+                <option key={y.value} value={y.value}>
+                  {y.label}
+                </option>
+              ))}
+            </select>
+          </div>
+        </>
+      )}
+    </section>
   )
 }
 

@@ -5,7 +5,7 @@ import { ExerciseSheet } from '../components/ExerciseSheet'
 import { LogFoodSheet } from '../components/LogFoodSheet'
 import { RecipeBuilder } from '../components/RecipeBuilder'
 import { useData } from '../lib/data'
-import { EXERCISE_KINDS, type Exercise } from '../lib/exercise'
+import { sessionLabel, type Exercise } from '../lib/exercise'
 import { MEALS, type Food, type LogEntry, type NewFood } from '../lib/foods'
 import { addNutrients, type NutrientKey, type Nutrients } from '../lib/nutrients'
 import { localDate } from '../lib/targets'
@@ -117,12 +117,11 @@ export function Log({ weightKg, date, onDateChange, onAdd }: Props) {
             </div>
             <div className="list">
               {sessions.map((e) => {
-                const k = EXERCISE_KINDS.find((x) => x.value === e.kind)!
                 return (
                   <button key={e.id} type="button" className="list-item" onClick={() => setExerciseSheet({ exercise: e })}>
                     <span className="grow">
                       <span className="title" style={{ display: 'block' }}>
-                        {k.emoji} {k.label} · {e.duration_min} min
+                        {sessionLabel(e)} · {e.duration_min} min
                       </span>
                       <span className="sub" style={{ display: 'block' }}>
                         {new Date(e.started_at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })} · {e.intensity === 'low' ? 'easy' : e.intensity === 'high' ? 'hard' : 'moderate'}

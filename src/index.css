@@ -865,3 +865,12 @@ input[type='date'] {
   padding: 8px;
   min-height: 40px;
 }
+
+input[type='time'] {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  min-height: 44px;
+}
