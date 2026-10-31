@@ -21,6 +21,10 @@ export interface UsualFood {
   stepGrams: number
   /** Your usual portion, in steps. */
   usualSteps: number
+  /** The most to suggest adding, in steps: about one more usual portion. */
+  maxSteps: number
+  /** Your usual portion in grams; seasonings (a pinch of salt or pepper) are never suggested. */
+  usualGrams: number
   /** Meals you've eaten it at. */
   meals: Set<Meal>
   timesLogged: number
@@ -42,6 +46,26 @@ const round1 = (n: number) => Math.round(n * 10) / 10
 
 /** Units you count rather than weigh ("1 egg", "slice", "pod"); weighed units step by half an ounce. */
 const WEIGHED = new Set(['g', 'oz', 'ml', 'fl oz', 'cup', 'tbsp', 'tsp'])
+/** Below this, a food is a seasoning (a pinch of salt or pepper), not something to eat more of. */
+const SEASONING_G = 5
+
+/** Step size in your unit, small enough to fit your usual portion (1 g of pepper isn't stepped by 15 g). */
+function stepFor(unit: string, usual: number) {
+  if (!WEIGHED.has(unit)) return 1
+  if (unit === 'g' || unit === 'ml') return usual >= 30 ? 15 : usual >= 10 ? 5 : 1
+  if (unit === 'oz' || unit === 'fl oz') return 0.5
+  if (unit === 'cup') return 0.25
+  return 1
+}
+
+function usualFood(food: Food, unit: string, usual: number, meals: Set<Meal>, timesLogged: number): UsualFood | null {
+  const step = stepFor(unit, usual)
+  const stepGrams = toGrams({ unitConversions: food.unit_conversions }, step, unit).grams
+  if (!(stepGrams > 0)) return null
+  const usualSteps = Math.max(1, Math.round(usual / step))
+  // Up to one more of your usual portion: 2 eggs → up to 2 more, 6 oz → up to 6 oz more.
+  return { food, unit, step, stepGrams, usualSteps, maxSteps: usualSteps, usualGrams: usualSteps * stepGrams, meals, timesLogged }
+}
 
 /** The ingredients you eat (anything you've logged, plus starred favorites), with your usual portion. */
 export function usualFoods(foods: Food[], history: LogEntry[]): UsualFood[] {
@@ -57,19 +81,15 @@ export function usualFoods(foods: Food[], history: LogEntry[]): UsualFood[] {
     for (const l of logs) units.set(l.unit, [...(units.get(l.unit) ?? []), l.amount])
     const [unit, amounts] = [...units.entries()].sort((a, b) => b[1].length - a[1].length)[0]
     const usual = [...amounts].sort((a, b) => a - b)[Math.floor(amounts.length / 2)]
-    const weighed = WEIGHED.has(unit)
-    const step = weighed ? (unit === 'g' ? 15 : unit === 'oz' || unit === 'fl oz' ? 0.5 : unit === 'cup' ? 0.25 : 1) : 1
-    const stepGrams = toGrams({ unitConversions: food.unit_conversions }, step, unit).grams
-    if (!(stepGrams > 0)) continue
-    out.push({ food, unit, step, stepGrams, usualSteps: Math.max(1, Math.round(usual / step)), meals: new Set(logs.map((l) => l.meal)), timesLogged: logs.length })
+    const u = usualFood(food, unit, usual, new Set(logs.map((l) => l.meal)), logs.length)
+    if (u) out.push(u)
   }
   // Starred favorites you haven't logged yet, in their first portion size.
   for (const food of foods) {
     if (!food.favorite || food.deleted_at || groups.has(food.id) || food.source === 'recipe' || isRestaurant(food) || isDrink(food)) continue
     const unit = food.meta.lastUnit ?? food.unit_conversions[0]?.unit ?? 'g'
-    const step = WEIGHED.has(unit) ? (unit === 'g' ? 15 : 0.5) : 1
-    const stepGrams = toGrams({ unitConversions: food.unit_conversions }, step, unit).grams
-    if (stepGrams > 0) out.push({ food, unit, step, stepGrams, usualSteps: Math.max(1, Math.round((food.meta.lastAmount ?? step) / step)), meals: new Set(food.meta.meals ?? []), timesLogged: 0 })
+    const u = usualFood(food, unit, food.meta.lastAmount ?? (unit === 'g' ? 30 : 1), new Set(food.meta.meals ?? []), 0)
+    if (u) out.push(u)
   }
   return out
 }
@@ -83,7 +103,7 @@ const MAX_ADD_KCAL = 200
 
 /**
  * The cheapest (in calories, with net carbs counting extra) addition from your usual foods that covers
- * `need` of a nutrient, within twice your usual portion (at least 3) and about 200 kcal. Prefers foods
+ * `need` of a nutrient, within one more of your usual portion and about 200 kcal (never seasonings). Prefers foods
  * you eat at `meal`. When nothing covers all of it, the best one that covers at least half (`partial`).
  */
 function bestAddition(usual: UsualFood[], key: keyof Nutrients, need: number, meal?: Meal) {
@@ -91,11 +111,11 @@ function bestAddition(usual: UsualFood[], key: keyof Nutrients, need: number, me
   let best: Pick | null = null
   let bestPartial: Pick | null = null
   for (const u of usual) {
+    if (u.usualGrams < SEASONING_G) continue
     const one = per(u, 1)[key] ?? 0
     if (one <= 0) continue
-    const maxSteps = Math.max(3, u.usualSteps * 2)
     const full = Math.ceil(need / one - 1e-9)
-    const steps = Math.min(full, maxSteps)
+    const steps = Math.min(full, u.maxSteps)
     const n = per(u, steps)
     const kcal = n.kcal ?? 0
     if (kcal > MAX_ADD_KCAL && full > 1) continue
