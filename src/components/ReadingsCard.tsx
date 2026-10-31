@@ -4,11 +4,9 @@ import { useData } from '../lib/data'
 import { KG_PER_LB, URINE_LEVELS, gkiBand, gkiFor, hoursSinceFood, ketoneBand, latest, weightTrend, type ReadingKind } from '../lib/readings'
 import { localDate } from '../lib/targets'
 import type { WeightUnit } from '../lib/types'
-import { Bar } from './Progress'
 
 interface Props {
   weightUnit: WeightUnit
-  waterTargetOz: number
   onAdd: (kind?: ReadingKind) => void
 }
 
@@ -34,8 +32,8 @@ function useNow() {
   return now
 }
 
-export function ReadingsCard({ weightUnit, waterTargetOz, onAdd }: Props) {
-  const { readings, readingsOn, saveReading, deleteReading, logs, cgmDays } = useData()
+export function ReadingsCard({ weightUnit, onAdd }: Props) {
+  const { readings, logs, cgmDays } = useData()
   const now = useNow()
   const fastH = hoursSinceFood(logs, now)
   const ketone = latest(readings, 'blood_ketone')
@@ -47,31 +45,12 @@ export function ReadingsCard({ weightUnit, waterTargetOz, onAdd }: Props) {
   const gki = ketone ? gkiFor(ketone, readings, cgm) : null
   const trend = weightTrend(readings)
   const toUnit = (kg: number) => (weightUnit === 'lb' ? kg / KG_PER_LB : kg)
-  const water = readingsOn(localDate()).filter((r) => r.kind === 'water')
-  const waterOz = water.reduce((s, r) => s + (r.value ?? 0), 0)
   const labs = useMemo(() => {
     const byTest = new Map<string, (typeof readings)[number]>()
     for (const r of readings.filter((r) => r.kind === 'lab').sort((a, b) => b.taken_at.localeCompare(a.taken_at)))
       if (r.meta.test && !byTest.has(r.meta.test)) byTest.set(r.meta.test, r)
     return [...byTest.values()].slice(0, 4)
   }, [readings])
-
-  function addWater(oz: number) {
-    saveReading({
-      id: crypto.randomUUID(),
-      taken_at: new Date().toISOString(),
-      kind: 'water',
-      value: oz,
-      urine_level: null,
-      context: 'other',
-      note: null,
-      predicted_value: null,
-      unit: 'oz',
-      meta: {},
-      updated_at: new Date().toISOString(),
-      deleted_at: null,
-    })
-  }
 
   return (
     <section className="card">
@@ -126,19 +105,6 @@ export function ReadingsCard({ weightUnit, waterTargetOz, onAdd }: Props) {
         </p>
       )}
 
-      <div style={{ marginTop: 12 }}>
-        <Bar label="Water" value={waterOz / 8} target={Math.round((waterTargetOz / 8) * 10) / 10} unit="cups" color="var(--water)" />
-        <div className="row" style={{ gap: 8 }}>
-          <button type="button" className="btn secondary small-btn" onClick={() => addWater(8)}>
-            + 1 cup (8 oz)
-          </button>
-          {water.length > 0 && (
-            <button type="button" className="btn secondary small-btn" onClick={() => deleteReading(water[water.length - 1].id)}>
-              Undo
-            </button>
-          )}
-        </div>
-      </div>
     </section>
   )
 }

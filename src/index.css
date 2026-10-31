@@ -1147,3 +1147,61 @@ input[type='time'] {
 .header-actions.three .btn {
   padding: 10px 6px;
 }
+
+/* Drinks card */
+.drink-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  gap: 8px;
+}
+
+.drink-btn {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  padding: 10px 4px 8px;
+  font: inherit;
+  color: var(--text);
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  cursor: pointer;
+}
+
+.drink-btn:active {
+  background: var(--surface-2);
+}
+
+.drink-dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+}
+
+.drink-name {
+  font-size: 0.85rem;
+  font-weight: 600;
+  line-height: 1.15;
+  text-align: center;
+}
+
+.drink-serving {
+  font-size: 0.7rem;
+  color: var(--text-2);
+}
+
+.drink-count {
+  position: absolute;
+  top: 4px;
+  right: 6px;
+  min-width: 18px;
+  padding: 0 5px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  line-height: 18px;
+  color: #fff;
+  background: var(--water);
+  border-radius: 9px;
+}

@@ -4,6 +4,7 @@ import { getGoogleToken, learnTypes, listExercises, mergeImported, toAppExercise
 import { useInstall } from '../lib/install'
 import { STATUS_TEXT, estimateKetosis, tomorrowMorning } from '../lib/ketosis'
 import { AminoCard } from '../components/AminoCard'
+import { DrinksCard } from '../components/DrinksCard'
 import { ExerciseSheet } from '../components/ExerciseSheet'
 import { TrainingCard } from '../components/TrainingCard'
 import { InstallCard } from '../components/InstallCard'
@@ -234,7 +235,9 @@ export function Today({ profile, targets, onOpenSettings, onToggleRefeed, onNavi
             <p className="muted small" style={{ marginBottom: 0 }}>The grayed-out buttons turn on in later phases.</p>
           </section>
 
-          <ReadingsCard weightUnit={profile.weightUnit} waterTargetOz={profile.waterOz} onAdd={(kind) => setReadingSheet({ kind })} />
+          <DrinksCard waterTargetOz={profile.waterOz} />
+
+          <ReadingsCard weightUnit={profile.weightUnit} onAdd={(kind) => setReadingSheet({ kind })} />
 
           <TrainingCard
             today={sessionsToday}

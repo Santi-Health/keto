@@ -15,6 +15,8 @@ export interface ReadingMeta {
   bodyFatPct?: number | null
   /** Lab readings: test name, e.g. HbA1c. */
   test?: string
+  /** Water readings: which drink, e.g. sparkling_water. */
+  drink?: string
   /** Ketosis estimate range at the time, kept for learning. */
   predictedLow?: number
   predictedHigh?: number
