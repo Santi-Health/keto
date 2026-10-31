@@ -1,0 +1,328 @@
+import { useState } from 'react'
+import type { Session } from '@supabase/supabase-js'
+import { NumberField, Segmented } from '../components/Fields'
+import type { SyncState } from '../lib/profileStore'
+import { supabase } from '../lib/supabase'
+import { ACTIVITY_FACTORS, CM_PER_IN, MAX_DEFICIT, kgToLb, lbToKg, type Targets } from '../lib/targets'
+import type { ActivityLevel, Profile } from '../lib/types'
+
+interface Props {
+  profile: Profile
+  update: (changes: Partial<Profile>) => void
+  targets: Targets
+  session: Session | null
+  sync: SyncState
+  recovering: boolean
+  onPassphraseChanged: () => void
+}
+
+const round1 = (n: number) => Math.round(n * 10) / 10
+
+export function Settings({ profile, update, targets, session, sync, recovering, onPassphraseChanged }: Props) {
+  const weightDisplay = profile.weightUnit === 'lb' ? round1(kgToLb(profile.weightKg)) : round1(profile.weightKg)
+  const totalIn = profile.heightCm != null ? profile.heightCm / CM_PER_IN : null
+
+  return (
+    <>
+      <header className="page-header">
+        <h1>Settings</h1>
+      </header>
+
+      <div className="grid two">
+        <div className="grid">
+          <section className="card">
+            <h2>About you</h2>
+            <div className="field">
+              <label htmlFor="birth">Birth date</label>
+              <input
+                id="birth"
+                type="date"
+                value={profile.birthDate}
+                onChange={(e) => e.target.value && update({ birthDate: e.target.value })}
+              />
+              <div className="hint">Age {targets.age}</div>
+            </div>
+
+            <Segmented
+              label="Sex (for the calorie formula)"
+              value={profile.sex}
+              options={[
+                { value: 'male', label: 'Male' },
+                { value: 'female', label: 'Female' },
+                { value: 'unspecified', label: 'Prefer not to say' },
+              ]}
+              onChange={(sex) => update({ sex })}
+            />
+
+            <Segmented
+              label="Height unit"
+              value={profile.heightUnit}
+              options={[
+                { value: 'cm', label: 'cm' },
+                { value: 'ftin', label: 'ft / in' },
+              ]}
+              onChange={(heightUnit) => update({ heightUnit })}
+            />
+            {profile.heightUnit === 'cm' ? (
+              <NumberField
+                label="Height"
+                value={profile.heightCm != null ? round1(profile.heightCm) : null}
+                suffix="cm"
+                min={100}
+                max={230}
+                onChange={(heightCm) => update({ heightCm })}
+              />
+            ) : (
+              <div className="row">
+                <NumberField
+                  label="Height (feet)"
+                  value={totalIn != null ? Math.floor(totalIn / 12) : null}
+                  suffix="ft"
+                  onChange={(ft) => update({ heightCm: (ft * 12 + (totalIn != null ? totalIn % 12 : 0)) * CM_PER_IN })}
+                />
+                <NumberField
+                  label="Inches"
+                  value={totalIn != null ? round1(totalIn % 12) : null}
+                  suffix="in"
+                  onChange={(inch) =>
+                    update({ heightCm: ((totalIn != null ? Math.floor(totalIn / 12) : 5) * 12 + inch) * CM_PER_IN })
+                  }
+                />
+              </div>
+            )}
+
+            <Segmented
+              label="Weight unit"
+              value={profile.weightUnit}
+              options={[
+                { value: 'lb', label: 'lb' },
+                { value: 'kg', label: 'kg' },
+              ]}
+              onChange={(weightUnit) => update({ weightUnit })}
+            />
+            <NumberField
+              label="Current weight"
+              value={weightDisplay}
+              suffix={profile.weightUnit}
+              step={0.1}
+              hint="A weight log with trends comes in phase 5; it will keep this updated."
+              onChange={(w) => update({ weightKg: profile.weightUnit === 'lb' ? lbToKg(w) : w })}
+            />
+
+            <div className="field">
+              <label htmlFor="activity">Activity level</label>
+              <select
+                id="activity"
+                value={profile.activityLevel}
+                onChange={(e) => update({ activityLevel: e.target.value as ActivityLevel })}
+              >
+                {Object.entries(ACTIVITY_FACTORS).map(([key, { label }]) => (
+                  <option key={key} value={key}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+              <div className="hint">Only used until Fitbit is connected. Then your real daily burn is used.</div>
+            </div>
+          </section>
+
+          <section className="card">
+            <h2>Targets</h2>
+            <NumberField
+              label="Net carb limit"
+              value={profile.netCarbLimitG}
+              suffix="g / day"
+              min={5}
+              max={100}
+              hint="Starting value. After ~2 weeks of blood ketone readings the app will recommend a personal limit."
+              onChange={(netCarbLimitG) => update({ netCarbLimitG })}
+            />
+            <NumberField
+              label="Protein per pound of body weight"
+              value={profile.proteinPerLb}
+              suffix="g / lb"
+              step={0.05}
+              min={0.5}
+              max={1.5}
+              onChange={(proteinPerLb) => update({ proteinPerLb })}
+            />
+            <div className="field">
+              <label htmlFor="deficit">Calorie deficit: {Math.round(profile.deficitPct * 100)}%</label>
+              <input
+                id="deficit"
+                type="range"
+                min={0}
+                max={MAX_DEFICIT}
+                step={0.01}
+                value={profile.deficitPct}
+                onChange={(e) => update({ deficitPct: Number(e.target.value) })}
+              />
+              <div className="hint">
+                For losing fat while keeping muscle, 10–15% is a common range. Capped at {MAX_DEFICIT * 100}%.
+              </div>
+            </div>
+            <div className="row">
+              <NumberField label="Sodium" value={profile.sodiumMg} suffix="mg" step={100} onChange={(sodiumMg) => update({ sodiumMg })} />
+              <NumberField label="Potassium" value={profile.potassiumMg} suffix="mg" step={100} onChange={(potassiumMg) => update({ potassiumMg })} />
+            </div>
+            <div className="row">
+              <NumberField label="Magnesium" value={profile.magnesiumMg} suffix="mg" step={10} onChange={(magnesiumMg) => update({ magnesiumMg })} />
+              <NumberField label="Fiber" value={profile.fiberG} suffix="g" onChange={(fiberG) => update({ fiberG })} />
+            </div>
+            <NumberField label="Water" value={profile.waterOz} suffix="oz / day" onChange={(waterOz) => update({ waterOz })} />
+            <p className="muted small" style={{ margin: 0 }}>
+              Electrolyte defaults follow common keto guidance (sodium 3,000–5,000 mg, potassium 3,500–4,700 mg, magnesium
+              300–500 mg). This is general guidance, not medical advice.
+            </p>
+          </section>
+        </div>
+
+        <div className="grid">
+          <TargetMath profile={profile} targets={targets} />
+          <Account session={session} sync={sync} recovering={recovering} onPassphraseChanged={onPassphraseChanged} />
+          <section className="card">
+            <h2>Appearance</h2>
+            <Segmented
+              label="Theme"
+              value={profile.theme}
+              options={[
+                { value: 'system', label: 'System' },
+                { value: 'light', label: 'Light' },
+                { value: 'dark', label: 'Dark' },
+              ]}
+              onChange={(theme) => update({ theme })}
+            />
+          </section>
+        </div>
+      </div>
+    </>
+  )
+}
+
+function TargetMath({ profile, targets }: { profile: Profile; targets: Targets }) {
+  const fmt = (n: number | null, unit = '') => (n == null ? '—' : `${n.toLocaleString()}${unit}`)
+  return (
+    <section className="card">
+      <h2>How your targets are calculated</h2>
+      <table className="calc">
+        <tbody>
+          <tr>
+            <td>Resting burn (Mifflin-St Jeor)</td>
+            <td>{fmt(targets.bmr, ' kcal')}</td>
+          </tr>
+          <tr>
+            <td>× activity factor {ACTIVITY_FACTORS[profile.activityLevel].factor}</td>
+            <td>{fmt(targets.estimatedBurn, ' kcal')}</td>
+          </tr>
+          <tr>
+            <td>
+              − {Math.round(profile.deficitPct * 100)}% deficit = calorie target
+              {targets.burnSource === 'fitbit' && <div className="muted small">using Fitbit burn {fmt(targets.burn)}</div>}
+            </td>
+            <td>{fmt(targets.calories, ' kcal')}</td>
+          </tr>
+          <tr>
+            <td>Protein: {round1(kgToLb(profile.weightKg))} lb × {profile.proteinPerLb} g</td>
+            <td>{targets.proteinG} g</td>
+          </tr>
+          <tr>
+            <td>Net carbs (limit)</td>
+            <td>{targets.netCarbsG} g</td>
+          </tr>
+          <tr>
+            <td>Fat: remaining calories ÷ 9</td>
+            <td>{fmt(targets.fatG, ' g')}</td>
+          </tr>
+        </tbody>
+      </table>
+      {targets.warnings.length > 0 && (
+        <p className="notice" style={{ marginBottom: 0 }}>
+          {targets.warnings.join(' ')}
+        </p>
+      )}
+    </section>
+  )
+}
+
+const SYNC_LABEL: Record<SyncState, { text: string; tone: '' | 'ok' | 'warn' }> = {
+  'local-only': { text: 'This device only', tone: 'warn' },
+  'signed-out': { text: 'Not signed in', tone: 'warn' },
+  syncing: { text: 'Syncing…', tone: '' },
+  synced: { text: 'Synced', tone: 'ok' },
+  offline: { text: 'Offline, will sync later', tone: 'warn' },
+  error: { text: 'Sync error', tone: 'warn' },
+}
+
+function Account({ session, sync, recovering, onPassphraseChanged }: AccountProps) {
+  const [passphrase, setPassphrase] = useState('')
+  const [status, setStatus] = useState<string | null>(null)
+  const label = SYNC_LABEL[sync]
+
+  async function changePassphrase(e: React.FormEvent) {
+    e.preventDefault()
+    if (!supabase) return
+    if (passphrase.length < 10) {
+      setStatus('Use at least 10 characters. A few random words works well.')
+      return
+    }
+    setStatus('Saving…')
+    const { error } = await supabase.auth.updateUser({ password: passphrase })
+    if (error) {
+      setStatus(`Couldn't change it: ${error.message}`)
+    } else {
+      setPassphrase('')
+      setStatus('Passphrase changed.')
+      onPassphraseChanged()
+    }
+  }
+
+  return (
+    <section className="card" id="account">
+      <div className="page-header" style={{ marginBottom: 12 }}>
+        <h2>Account &amp; sync</h2>
+        <span className={`badge ${label.tone}`}>{label.text}</span>
+      </div>
+      {!supabase || !session ? (
+        <p className="muted small" style={{ margin: 0 }}>
+          Cloud sync isn't set up yet, so data is saved on this device only. Follow the Supabase steps in the README to
+          turn it on.
+        </p>
+      ) : (
+        <>
+          <p className="small" style={{ marginTop: 0 }}>
+            Signed in as <strong>{session.user.email}</strong>
+          </p>
+          <form onSubmit={changePassphrase}>
+            {recovering && <p className="notice">Choose a new passphrase to finish resetting it.</p>}
+            <div className="field">
+              <label htmlFor="new-pass">{recovering ? 'New passphrase' : 'Change passphrase'}</label>
+              <input
+                id="new-pass"
+                type="password"
+                autoComplete="new-password"
+                value={passphrase}
+                onChange={(e) => setPassphrase(e.target.value)}
+              />
+            </div>
+            <div className="row" style={{ flexWrap: 'wrap' }}>
+              <button type="submit" className="btn">
+                Save passphrase
+              </button>
+              <button type="button" className="btn secondary" onClick={() => supabase!.auth.signOut()}>
+                Sign out
+              </button>
+            </div>
+            {status && <p className="small" role="status">{status}</p>}
+          </form>
+        </>
+      )}
+    </section>
+  )
+}
+
+interface AccountProps {
+  session: Session | null
+  sync: SyncState
+  recovering: boolean
+  onPassphraseChanged: () => void
+}
