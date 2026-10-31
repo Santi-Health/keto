@@ -79,8 +79,13 @@ export function DrinksCard({ days, waterTargetOz }: Props) {
   const findOrSave = (template: ReturnType<typeof drinkFood>): Food => {
     const found = foods.find((f) => f.meta.externalId === template.meta.externalId)
     if (!found) return saveFood(template)
-    if (JSON.stringify(found.per_100g) === JSON.stringify(template.per_100g) && JSON.stringify(found.fields_estimated) === JSON.stringify(template.fields_estimated)) return found
-    const refreshed: Food = { ...found, per_100g: template.per_100g, fields_estimated: template.fields_estimated, confidence: template.confidence }
+    if (
+      found.name === template.name &&
+      JSON.stringify(found.per_100g) === JSON.stringify(template.per_100g) &&
+      JSON.stringify(found.fields_estimated) === JSON.stringify(template.fields_estimated)
+    )
+      return found
+    const refreshed: Food = { ...found, name: template.name, per_100g: template.per_100g, fields_estimated: template.fields_estimated, confidence: template.confidence }
     saveFood(refreshed)
     return refreshed
   }

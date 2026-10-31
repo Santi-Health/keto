@@ -126,7 +126,7 @@ const ALL: Drink[] = [
   },
   {
     key: 'kazar',
-    label: 'Kazar',
+    label: 'Kazaar',
     serving: 'Nespresso pod',
     oz: 1.4,
     hydration: false,
