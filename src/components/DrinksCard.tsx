@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useData } from '../lib/data'
-import { ALL_DRINKS, DRINKS, MILKS, asksForMilk, drinkFood, drinkPortion, milkFood, type Drink, type DrinkKey, type MilkKey } from '../lib/drinks'
+import { ALL_DRINKS, CAFFEINE_FREE_MG, DRINKS, MILKS, asksForMilk, drinkFood, drinkPortion, hydration, milkFood, type Drink, type DrinkKey, type MilkKey } from '../lib/drinks'
 import { portionNutrients, type Food } from '../lib/foods'
 import { mealForTime } from '../lib/foods'
 import { localDate } from '../lib/targets'
@@ -17,7 +17,7 @@ interface Props {
 
 type Undo = { kind: 'reading' | 'log'; ids: string[]; label: string }
 
-/** One tap per drink. Water and sparkling water fill the water goal; the rest log caffeine, sodium and sweeteners. */
+/** One tap per drink. Every drink fills the water goal by volume; sodas, coffee and tea also log caffeine, sodium and sweeteners. */
 export function DrinksCard({ days, waterTargetOz }: Props) {
   const { readingsOn, saveReading, deleteReading, logsOn, deleteLog, foods, foodById, saveFood, logFood } = useData()
   const [undo, setUndo] = useState<Undo | null>(null)
@@ -25,7 +25,17 @@ export function DrinksCard({ days, waterTargetOz }: Props) {
   const isToday = days.length === 1 && days[0] === localDate()
   const water = days.flatMap((d) => readingsOn(d)).filter((r) => r.kind === 'water')
   const waterOz = water.reduce((s, r) => s + (r.value ?? 0), 0) / days.length
-  const drinkLogs = days.flatMap((d) => logsOn(d)).filter((l) => l.food_id && foodById[l.food_id]?.meta.externalId?.startsWith('drink:'))
+  const isDrinkLog = (l: { food_id: string | null }) => !!l.food_id && !!foodById[l.food_id]?.meta.externalId?.startsWith('drink:')
+  const drinkLogs = days.flatMap((d) => logsOn(d)).filter(isDrinkLog)
+  // Fluid per day (caffeine is judged per day), averaged over the week.
+  const perDay = days.map((d) =>
+    hydration(
+      readingsOn(d).filter((r) => r.kind === 'water').reduce((s, r) => s + (r.value ?? 0), 0),
+      logsOn(d).filter(isDrinkLog).map((l) => ({ grams: l.grams, caffeineMg: l.nutrients.caffeineMg })),
+    ),
+  )
+  const avg = (get: (h: (typeof perDay)[number]) => number) => perDay.reduce((s, h) => s + get(h), 0) / days.length
+  const fluid = { total: avg((h) => h.totalOz), drinks: avg((h) => h.drinksOz), loss: avg((h) => h.caffeineLossOz) }
 
   const counts: Partial<Record<DrinkKey, number>> = {}
   for (const r of water) {
@@ -109,7 +119,15 @@ export function DrinksCard({ days, waterTargetOz }: Props) {
   return (
     <section className="card">
       <h2>Drinks{days.length > 1 ? ' (7-day totals)' : ''}</h2>
-      <Bar label={days.length > 1 ? 'Water, daily average' : 'Water'} value={waterOz / 8} target={Math.round((waterTargetOz / 8) * 10) / 10} unit="cups" color="var(--water)" />
+      <Bar label={days.length > 1 ? 'Fluids, daily average' : 'Fluids'} value={Math.round((fluid.total / 8) * 10) / 10} target={Math.round((waterTargetOz / 8) * 10) / 10} unit="cups" color="var(--water)" />
+      {fluid.drinks > 0 && (
+        <p className="muted small" style={{ margin: '0 0 4px' }}>
+          {Math.round((waterOz / 8) * 10) / 10} cups water + {Math.round((fluid.drinks / 8) * 10) / 10} from other drinks
+          {fluid.loss > 0.05
+            ? ` − ${Math.round((fluid.loss / 8) * 10) / 10} for caffeine over ${CAFFEINE_FREE_MG} mg.`
+            : '. Coffee, tea and sodas hydrate like water at your caffeine level.'}
+        </p>
+      )}
       {(tally.length > 0 || counts.sparkling_water) && (
         <p className="muted small" style={{ margin: '0 0 8px' }}>
           {counts.sparkling_water ? `${counts.sparkling_water} cup${counts.sparkling_water > 1 ? 's' : ''} sparkling in the water total. ` : ''}

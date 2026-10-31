@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { DRINKS, MILKS, drinkByKey, drinkFood, drinkPortion, milkFood } from './drinks'
+import { DRINKS, MILKS, drinkByKey, drinkFood, drinkPortion, hydration, milkFood } from './drinks'
 import { portionNutrients, type Food } from './foods'
 
 const asFood = (f: ReturnType<typeof drinkFood>): Food => ({ ...f, id: 'x', favorite: false, use_count: 0, last_used_at: null, updated_at: '', deleted_at: null })
@@ -64,5 +64,22 @@ describe('button order and Kazaar', () => {
     expect(asksForMilk(k)).toBe(true)
     const n = portionNutrients({ ...drinkFood(k), id: 'k', favorite: false, use_count: 0, last_used_at: null, updated_at: '', deleted_at: null }, 40)
     expect(n.caffeineMg).toBeCloseTo(120, 0)
+  })
+})
+
+describe('hydration', () => {
+  it('counts every drink by volume, with no caffeine penalty up to 400 mg', () => {
+    // 4 cups water + a 12 oz can of Coke Zero (34 mg caffeine) + a double espresso (128 mg).
+    const h = hydration(32, [{ grams: 355, caffeineMg: 34 }, { grams: 60, caffeineMg: 128 }])
+    expect(h.drinksOz).toBeCloseTo(14, 0)
+    expect(h.caffeineLossOz).toBe(0)
+    expect(h.totalOz).toBeCloseTo(46, 0)
+  })
+
+  it('takes a little off for caffeine above 400 mg', () => {
+    // 600 mg: 200 mg over × 0.36 mL ≈ 72 mL ≈ 2.4 oz.
+    const h = hydration(0, [{ grams: 296, caffeineMg: 600 }])
+    expect(h.caffeineLossOz).toBeCloseTo(2.4, 1)
+    expect(h.totalOz).toBeCloseTo(10 - 2.4, 1)
   })
 })

@@ -254,3 +254,30 @@ export function milkFood(m: Milk): NewFood {
     meta: { externalId: `drink:milk_${m.key}`, sweeteners: m.sweeteners ?? [], meals: [] },
   }
 }
+
+/**
+ * Caffeine's mild diuretic effect only matters at high doses: below ~400 mg a day, coffee, tea and
+ * caffeinated sodas hydrate about as well as water (Killer 2014; Maughan 2016 beverage hydration index).
+ * Above that, about 0.36 mL extra urine per mg (Zhang 2015 meta-analysis: ~109 mL for 300 mg).
+ */
+export const CAFFEINE_FREE_MG = 400
+const LOSS_ML_PER_MG = 0.36
+
+export interface Hydration {
+  /** Plain and sparkling water. */
+  waterOz: number
+  /** Everything else you drank: sodas, coffee, tea, milk. */
+  drinksOz: number
+  caffeineMg: number
+  /** Fluid taken off for caffeine above 400 mg. */
+  caffeineLossOz: number
+  totalOz: number
+}
+
+/** Fluid for the day: water readings plus logged drinks (by volume), less a small caffeine adjustment over 400 mg. */
+export function hydration(waterOz: number, drinks: { grams: number; caffeineMg?: number }[]): Hydration {
+  const drinksOz = drinks.reduce((s, d) => s + d.grams, 0) / FL_OZ_G
+  const caffeineMg = drinks.reduce((s, d) => s + (d.caffeineMg ?? 0), 0)
+  const caffeineLossOz = (Math.max(0, caffeineMg - CAFFEINE_FREE_MG) * LOSS_ML_PER_MG) / FL_OZ_G
+  return { waterOz, drinksOz, caffeineMg, caffeineLossOz, totalOz: Math.max(0, waterOz + drinksOz - caffeineLossOz) }
+}
