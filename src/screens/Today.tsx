@@ -7,6 +7,7 @@ import { STATUS_TEXT, estimateKetosis, tomorrowMorning } from '../lib/ketosis'
 import { AminoCard } from '../components/AminoCard'
 import { ActivityCard } from '../components/ActivityCard'
 import { RelinkBanner } from '../components/BackgroundSyncCard'
+import { SuggestionsCard } from '../components/SuggestionsCard'
 import { useOpenSyncState } from '../lib/backgroundSync'
 import { deviceTz, travelDay, zoneLabel } from '../lib/time'
 import { DrinksCard } from '../components/DrinksCard'
@@ -378,6 +379,8 @@ export function Today({ profile, targets, onOpenSettings, onToggleRefeed, onNavi
               </button>
             )}
           </section>
+
+          {!isWeek && <SuggestionsCard dayLogs={dayLogs} targets={targets} muscleGoal={profile.muscleGoal} fatBudget={fatBudget} past={!isToday} />}
 
           <section className="card">
             <h2>Electrolytes &amp; fiber</h2>
