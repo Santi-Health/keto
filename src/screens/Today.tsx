@@ -63,6 +63,11 @@ export function Today({ targets, onOpenSettings, onToggleRefeed }: Props) {
                       ? `Calories based on an estimated ${targets.burn.toLocaleString()} kcal burn. Fitbit will replace this in phase 6.`
                       : 'Add your height in Settings to get a calorie target.'}
             </p>
+            {targets.muscleWarning && (
+              <p className="notice" role="status">
+                <strong>Muscle check:</strong> {targets.muscleWarning}
+              </p>
+            )}
             <button type="button" className={`btn ${targets.isRefeed ? '' : 'secondary'}`} onClick={onToggleRefeed} aria-pressed={targets.isRefeed}>
               {targets.isRefeed ? 'Refeed day ✓ (tap to undo)' : 'Make today a refeed day'}
             </button>

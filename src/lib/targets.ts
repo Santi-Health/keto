@@ -54,6 +54,10 @@ export interface Targets {
   /** True when the calorie ceiling lowered today's target. */
   capped: boolean
   isRefeed: boolean
+  /** Deficit implied by the calorie target vs. burn (0–1), null when unknown. */
+  effectiveDeficit: number | null
+  /** Set when the deficit is big enough to risk losing muscle. */
+  muscleWarning: string | null
   proteinG: number
   netCarbsG: number
   /** Null when calories can't be computed. */
@@ -102,6 +106,14 @@ export function computeTargets(
     calories = cap
     capped = true
   }
+  const effectiveDeficit = burn != null && calories != null ? Math.max(0, 1 - calories / burn) : null
+  const muscleWarning =
+    effectiveDeficit != null && effectiveDeficit > MAX_DEFICIT
+      ? `Today's target is a ${Math.round(effectiveDeficit * 100)}% deficit (${Math.round(burn! - calories!).toLocaleString()} kcal under your burn). ` +
+        `Above ~${MAX_DEFICIT * 100}% raises the risk of losing muscle: keep protein at target, keep strength training, ` +
+        `and plan a refeed after a few days like this.`
+      : null
+
   const proteinG = kgToLb(profile.weightKg) * profile.proteinPerLb
   const netCarbsG = profile.netCarbLimitG
   const fatG = calories != null ? Math.max(0, (calories - proteinG * 4 - netCarbsG * 4) / 9) : null
@@ -115,6 +127,8 @@ export function computeTargets(
     calories: calories != null ? Math.round(calories) : null,
     capped,
     isRefeed,
+    effectiveDeficit: effectiveDeficit != null ? Math.round(effectiveDeficit * 1000) / 1000 : null,
+    muscleWarning,
     proteinG: Math.round(proteinG),
     netCarbsG,
     fatG: fatG != null ? Math.round(fatG) : null,

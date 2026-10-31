@@ -10,7 +10,7 @@ The full feature spec is in `../keto-tracker-build-prompt.md`. This repo is bein
 | 2 | Food logging: search, barcode scan, units, My Foods, live Today totals, watch list (sat fat, trans fat, mercury, processed meat…) | Next |
 | 3 | JSON import + "copy prompt for Claude chat" (no API), then AI label photos | |
 | 4 | Saved meals + recipe builder | |
-| 5 | Readings (glucose, ketones, urine), GKI, weight, labs, exercise, fasting timer, water | |
+| 5 | Readings (glucose, ketones, urine), GKI, weight, labs, exercise, fasting timer, water, muscle guard (deficit, protein, lifting, weight-loss rate) | |
 | 6 | Fitbit integration | |
 | 7 | Ketosis engine (prediction + personal learning + carb-limit recommendation) | |
 | 8 | Trends, export, doctor summary, polish | |

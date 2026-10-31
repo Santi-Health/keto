@@ -61,6 +61,19 @@ describe('computeTargets', () => {
     expect(t.fatG).toBe(144)
   })
 
+  it('warns about muscle loss when the ceiling forces a deficit over 20%', () => {
+    const t = computeTargets(profile({ heightCm: 175, calorieCapKcal: 2000 }), oct30, 3000)
+    expect(t.effectiveDeficit).toBeCloseTo(0.333, 3)
+    expect(t.muscleWarning).toContain('33% deficit')
+  })
+
+  it('does not warn on a moderate deficit or a refeed day', () => {
+    expect(computeTargets(profile({ heightCm: 175, calorieCapKcal: 2500, deficitPct: 0.12 }), oct30, 2700).muscleWarning).toBeNull()
+    expect(
+      computeTargets(profile({ heightCm: 175, calorieCapKcal: 2000, refeedDate: '2026-10-30' }), oct30, 3000).muscleWarning,
+    ).toBeNull()
+  })
+
   it('applies the ceiling even without height', () => {
     const t = computeTargets(profile({ heightCm: null, calorieCapKcal: 2000 }), oct30)
     expect(t.calories).toBe(2000)
