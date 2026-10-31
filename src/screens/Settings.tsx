@@ -312,7 +312,12 @@ function TargetMath({ profile, targets }: { profile: Profile; targets: Targets }
             <td>{targets.netCarbsG} g</td>
           </tr>
           <tr>
-            <td>Fat: remaining calories ÷ 9</td>
+            <td>
+              Fat budget: calories left ÷ 9
+              <div className="muted small">
+                not a goal; shrinks if you eat more protein · minimum {fmt(targets.fatMinG, ' g')} (20% of calories)
+              </div>
+            </td>
             <td>{fmt(targets.fatG, ' g')}</td>
           </tr>
         </tbody>

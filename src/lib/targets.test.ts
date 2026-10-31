@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { ageOn, bmrMifflin, computeTargets, lbToKg } from './targets'
+import { ageOn, bmrMifflin, computeTargets, lbToKg, liveFatBudget } from './targets'
 import { DEFAULT_PROFILE, type Profile } from './types'
 
 const profile = (overrides: Partial<Profile> = {}): Profile => ({
@@ -108,5 +108,14 @@ describe('computeTargets', () => {
     expect(t.burnSource).toBe('estimate')
     // age 42: 10×70 + 6.25×175 − 5×42 + 5 = 1588.75; × 1.55 = 2462.6
     expect(t.estimatedBurn).toBe(2463)
+  })
+
+  it('shrinks the fat budget when protein goes over, but not below 20% of calories', () => {
+    const t = computeTargets(profile({ heightCm: 175, calorieCapKcal: 2000 }), oct30, 3000)
+    expect(t.fatMinG).toBe(44) // 2000 × 20% ÷ 9
+    expect(liveFatBudget(t, { protein: 0, netCarbs: 0 })).toBe(144)
+    // 200 g protein instead of 150: (2000 − 800 − 100) / 9 = 122
+    expect(liveFatBudget(t, { protein: 200, netCarbs: 10 })).toBe(122)
+    expect(liveFatBudget(t, { protein: 400, netCarbs: 25 })).toBe(44)
   })
 })

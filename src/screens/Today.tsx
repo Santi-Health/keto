@@ -5,7 +5,7 @@ import { Bar, Ring } from '../components/Progress'
 import { WatchListCard } from '../components/WatchListCard'
 import { useData } from '../lib/data'
 import { addNutrients } from '../lib/nutrients'
-import { localDate, type Targets } from '../lib/targets'
+import { liveFatBudget, localDate, type Targets } from '../lib/targets'
 import type { Profile } from '../lib/types'
 import { computeWatchList } from '../lib/watchlist'
 
@@ -48,6 +48,8 @@ export function Today({ profile, targets, onOpenSettings, onToggleRefeed, onNavi
       ),
     [dayLogs, weekLogs, targets.calories, profile.weightKg, profile.watchList],
   )
+  // Fat fills what's left: protein or carbs over plan shrink it, never below the minimum.
+  const fatBudget = liveFatBudget(targets, { protein: totals.protein, netCarbs: totals.netCarbs })
   const carbsLeft = targets.netCarbsG - totals.netCarbs
   const proteinLeft = targets.proteinG - totals.protein
   const date = new Date().toLocaleDateString('en-US', {
@@ -83,7 +85,7 @@ export function Today({ profile, targets, onOpenSettings, onToggleRefeed, onNavi
             <div className="rings">
               <Ring label="Net carbs" value={totals.netCarbs} target={targets.netCarbsG} unit="g" color="var(--carbs)" isLimit />
               <Ring label="Protein" value={totals.protein} target={targets.proteinG} unit="g" color="var(--protein)" />
-              <Ring label="Fat" value={totals.fat} target={targets.fatG} unit="g" color="var(--fat)" />
+              <Ring label="Fat" value={totals.fat} target={fatBudget} unit="g" color="var(--fat)" isLimit caption="Fat budget" />
               <Ring label="Calories" value={totals.calories} target={targets.calories} unit="" color="var(--calories)" isLimit />
             </div>
             {dayLogs.length > 0 && (
@@ -102,6 +104,21 @@ export function Today({ profile, targets, onOpenSettings, onToggleRefeed, onNavi
                   </>
                 ) : (
                   'protein target reached ✓'
+                )}
+                {fatBudget != null && (
+                  <>
+                    {' · '}
+                    <strong>{Math.max(0, Math.round(fatBudget - totals.fat))} g</strong> fat room left
+                  </>
+                )}
+              </p>
+            )}
+            {targets.fatMinG != null && (
+              <p className="muted small" style={{ marginBottom: 0 }}>
+                Fat isn't a goal: it fills the calories left after protein and carbs, so extra protein shrinks it. Aim
+                for at least {targets.fatMinG} g (20% of calories).
+                {dayLogs.length > 0 && fatBudget === targets.fatMinG && totals.protein > targets.proteinG && (
+                  <> Protein is now using your fat room; you're at the minimum.</>
                 )}
               </p>
             )}

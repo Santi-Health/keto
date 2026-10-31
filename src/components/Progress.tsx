@@ -6,9 +6,11 @@ interface RingProps {
   color: string
   /** Carbs are a limit: going over is bad, not good. */
   isLimit?: boolean
+  /** Replaces the label under the ring. */
+  caption?: string
 }
 
-export function Ring({ label, value, target, unit, color, isLimit }: RingProps) {
+export function Ring({ label, value, target, unit, color, isLimit, caption }: RingProps) {
   const r = 40
   const c = 2 * Math.PI * r
   const pct = target ? Math.min(value / target, 1) : 0
@@ -37,7 +39,7 @@ export function Ring({ label, value, target, unit, color, isLimit }: RingProps) 
       <div className="ring-value">
         {target != null ? `${target}${unit}` : '—'}
       </div>
-      <div className="ring-label">{isLimit ? `${label} limit` : label}</div>
+      <div className="ring-label">{caption ?? (isLimit ? `${label} limit` : label)}</div>
     </div>
   )
 }

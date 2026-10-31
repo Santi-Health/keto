@@ -15,6 +15,23 @@ export const ACTIVITY_FACTORS: Record<ActivityLevel, { factor: number; label: st
 }
 
 export const MAX_DEFICIT = 0.2
+/** Lower end of the Acceptable Macronutrient Distribution Range for fat. */
+export const FAT_MIN_PCT = 0.2
+
+function fatBudget(calories: number, proteinG: number, netCarbsG: number, minG: number): number {
+  return Math.max(minG, (calories - proteinG * 4 - netCarbsG * 4) / 9)
+}
+
+/**
+ * Fat left for the rest of the day. Fat isn't a goal: it fills whatever calories remain after
+ * protein and carbs. Eating more protein (or carbs) than planned shrinks it, down to the minimum.
+ */
+export function liveFatBudget(t: Targets, eaten: { protein: number; netCarbs: number }): number | null {
+  if (t.calories == null || t.fatMinG == null) return null
+  const protein = Math.max(eaten.protein, t.proteinG)
+  const carbs = Math.max(eaten.netCarbs, t.netCarbsG)
+  return Math.round(fatBudget(t.calories, protein, carbs, t.fatMinG))
+}
 
 /** YYYY-MM-DD in the device's time zone. */
 export function localDate(d: Date = new Date()): string {
@@ -61,7 +78,10 @@ export interface Targets {
   proteinG: number
   netCarbsG: number
   /** Null when calories can't be computed. */
+  /** Fat budget at the start of the day: calories left after protein and carbs, never below the minimum. */
   fatG: number | null
+  /** Minimum fat: 20% of calories (lower end of the dietary reference range). */
+  fatMinG: number | null
   fiberG: number
   sodiumMg: number
   potassiumMg: number
@@ -116,7 +136,8 @@ export function computeTargets(
 
   const proteinG = kgToLb(profile.weightKg) * profile.proteinPerLb
   const netCarbsG = profile.netCarbLimitG
-  const fatG = calories != null ? Math.max(0, (calories - proteinG * 4 - netCarbsG * 4) / 9) : null
+  const fatMinG = calories != null ? (calories * FAT_MIN_PCT) / 9 : null
+  const fatG = calories != null ? fatBudget(calories, proteinG, netCarbsG, fatMinG!) : null
 
   return {
     age,
@@ -132,6 +153,7 @@ export function computeTargets(
     proteinG: Math.round(proteinG),
     netCarbsG,
     fatG: fatG != null ? Math.round(fatG) : null,
+    fatMinG: fatMinG != null ? Math.round(fatMinG) : null,
     fiberG: profile.fiberG,
     sodiumMg: profile.sodiumMg,
     potassiumMg: profile.potassiumMg,
