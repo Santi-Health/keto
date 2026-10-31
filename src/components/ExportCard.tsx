@@ -14,8 +14,8 @@ export function ExportCard({ profile, update, onOpenReport }: { profile: Profile
     <section className="card">
       <h2>Your data</h2>
       <p className="muted small" style={{ marginTop: 0 }}>
-        Everything is stored in your Supabase account and on this phone. A full copy also goes to Google Drive (“{BACKUP_FOLDER}”) once a week when you import
-        from Fitbit; the newest {KEEP_BACKUPS} are kept.
+        Everything is stored in your Supabase account and on this phone. Once a week, Today reminds you to save a full copy to Google Drive (“{BACKUP_FOLDER}”);
+        the newest {KEEP_BACKUPS} are kept.
       </p>
       <p className="small" style={{ marginTop: 0 }}>
         Last Drive backup:{' '}

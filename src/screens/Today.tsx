@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { daysSinceStrength, routineDue, routineSession, sessionLabel, trainingWarnings } from '../lib/exercise'
 import { catchUpDays, mergeActivity, weightReadings } from '../lib/activity'
-import { fetchActivity, getGoogleToken, heartRateCalories, learnTypes, listExercises, mergeImported, toAppExercise } from '../lib/googleHealth'
+import { DRIVE_SCOPE, cachedToken, fetchActivity, getGoogleToken, heartRateCalories, learnTypes, listExercises, mergeImported, toAppExercise } from '../lib/googleHealth'
 import { useInstall } from '../lib/install'
 import { STATUS_TEXT, estimateKetosis, tomorrowMorning } from '../lib/ketosis'
 import { AminoCard } from '../components/AminoCard'
@@ -119,11 +119,13 @@ export function Today({ profile, targets, onOpenSettings, onToggleRefeed, onNavi
         actMessage = `Couldn't read steps/sleep: ${(e as Error).message}`
       }
 
-      // The weekly Drive backup rides along with the import, since Google sign-in is already done.
+      // The weekly Drive backup rides along when Drive was already approved this session (no popup);
+      // otherwise the reminder on Today offers it with one tap.
       let backupMessage = ''
-      if (backupDue(profile.lastBackupAt)) {
+      const driveToken = cachedToken(DRIVE_SCOPE)
+      if (backupDue(profile.lastBackupAt) && driveToken) {
         try {
-          backupMessage = await backup.backUp(token)
+          backupMessage = await backup.backUp(driveToken)
         } catch (e) {
           backupMessage = (e as Error).message
         }
@@ -256,11 +258,11 @@ export function Today({ profile, targets, onOpenSettings, onToggleRefeed, onNavi
 
       <div className="grid two">
         <div className="grid">
-          {isToday && hasData && backupDue(profile.lastBackupAt, Date.now() - 86_400_000) && (
+          {isToday && hasData && backupDue(profile.lastBackupAt) && (
             <div className="notice small" role="status">
               {profile.lastBackupAt
-                ? `Your weekly Google Drive backup is overdue (last ${new Date(profile.lastBackupAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}).`
-                : 'Back up your data to Google Drive once a week. It also runs on its own when you import from Fitbit.'}{' '}
+                ? `Time for your weekly Google Drive backup (last ${new Date(profile.lastBackupAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}).`
+                : 'Back up your data to Google Drive once a week (Google asks once to allow it).'}{' '}
               <button type="button" className="link-btn" disabled={backup.busy} onClick={() => void backup.backUp().catch(() => {})}>
                 {backup.busy ? 'Backing up…' : 'Back up now'}
               </button>

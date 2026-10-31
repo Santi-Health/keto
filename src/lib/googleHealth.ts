@@ -9,9 +9,9 @@ const SCOPE = [
   'https://www.googleapis.com/auth/googlehealth.activity_and_fitness.readonly',
   'https://www.googleapis.com/auth/googlehealth.health_metrics_and_measurements.readonly',
   'https://www.googleapis.com/auth/googlehealth.sleep.readonly',
-  // Weekly backups: only files this app creates in Drive.
-  'https://www.googleapis.com/auth/drive.file',
 ].join(' ')
+/** Weekly backups: only files this app creates in Drive. Asked for separately, so health imports never depend on it. */
+export const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.file'
 const API = 'https://health.googleapis.com/v4/users/me'
 
 // --- Sign-in (Google Identity Services token flow: no secret, no server) ---------------
@@ -57,10 +57,12 @@ function loadGis(): Promise<void> {
 }
 
 const TOKEN_KEY = 'keto.googleHealth.token'
+const keyFor = (scope: string) => (scope === SCOPE ? TOKEN_KEY : `${TOKEN_KEY}.${scope.split('/').pop()}`)
 
-function cachedToken(): string | null {
+/** A token from earlier this session for the given scope, if it's still valid (no popup). */
+export function cachedToken(scope = SCOPE): string | null {
   try {
-    const raw = sessionStorage.getItem(TOKEN_KEY)
+    const raw = sessionStorage.getItem(keyFor(scope))
     if (!raw) return null
     const { token, expires } = JSON.parse(raw) as { token: string; expires: number }
     return Date.now() < expires - 60_000 ? token : null
@@ -70,18 +72,18 @@ function cachedToken(): string | null {
 }
 
 /** Gets an access token, showing Google's sign-in/consent popup when needed. Must run from a tap. */
-export async function getGoogleToken(forceConsent = false): Promise<string> {
-  const cached = !forceConsent && cachedToken()
+export async function getGoogleToken(forceConsent = false, scope = SCOPE): Promise<string> {
+  const cached = !forceConsent && cachedToken(scope)
   if (cached) return cached
   await loadGis()
   return new Promise((resolve, reject) => {
     const client = window.google!.accounts.oauth2.initTokenClient({
       client_id: GOOGLE_CLIENT_ID,
-      scope: SCOPE,
+      scope,
       callback: (r) => {
         if (r.error || !r.access_token) return reject(new Error(r.error_description || r.error || 'Google sign-in was cancelled.'))
         try {
-          sessionStorage.setItem(TOKEN_KEY, JSON.stringify({ token: r.access_token, expires: Date.now() + (r.expires_in ?? 3600) * 1000 }))
+          sessionStorage.setItem(keyFor(scope), JSON.stringify({ token: r.access_token, expires: Date.now() + (r.expires_in ?? 3600) * 1000 }))
         } catch {
           // Token just won't be reused this session.
         }

@@ -2,7 +2,7 @@ import { useCallback, useState } from 'react'
 import { useData } from './data'
 import { backupToDrive } from './driveBackup'
 import type { ExportBundle } from './exportData'
-import { getGoogleToken } from './googleHealth'
+import { DRIVE_SCOPE, getGoogleToken } from './googleHealth'
 import { localDate } from './targets'
 import type { Profile } from './types'
 
@@ -27,13 +27,13 @@ export function useBackup(profile: Profile, update: (p: Partial<Profile>) => voi
     [profile, foods, logs, savedMeals, exercises, readings, activity, cgmDays],
   )
 
-  /** Pass a token when one is already at hand (e.g. during the Fitbit import); otherwise this asks Google. */
+  /** Pass a Drive token when one is already at hand; otherwise this asks Google (must run from a tap). */
   const backUp = useCallback(
     async (token?: string): Promise<string> => {
       setBusy(true)
       setMessage(null)
       try {
-        const t = token ?? (await getGoogleToken())
+        const t = token ?? (await getGoogleToken(false, DRIVE_SCOPE))
         const r = await backupToDrive(t, JSON.stringify(bundle()), `keto-tracker-${localDate()}.json`, profile.backupFolderId)
         update({ lastBackupAt: new Date().toISOString(), backupFolderId: r.folderId })
         const msg = `Backed up to Google Drive → “Keto Tracker backups” / ${r.fileName} (${Math.round(r.bytes / 1024)} KB).`
