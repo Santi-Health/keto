@@ -19,6 +19,7 @@ import { ReadingSheet } from '../components/ReadingSheet'
 import { ReadingsCard } from '../components/ReadingsCard'
 import { Molecule } from '../components/Molecules'
 import { Bar, Ring } from '../components/Progress'
+import { DeficitNow } from '../components/DeficitNow'
 import { WatchListCard } from '../components/WatchListCard'
 import { useData } from '../lib/data'
 import { addNutrients, type NutrientKey, type Nutrients } from '../lib/nutrients'
@@ -306,6 +307,16 @@ export function Today({ profile, targets, onOpenSettings, onToggleRefeed, onNavi
           )}
 
           <section className="card">
+            {isToday && targets.bmr != null && (
+              <DeficitNow
+                day={today}
+                bmr={targets.bmr}
+                logs={dayLogs}
+                exercises={sessionsToday}
+                activity={Object.values(activity).find((a) => a.day === today && !a.deleted_at) ?? null}
+                goal={targets.burn != null && targets.calories != null ? Math.max(0, targets.burn - targets.calories) : null}
+              />
+            )}
             <h2>Macros</h2>
             <div className="rings">
               <Ring label="Net carbs" value={totals.netCarbs} target={targets.netCarbsG * mult} unit="g" color="var(--carbs)" isLimit molecule="glucose" />
