@@ -86,19 +86,19 @@ export function DeficitNow({ day, bmr, logs, exercises, activity, goal, calorieL
     <>
       <section className="card deficit-summary">
         <div className="deficit-stat">
-          <div className="deficit-big">
+          <div className="deficit-big" style={{ color: 'var(--accent)' }}>
             {d.burned.toLocaleString()} <span className="deficit-unit">kcal</span>
           </div>
           <div className="muted small">Burned</div>
         </div>
         <div className="deficit-stat end wide">
-          <div className="deficit-mid" style={{ color: surplus ? 'var(--warn)' : 'var(--carbs)' }}>
+          <div className="deficit-mid" style={{ color: surplus ? 'var(--warn)' : 'var(--accent)' }}>
             {fmt(d.deficit)} <span className="deficit-unit">kcal</span>
           </div>
           <div className="muted small">{surplus ? 'Surplus' : 'Deficit'} so far</div>
         </div>
         <div className="deficit-stat">
-          <div className="deficit-big">
+          <div className="deficit-big" style={{ color: 'var(--warn)' }}>
             {d.eaten.toLocaleString()} <span className="deficit-unit">kcal</span>
           </div>
           <div className="muted small">
@@ -127,7 +127,7 @@ export function DeficitNow({ day, bmr, logs, exercises, activity, goal, calorieL
           aria-label={goal ? `${Math.round((goalPct ?? 0) * 100)}% of today's ${goal} kcal deficit goal` : undefined}
         >
           <div>
-            <b>{surplus ? '+' : ''}{fmt(d.deficit)}</b>
+            <b style={{ color: surplus ? 'var(--warn)' : 'var(--accent)' }}>{surplus ? '+' : ''}{fmt(d.deficit)}</b>
             <span>kcal</span>
           </div>
         </div>
