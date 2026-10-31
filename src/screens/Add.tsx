@@ -5,10 +5,12 @@ import { FoodForm } from '../components/FoodForm'
 import { FoodRow } from '../components/FoodRow'
 import { LogFoodSheet } from '../components/LogFoodSheet'
 import { RecipeBuilder } from '../components/RecipeBuilder'
+import { LogSavedMealSheet } from '../components/SavedMealSheets'
 import { useData } from '../lib/data'
 import { lookupBarcode } from '../lib/foodApi'
 import type { RestaurantDish } from '../lib/foodJson'
 import { MEALS, mealForTime, setUsual, suggestForMeal, type Food, type Meal, type NewFood } from '../lib/foods'
+import { mealTotals, type SavedMeal } from '../lib/savedMeals'
 import { useFoodSearch } from '../lib/useFoodSearch'
 
 type Overlay =
@@ -17,6 +19,7 @@ type Overlay =
   | { kind: 'scan' }
   | { kind: 'recipe'; recipe?: Food; dish?: RestaurantDish }
   | { kind: 'claude'; mode?: 'label' | 'restaurant' }
+  | { kind: 'meal'; savedMeal: SavedMeal }
   | null
 
 interface Props {
@@ -30,12 +33,16 @@ interface Props {
 }
 
 export function Add({ startScan, startClaude, date, onLogged }: Props) {
-  const { foods, logs, updateFood } = useData()
+  const { foods, logs, updateFood, savedMeals, foodById } = useData()
   const [meal, setMeal] = useState<Meal>(() => mealForTime(new Date()))
   const mealLabel = MEALS.find((m) => m.value === meal)!.label
   const usual = suggestForMeal(foods, logs, meal)
   const [query, setQuery] = useState('')
   const { q, mine, results, searching, error } = useFoodSearch(query, 40)
+  // Meals saved for this slot first, then by how often they're used.
+  const meals = [...savedMeals].sort(
+    (a, b) => Number(b.meta.meal === meal) - Number(a.meta.meal === meal) || b.use_count - a.use_count || a.name.localeCompare(b.name),
+  )
   const recipes = foods.filter((f) => f.source === 'recipe').sort((a, b) => a.name.localeCompare(b.name))
   const [overlay, setOverlay] = useState<Overlay>(startScan ? { kind: 'scan' } : startClaude ? { kind: 'claude' } : null)
   const [notice, setNotice] = useState<string | null>(null)
@@ -126,6 +133,28 @@ export function Add({ startScan, startClaude, date, onLogged }: Props) {
 
         {!q && (
           <>
+            <div className="section-label">Saved meals</div>
+            {meals.length ? (
+              <div className="food-grid">
+                {meals.map((m) => {
+                  const t = mealTotals(m.items, foodById)
+                  return (
+                    <button key={m.id} type="button" className="saved-meal" onClick={() => setOverlay({ kind: 'meal', savedMeal: m })}>
+                      <b>{m.name}</b>
+                      <span className="muted small">
+                        {m.items.map((i) => (i.foodId && foodById[i.foodId]?.name) || i.food.name).join(' · ')}
+                      </span>
+                      <span className="small">
+                        {Math.round(t.kcal)} kcal · {t.netCarbs.toFixed(1)} g net · {Math.round(t.protein)} g protein
+                      </span>
+                    </button>
+                  )
+                })}
+              </div>
+            ) : (
+              <p className="muted small">None yet. On the Log tab, tap "Save as meal" next to any meal to reuse it in one tap.</p>
+            )}
+
             <div className="section-label">Usual for {mealLabel.toLowerCase()}</div>
             {usual.length ? (
               <div className="food-grid">
@@ -201,6 +230,9 @@ export function Add({ startScan, startClaude, date, onLogged }: Props) {
       )}
       {overlay?.kind === 'recipe' && (
         <RecipeBuilder recipe={overlay.recipe} dish={overlay.dish} onClose={close} onSaved={(food) => setOverlay({ kind: 'log', food })} />
+      )}
+      {overlay?.kind === 'meal' && (
+        <LogSavedMealSheet savedMeal={overlay.savedMeal} date={date} meal={meal} onClose={close} onDone={logged} />
       )}
       {overlay?.kind === 'claude' && (
         <ClaudeChatSheet

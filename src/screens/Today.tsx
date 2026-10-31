@@ -232,13 +232,10 @@ export function Today({ profile, targets, onOpenSettings, onToggleRefeed, onNavi
               <button type="button" style={{ color: 'var(--text)' }} onClick={() => onNavigate('add/claude')}>
                 Label photo
               </button>
-              {['Saved meal'].map((label) => (
-                <button key={label} type="button" disabled title="Coming in a later phase">
-                  {label}
-                </button>
-              ))}
+              <button type="button" style={{ color: 'var(--text)' }} onClick={() => onNavigate('add')}>
+                Saved meal
+              </button>
             </div>
-            <p className="muted small" style={{ marginBottom: 0 }}>The grayed-out buttons turn on in later phases.</p>
           </section>
 
           <DrinksCard waterTargetOz={profile.waterOz} />
