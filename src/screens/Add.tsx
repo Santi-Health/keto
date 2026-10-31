@@ -3,7 +3,7 @@ import { BarcodeScanner } from '../components/BarcodeScanner'
 import { ClaudeChatSheet } from '../components/ClaudeChatSheet'
 import { FoodForm } from '../components/FoodForm'
 import { FoodRow } from '../components/FoodRow'
-import { LogFoodSheet } from '../components/LogFoodSheet'
+import { LogFoodSheet, type AddMode } from '../components/LogFoodSheet'
 import { RecipeBuilder } from '../components/RecipeBuilder'
 import { LogSavedMealSheet } from '../components/SavedMealSheets'
 import { useData } from '../lib/data'
@@ -46,6 +46,12 @@ export function Add({ startScan, startClaude, date, onLogged }: Props) {
   const recipes = foods.filter((f) => f.source === 'recipe').sort((a, b) => a.name.localeCompare(b.name))
   const [overlay, setOverlay] = useState<Overlay>(startScan ? { kind: 'scan' } : startClaude ? { kind: 'claude' } : null)
   const [notice, setNotice] = useState<string | null>(null)
+  // Log it, save it for later (a recipe ingredient, tonight's dinner), or just look (at the supermarket).
+  const [mode, setMode] = useState<AddMode>('log')
+  const savedOnly = (food: Food) => {
+    setOverlay(null)
+    setNotice(`Saved ${food.name} to My Foods. Nothing was logged.`)
+  }
 
   const onDetected = useCallback(
     async (code: string) => {
@@ -79,7 +85,7 @@ export function Add({ startScan, startClaude, date, onLogged }: Props) {
   return (
     <>
       <header className="page-header">
-        <h1>Add food</h1>
+        <h1>{mode === 'log' ? 'Add food' : mode === 'save' ? 'Save a food' : 'Look up a food'}</h1>
         {date && (
           <span className="badge">
             to {new Date(`${date}T12:00:00`).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
@@ -88,6 +94,27 @@ export function Add({ startScan, startClaude, date, onLogged }: Props) {
       </header>
 
       <div className="card">
+        <div className="segmented" role="group" aria-label="What to do" style={{ marginBottom: 12 }}>
+          {(
+            [
+              ['log', 'Log it'],
+              ['save', 'Save only'],
+              ['look', 'Just look'],
+            ] as const
+          ).map(([v, l]) => (
+            <button key={v} type="button" aria-pressed={mode === v} onClick={() => setMode(v)}>
+              {l}
+            </button>
+          ))}
+        </div>
+        {mode !== 'log' && (
+          <p className="muted small" style={{ marginTop: -4 }}>
+            {mode === 'save'
+              ? 'Foods you open here are saved to My Foods without logging: for a recipe, or something you\u2019ll eat later.'
+              : 'See the nutrition of anything you search or scan. Nothing is logged; save it if you buy it.'}
+          </p>
+        )}
+        {mode === 'log' && (
         <div className="field" style={{ marginBottom: 12 }}>
           <span className="label">Logging to</span>
           <div className="segmented meal-picker" role="group" aria-label="Meal">
@@ -98,6 +125,7 @@ export function Add({ startScan, startClaude, date, onLogged }: Props) {
             ))}
           </div>
         </div>
+        )}
         <div className="search">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
             <circle cx="11" cy="11" r="7" />
@@ -223,13 +251,15 @@ export function Add({ startScan, startClaude, date, onLogged }: Props) {
           meal={meal}
           onClose={close}
           onDone={logged}
+          mode={mode}
+          onSavedFood={savedOnly}
           onEditFood={(food) =>
             setOverlay('id' in food && food.source === 'recipe' ? { kind: 'recipe', recipe: food } : { kind: 'form', food })
           }
         />
       )}
       {overlay?.kind === 'recipe' && (
-        <RecipeBuilder recipe={overlay.recipe} dish={overlay.dish} onClose={close} onSaved={(food) => setOverlay({ kind: 'log', food })} />
+        <RecipeBuilder recipe={overlay.recipe} dish={overlay.dish} onClose={close} onSaved={(food) => (mode === 'save' ? savedOnly(food) : setOverlay({ kind: 'log', food }))} />
       )}
       {overlay?.kind === 'meal' && (
         <LogSavedMealSheet savedMeal={overlay.savedMeal} date={date} meal={meal} onClose={close} onDone={logged} />
@@ -249,7 +279,8 @@ export function Add({ startScan, startClaude, date, onLogged }: Props) {
           onClose={close}
           onSaved={(food) => {
             setNotice(null)
-            setOverlay({ kind: 'log', food })
+            if (mode === 'save') savedOnly(food)
+            else setOverlay({ kind: 'log', food })
           }}
         />
       )}

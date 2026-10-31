@@ -17,7 +17,13 @@ interface Props {
   onClose: () => void
   onEditFood?: (food: Food | NewFood) => void
   onDone?: () => void
+  /** log: log it (default). save: keep it in My Foods without logging. look: just see the nutrition, save if you like. */
+  mode?: AddMode
+  /** Called after "Save to My Foods". */
+  onSavedFood?: (food: Food) => void
 }
+
+export type AddMode = 'log' | 'save' | 'look'
 
 /** "YYYY-MM-DDTHH:mm" in local time, for datetime-local inputs. */
 const toLocalInput = (d: Date) => {
@@ -32,7 +38,8 @@ function defaultTime(date?: string): Date {
   return d.toDateString() === now.toDateString() ? now : d
 }
 
-export function LogFoodSheet({ food, entry, date, meal: chosenMeal, onClose, onEditFood, onDone }: Props) {
+export function LogFoodSheet({ food, entry, date, meal: chosenMeal, onClose, onEditFood, onDone, mode = 'log', onSavedFood }: Props) {
+  const logging = mode === 'log' || !!entry
   const { saveFood, logFood, updateLog, deleteLog, updateFood, logs } = useData()
   const saved = 'id' in food ? food : null
   const units = unitsFor({ unitConversions: food.unit_conversions })
@@ -81,6 +88,15 @@ export function LogFoodSheet({ food, entry, date, meal: chosenMeal, onClose, onE
     onClose()
   }
 
+  /** Keep it in My Foods without logging, remembering this amount as its usual portion. */
+  function saveOnly() {
+    const f = saved ?? saveFood(food)
+    const keep: Food = { ...f, favorite, meta: { ...f.meta, meals: usualMeta.meals, notMeals: usualMeta.notMeals, ...(valid ? { lastAmount: qty, lastUnit: unit } : {}) } }
+    updateFood(keep)
+    onSavedFood?.(keep)
+    onClose()
+  }
+
   function toggleUsual(m: Meal) {
     const next = setUsual(usualMeta, m, !usualMeals.includes(m))
     setUsualMeta(next)
@@ -95,7 +111,15 @@ export function LogFoodSheet({ food, entry, date, meal: chosenMeal, onClose, onE
   const estimated = food.source === 'ai_estimate' || food.fields_estimated.length > 0
 
   return (
-    <Sheet title={food.name} subtitle={`${entry ? 'Editing' : 'Logging to'} ${MEALS.find((m) => m.value === meal)!.label.toLowerCase()} · ${foodSubtitle(food)}`} onClose={onClose}>
+    <Sheet
+      title={food.name}
+      subtitle={
+        logging
+          ? `${entry ? 'Editing' : 'Logging to'} ${MEALS.find((m) => m.value === meal)!.label.toLowerCase()} · ${foodSubtitle(food)}`
+          : `${mode === 'save' ? 'Save without logging' : 'Just looking: nothing is logged'} · ${foodSubtitle(food)}`
+      }
+      onClose={onClose}
+    >
       <FoodFlags food={food} portion={portion?.n} />
       {portion && <MacroStrip n={portion.n} estimated={estimated} />}
       {portion && (
@@ -123,6 +147,8 @@ export function LogFoodSheet({ food, entry, date, meal: chosenMeal, onClose, onE
           </select>
         </div>
       </div>
+      {logging && (
+      <>
       <div className="row">
         <div className="field">
           <label htmlFor="meal">Meal</label>
@@ -151,11 +177,39 @@ export function LogFoodSheet({ food, entry, date, meal: chosenMeal, onClose, onE
         </div>
         <div className="hint">Highlighted meals show this food under "Usual for…". Tap to add or remove; it overrides what the app learned.</div>
       </div>
+      </>
+      )}
 
+      {!logging && (
+        <p className="muted small">
+          {saved
+            ? 'Already in My Foods. Change the amount to see other portions.'
+            : mode === 'save'
+              ? 'Saves it to My Foods (with this amount as your usual portion) so it\u2019s one tap to log later.'
+              : 'Change the amount to see other portions. Close to leave it, or save it if you buy it.'}
+        </p>
+      )}
       <div className="row" style={{ flexWrap: 'wrap' }}>
-        <button type="button" className="btn" onClick={submit} disabled={!valid}>
-          {entry ? 'Save changes' : 'Log it'}
-        </button>
+        {logging ? (
+          <button type="button" className="btn" onClick={submit} disabled={!valid}>
+            {entry ? 'Save changes' : 'Log it'}
+          </button>
+        ) : mode === 'save' && !saved ? (
+          <button type="button" className="btn" onClick={saveOnly}>
+            Save to My Foods
+          </button>
+        ) : (
+          <>
+            <button type="button" className="btn" onClick={onClose}>
+              Done
+            </button>
+            {!saved && (
+              <button type="button" className="btn secondary" onClick={saveOnly}>
+                Save to My Foods
+              </button>
+            )}
+          </>
+        )}
         <button type="button" className="btn secondary" onClick={toggleFavorite} aria-pressed={favorite}>
           {favorite ? '★ Favorite' : '☆ Favorite'}
         </button>
