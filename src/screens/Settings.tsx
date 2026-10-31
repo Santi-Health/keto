@@ -108,7 +108,7 @@ export function Settings({ profile, update, targets, session, sync, recovering, 
               value={weightDisplay}
               suffix={profile.weightUnit}
               step={0.1}
-              hint="A weight log with trends comes in phase 5; it will keep this updated."
+              hint="Updates automatically when you log a weigh-in under Readings."
               onChange={(w) => update({ weightKg: profile.weightUnit === 'lb' ? lbToKg(w) : w })}
             />
 

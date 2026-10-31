@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import type { Session } from '@supabase/supabase-js'
-import { DataProvider } from './lib/data'
+import { DataProvider, useData } from './lib/data'
+import { latest } from './lib/readings'
+import type { Profile } from './lib/types'
 import { useProfile, useSession } from './lib/profileStore'
 import { computeTargets, localDate } from './lib/targets'
 import { supabase } from './lib/supabase'
@@ -79,6 +81,7 @@ function Tracker({ session, recovering = false, onPassphraseChanged = () => {} }
 
   return (
     <DataProvider session={session}>
+    <WeightFromReadings weightKg={profile.weightKg} lastId={profile.weightReadingId ?? null} update={update} />
     <div className="app">
       <main className="main">
         {tab === 'today' && (
@@ -104,6 +107,9 @@ function Tracker({ session, recovering = false, onPassphraseChanged = () => {} }
         {tab === 'log' && (
           <Log
             weightKg={profile.weightKg}
+            weightUnit={profile.weightUnit}
+            netCarbLimit={targets.netCarbsG}
+            proteinTarget={targets.proteinG}
             date={isDate(param) ? param : localDate()}
             onDateChange={(d) => go(d === localDate() ? 'log' : `log/${d}`)}
             onAdd={(d) => go(d === localDate() ? 'add' : `add/${d}`)}
@@ -130,4 +136,16 @@ function Tracker({ session, recovering = false, onPassphraseChanged = () => {} }
     </div>
     </DataProvider>
   )
+}
+
+/** A newly logged weight becomes the profile weight, so targets follow it. Editing Settings still works until the next weigh-in. */
+function WeightFromReadings({ weightKg, lastId, update }: { weightKg: number; lastId: string | null; update: (p: Partial<Profile>) => void }) {
+  const { readings } = useData()
+  const w = latest(readings, 'weight')
+  const key = w ? `${w.id}@${w.taken_at}@${w.value}` : null
+  useEffect(() => {
+    if (!w?.value || key === lastId) return
+    update({ weightKg: Math.round(w.value * 100) / 100, weightReadingId: key })
+  }, [key, lastId, w?.value, weightKg, update])
+  return null
 }

@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useMemo, type ReactNode } from 
 import type { Session } from '@supabase/supabase-js'
 import type { CgmDay } from './cgm'
 import type { Exercise } from './exercise'
+import type { ReadingRow } from './readings'
 import { buildLogEntry, type Food, type LogEntry, type Meal, type NewFood } from './foods'
 import { supabase } from './supabase'
 import { localDate } from './targets'
@@ -29,6 +30,10 @@ interface Data {
   exercisesOn: (date: string) => Exercise[]
   cgmDays: Record<string, CgmDay>
   saveCgmDay: (d: CgmDay) => void
+  readings: ReadingRow[]
+  saveReading: (r: ReadingRow) => void
+  deleteReading: (id: string) => void
+  readingsOn: (date: string) => ReadingRow[]
 }
 
 const DataContext = createContext<Data | null>(null)
@@ -38,6 +43,7 @@ export function DataProvider({ session, children }: { session: Session | null; c
   const logsTable = useSyncedTable<LogEntry>('food_logs', session)
   const exerciseTable = useSyncedTable<Exercise>('exercises', session)
   const cgmTable = useSyncedTable<CgmDay>('cgm_days', session)
+  const readingTable = useSyncedTable<ReadingRow>('readings', session)
 
   const saveFood = useCallback(
     (food: NewFood | Food): Food => {
@@ -114,14 +120,22 @@ export function DataProvider({ session, children }: { session: Session | null; c
     [exerciseTable.rows],
   )
 
+  const readingsOn = useCallback(
+    (date: string) =>
+      readingTable.rows
+        .filter((r) => localDate(new Date(r.taken_at)) === date)
+        .sort((a, b) => a.taken_at.localeCompare(b.taken_at)),
+    [readingTable.rows],
+  )
+
   const value = useMemo<Data>(
     () => ({
       foods: foodsTable.rows,
       foodById: foodsTable.byId,
       logs: logsTable.rows,
       // Without a database (local development) nothing is waiting to sync.
-      pending: supabase ? foodsTable.pending + logsTable.pending + exerciseTable.pending + cgmTable.pending : 0,
-      syncError: foodsTable.error ?? logsTable.error ?? exerciseTable.error ?? cgmTable.error,
+      pending: supabase ? foodsTable.pending + logsTable.pending + exerciseTable.pending + cgmTable.pending + readingTable.pending : 0,
+      syncError: foodsTable.error ?? logsTable.error ?? exerciseTable.error ?? cgmTable.error ?? readingTable.error,
       saveFood,
       updateFood: foodsTable.upsert,
       deleteFood: foodsTable.remove,
@@ -136,8 +150,12 @@ export function DataProvider({ session, children }: { session: Session | null; c
       exercisesOn,
       cgmDays: cgmTable.byId,
       saveCgmDay: cgmTable.upsert,
+      readings: readingTable.rows,
+      saveReading: readingTable.upsert,
+      deleteReading: readingTable.remove,
+      readingsOn,
     }),
-    [foodsTable, logsTable, exerciseTable, cgmTable, saveFood, logFood, logsOn, logsWeekEnding, exercisesOn],
+    [foodsTable, logsTable, exerciseTable, cgmTable, readingTable, saveFood, logFood, logsOn, logsWeekEnding, exercisesOn, readingsOn],
   )
 
   return <DataContext.Provider value={value}>{children}</DataContext.Provider>

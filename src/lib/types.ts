@@ -38,6 +38,8 @@ export interface Profile {
   muscleGoal: 'maintain' | 'build'
   /** Usual yoga days and time, for one-tap logging. Null turns the reminder off. */
   yogaRoutine: Routine | null
+  /** Latest weigh-in already copied into weightKg. */
+  weightReadingId?: string | null
   /** ISO timestamp of the last local edit, used to resolve sync conflicts. */
   updatedAt: string
 }

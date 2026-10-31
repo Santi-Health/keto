@@ -7,6 +7,8 @@ import { AminoCard } from '../components/AminoCard'
 import { ExerciseSheet } from '../components/ExerciseSheet'
 import { TrainingCard } from '../components/TrainingCard'
 import { InstallCard } from '../components/InstallCard'
+import { ReadingSheet } from '../components/ReadingSheet'
+import { ReadingsCard } from '../components/ReadingsCard'
 import { Molecule } from '../components/Molecules'
 import { Bar, Ring } from '../components/Progress'
 import { WatchListCard } from '../components/WatchListCard'
@@ -15,6 +17,7 @@ import { addNutrients } from '../lib/nutrients'
 import { liveFatBudget, localDate, type Targets } from '../lib/targets'
 import type { Profile } from '../lib/types'
 import { computeWatchList } from '../lib/watchlist'
+import { ketoneBand, latest, type ReadingKind } from '../lib/readings'
 
 interface Props {
   profile: Profile
@@ -30,8 +33,9 @@ function useInstallOffer() {
 }
 
 export function Today({ profile, targets, onOpenSettings, onToggleRefeed, onNavigate }: Props) {
-  const { logsOn, logsWeekEnding, pending, syncError, exercises, exercisesOn, saveExercise, logs } = useData()
+  const { logsOn, logsWeekEnding, pending, syncError, exercises, exercisesOn, saveExercise, logs, readings } = useData()
   const [logExercise, setLogExercise] = useState(false)
+  const [readingSheet, setReadingSheet] = useState<{ kind?: ReadingKind } | null>(null)
   const [importing, setImporting] = useState(false)
   const [importMessage, setImportMessage] = useState<string | null>(null)
 
@@ -99,6 +103,9 @@ export function Today({ profile, targets, onOpenSettings, onToggleRefeed, onNavi
   })
   const keto = estimateKetosis({ at: Date.now(), logs, exercises, netCarbLimit: targets.netCarbsG, proteinTarget: targets.proteinG })
   const ketoTomorrow = estimateKetosis({ at: tomorrowMorning(), logs, exercises, netCarbLimit: targets.netCarbsG, proteinTarget: targets.proteinG })
+  // A blood reading from the last 3 hours beats the estimate.
+  const lastKetone = latest(readings, 'blood_ketone')
+  const measured = lastKetone?.value != null && Date.now() - Date.parse(lastKetone.taken_at) < 3 * 3_600_000 ? lastKetone : null
   const carbsLeft = targets.netCarbsG - totals.netCarbs
   const proteinLeft = targets.proteinG - totals.protein
   const date = new Date().toLocaleDateString('en-US', {
@@ -215,7 +222,10 @@ export function Today({ profile, targets, onOpenSettings, onToggleRefeed, onNavi
               <button type="button" style={{ color: 'var(--text)' }} onClick={() => setLogExercise(true)}>
                 Exercise
               </button>
-              {['Label photo', 'Saved meal', 'Reading'].map((label) => (
+              <button type="button" style={{ color: 'var(--text)' }} onClick={() => setReadingSheet({})}>
+                Reading
+              </button>
+              {['Label photo', 'Saved meal'].map((label) => (
                 <button key={label} type="button" disabled title="Coming in a later phase">
                   {label}
                 </button>
@@ -223,6 +233,8 @@ export function Today({ profile, targets, onOpenSettings, onToggleRefeed, onNavi
             </div>
             <p className="muted small" style={{ marginBottom: 0 }}>The grayed-out buttons turn on in later phases.</p>
           </section>
+
+          <ReadingsCard weightUnit={profile.weightUnit} waterTargetOz={profile.waterOz} onAdd={(kind) => setReadingSheet({ kind })} />
 
           <TrainingCard
             today={sessionsToday}
@@ -254,6 +266,12 @@ export function Today({ profile, targets, onOpenSettings, onToggleRefeed, onNavi
                 Estimated blood ketones {keto.low}–{keto.high} mmol/L
               </span>
             </div>
+            {measured && (
+              <p className="small" style={{ margin: '0 0 6px' }}>
+                <b>Measured {measured.value!.toFixed(1)} mmol/L</b> at{' '}
+                {new Date(measured.taken_at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}: {ketoneBand(measured.value!)}.
+              </p>
+            )}
             <ul className="keto-reasons">
               {keto.reasons.map((r) => (
                 <li key={r}>{r}</li>
@@ -265,12 +283,21 @@ export function Today({ profile, targets, onOpenSettings, onToggleRefeed, onNavi
               {keto.status === 'out' && ketoTomorrow.status === 'out' && ' Back under 25 g a day, it usually takes 1–3 days to return to ketosis.'}
             </p>
             <p className="muted small" style={{ marginBottom: 0 }}>
-              Estimate from general research (carbs, fasting, exercise, protein). Ketosis means about 0.5+ mmol/L. It will personalize once you
-              enter blood ketone readings.
+              Estimate from general research (carbs, fasting, exercise, protein). Ketosis means about 0.5+ mmol/L. Each blood ketone reading is
+              saved next to what the estimate said; after about 10 readings it will start learning your own pattern.
             </p>
           </section>
         </div>
       </div>
+      {readingSheet && (
+        <ReadingSheet
+          weightUnit={profile.weightUnit}
+          netCarbLimit={targets.netCarbsG}
+          proteinTarget={targets.proteinG}
+          kind={readingSheet.kind}
+          onClose={() => setReadingSheet(null)}
+        />
+      )}
       {logExercise && <ExerciseSheet weightKg={profile.weightKg} onClose={() => setLogExercise(false)} />}
     </>
   )

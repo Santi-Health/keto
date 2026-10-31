@@ -25,6 +25,7 @@
   --bond: #9aa0a6;
   --fiber: #9a7b4f;
   --ketone: #8b5cf6;
+  --water: #2f80c9;
   --radius: 14px;
   --nav-h: 64px;
 
@@ -63,6 +64,7 @@
     --bond: #6b7078;
     --fiber: #c4a274;
     --ketone: #a78bfa;
+    --water: #5aa9e6;
     color-scheme: dark;
   }
 }
@@ -93,6 +95,7 @@
   --bond: #6b7078;
   --fiber: #c4a274;
   --ketone: #a78bfa;
+  --water: #5aa9e6;
   color-scheme: dark;
 }
 
@@ -1099,4 +1102,48 @@ input[type='time'] {
 
 .keto-reasons li + li {
   margin-top: 3px;
+}
+
+/* Readings card */
+.stat-grid.two-col {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.stat-btn {
+  font: inherit;
+  color: inherit;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 8px 6px;
+  cursor: pointer;
+}
+
+.stat-grid.two-col > div {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 8px 6px;
+}
+
+.btn.small-btn {
+  padding: 6px 12px;
+  min-height: 0;
+  font-size: 0.85rem;
+}
+
+.chip-btn.urine-negative.on { background: #f3e9b8; color: #4a3f10; }
+.chip-btn.urine-trace.on { background: #f2c6c9; color: #5a1f27; }
+.chip-btn.urine-small.on { background: #e39aae; color: #4a0f22; }
+.chip-btn.urine-moderate.on { background: #b45786; color: #fff; }
+.chip-btn.urine-large.on { background: #6e2266; color: #fff; }
+
+.header-actions.three {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin: 8px 0 4px;
+}
+
+.header-actions.three .btn {
+  padding: 10px 6px;
 }
