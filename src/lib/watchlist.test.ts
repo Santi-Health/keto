@@ -3,7 +3,6 @@ import {
   computeWatchList,
   detectFishSpecies,
   detectHeavyMetalRisk,
-  detectProcessedMeat,
   detectSweeteners,
 } from './watchlist'
 
@@ -17,18 +16,6 @@ describe('detectFishSpecies', () => {
     expect(detectFishSpecies('Wild sockeye salmon fillet')).toBe('salmon')
     expect(detectFishSpecies('Sardines in olive oil')).toBe('sardine')
     expect(detectFishSpecies('Ribeye steak')).toBeNull()
-  })
-})
-
-describe('detectProcessedMeat', () => {
-  it('matches cured meats by name or category', () => {
-    expect(detectProcessedMeat('Thick cut bacon')).toBe(true)
-    expect(detectProcessedMeat('Genoa salami')).toBe(true)
-    expect(detectProcessedMeat('Something', ['en:prepared-meats'])).toBe(true)
-  })
-  it('does not match words that only contain "ham"', () => {
-    expect(detectProcessedMeat('Hamburger patty, 80/20 ground beef')).toBe(false)
-    expect(detectProcessedMeat('Chicken thigh')).toBe(false)
   })
 })
 

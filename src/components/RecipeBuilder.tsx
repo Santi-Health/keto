@@ -296,7 +296,6 @@ export function RecipeBuilder({ recipe, dish, onClose, onSaved }: Props) {
             Per serving: sodium {Math.round(totals.perServing.sodiumMg ?? 0)} mg · potassium {Math.round(totals.perServing.potassiumMg ?? 0)} mg ·
             sat fat {(totals.perServing.satFat ?? 0).toFixed(1)} g · fiber {(totals.perServing.fiber ?? 0).toFixed(1)} g
             {mercury ? ` · ~${mercury.toFixed(0)} µg mercury (${fishNames.join(', ')})` : ''}
-            {totals.perServing.processedMeatG ? ` · ${Math.round(totals.perServing.processedMeatG)} g processed meat` : ''}
           </p>
           {totals.approximate && <p className="muted small" style={{ marginBottom: 0 }}>~ Some amounts are estimates; check the ones marked.</p>}
         </div>

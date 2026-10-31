@@ -5,7 +5,6 @@ import {
   detectFishSpecies,
   detectHeavyMetalRisk,
   detectPartiallyHydrogenated,
-  detectProcessedMeat,
   detectSweeteners,
 } from './watchlist'
 
@@ -19,7 +18,6 @@ function withDetectedMeta(food: NewFood, categories: string[] = []): NewFood {
     meta: {
       ...food.meta,
       fishSpecies: food.meta.fishSpecies ?? detectFishSpecies(text),
-      processedMeat: food.meta.processedMeat ?? detectProcessedMeat(text, categories),
       sweeteners: detectSweeteners(food.ingredients_text, food.meta.additives),
       heavyMetalRisk: detectHeavyMetalRisk(`${text} ${categories.join(' ')}`),
       partiallyHydrogenated: detectPartiallyHydrogenated(food.ingredients_text),

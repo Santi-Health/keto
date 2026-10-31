@@ -81,14 +81,6 @@ export function detectFishSpecies(text: string): FishSpecies | null {
   return FISH_PATTERNS.find(([re]) => re.test(text))?.[1] ?? null
 }
 
-const PROCESSED_MEAT =
-  /\b(bacon|salami|pepperoni|prosciutto|ham|sausages?|hot ?dogs?|frankfurters?|chorizo|bologna|pastrami|corned beef|jerky|deli meat|luncheon meat|mortadella|kielbasa|bratwurst|summer sausage|soppressata|capicola|pancetta|lunch meat|spam)\b/i
-const PROCESSED_MEAT_CATEGORIES = /en:(prepared-meats|sausages|hams|bacons?|salamis?|cured-meats|cold-cuts|meat-snacks|jerky)/
-
-export function detectProcessedMeat(text: string, categories: string[] = []): boolean {
-  return PROCESSED_MEAT.test(text) || categories.some((c) => PROCESSED_MEAT_CATEGORIES.test(c))
-}
-
 /** Artificial sweeteners by E-number and by name. Stevia and monk fruit aren't counted. */
 const SWEETENER_ADDITIVES: Record<string, string> = {
   'en:e950': 'acesulfame K',
@@ -135,7 +127,6 @@ export type WatchKey =
   | 'cholesterol'
   | 'omegaRatio'
   | 'mercury'
-  | 'processedMeat'
   | 'retinol'
   | 'heavyMetal'
   | 'alcohol'
@@ -210,14 +201,6 @@ export const WATCH_LIST: Record<WatchKey, WatchDef> = {
     limit: (ctx) => Math.round(0.1 * ctx.weightKg * 7),
     value: (t) => t.mercuryUg,
     guidance: 'EPA reference dose: 0.1 µg per kg body weight per day. Estimated from FDA average levels per fish.',
-  },
-  processedMeat: {
-    label: 'Processed meat',
-    unit: 'g',
-    period: 'week',
-    limit: () => 100,
-    value: (t) => t.processedMeatG,
-    guidance: 'Bacon, salami, deli meat, sausages. Cancer-prevention guidance is "little, if any". Default limit 100 g/week.',
   },
   retinol: {
     label: 'Vitamin A (retinol)',

@@ -53,12 +53,11 @@ describe('buildLogEntry', () => {
     expect(e.nutrients.netCarbs).toBe(4.5)
   })
 
-  it('adds mercury for fish and grams for processed meat', () => {
+  it('adds mercury for fish and counts sweetener servings', () => {
     const tuna = buildLogEntry(food({ meta: { fishSpecies: 'tuna_albacore' } }), 142, 'g', 'lunch', new Date())
     expect(tuna.nutrients.mercuryUg).toBeCloseTo(49.7, 1)
-    const bacon = buildLogEntry(food({ meta: { processedMeat: true, sweeteners: ['sucralose'] } }), 30, 'g', 'breakfast', new Date())
-    expect(bacon.nutrients.processedMeatG).toBe(30)
-    expect(bacon.nutrients.sweetenerServings).toBe(1)
+    const sweetened = buildLogEntry(food({ meta: { sweeteners: ['sucralose'] } }), 30, 'g', 'breakfast', new Date())
+    expect(sweetened.nutrients.sweetenerServings).toBe(1)
   })
 })
 

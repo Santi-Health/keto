@@ -4,7 +4,7 @@ import { completeNutrients, type Food, type NewFood } from '../lib/foods'
 import type { SugarAlcoholType } from '../lib/nutrition'
 import type { NutrientKey, Nutrients } from '../lib/nutrients'
 import type { UnitConversion } from '../lib/units'
-import { MERCURY_PPM, detectFishSpecies, detectProcessedMeat, type FishSpecies } from '../lib/watchlist'
+import { MERCURY_PPM, detectFishSpecies, type FishSpecies } from '../lib/watchlist'
 import { Sheet } from './Sheet'
 
 interface Props {
@@ -80,7 +80,6 @@ export function FoodForm({ food, barcode, onClose, onSaved }: Props) {
   const [euLabel, setEuLabel] = useState(food?.carbs_exclude_fiber ?? false)
   const [alcoholType, setAlcoholType] = useState<SugarAlcoholType>(food?.meta.sugarAlcoholType ?? 'erythritol')
   const [fish, setFish] = useState<FishSpecies | ''>(food?.meta.fishSpecies ?? '')
-  const [processed, setProcessed] = useState(food?.meta.processedMeat ?? false)
   const [sweeteners, setSweeteners] = useState((food?.meta.sweeteners ?? []).join(', '))
   const [ultra, setUltra] = useState(food?.meta.novaGroup === 4)
   const [heavyMetal, setHeavyMetal] = useState(food?.meta.heavyMetalRisk ?? false)
@@ -94,7 +93,6 @@ export function FoodForm({ food, barcode, onClose, onSaved }: Props) {
       const f = detectFishSpecies(`${name} ${brand}`)
       if (f) setFish(f)
     }
-    if (!processed && detectProcessedMeat(`${name} ${brand}`)) setProcessed(true)
   }
 
   function save() {
@@ -129,7 +127,6 @@ export function FoodForm({ food, barcode, onClose, onSaved }: Props) {
       meta: {
         ...food?.meta,
         fishSpecies: fish || null,
-        processedMeat: processed,
         sweeteners: sweetenerList,
         novaGroup: ultra ? 4 : food?.meta.novaGroup === 4 ? null : (food?.meta.novaGroup ?? null),
         heavyMetalRisk: heavyMetal,
@@ -247,10 +244,6 @@ export function FoodForm({ food, barcode, onClose, onSaved }: Props) {
           ))}
         </select>
       </div>
-      <label className="check">
-        <input type="checkbox" checked={processed} onChange={(e) => setProcessed(e.target.checked)} />
-        Processed or cured meat (bacon, salami, deli…)
-      </label>
       <label className="check">
         <input type="checkbox" checked={ultra} onChange={(e) => setUltra(e.target.checked)} />
         Ultra-processed

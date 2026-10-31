@@ -18,7 +18,6 @@ export const MEALS: { value: Meal; label: string }[] = [
 
 export interface FoodMeta {
   fishSpecies?: FishSpecies | null
-  processedMeat?: boolean
   /** Open Food Facts NOVA group; 4 = ultra-processed. */
   novaGroup?: number | null
   additives?: string[]
@@ -105,7 +104,6 @@ export function portionNutrients(food: Food, grams: number): Nutrients {
   const n = estimateAminos(scaleNutrients(food.per_100g, grams))
   const m = food.meta
   if (m.fishSpecies) n.mercuryUg = grams * MERCURY_PPM[m.fishSpecies].ppm
-  if (m.processedMeat) n.processedMeatG = grams
   if (m.sweeteners?.length) n.sweetenerServings = 1
   if (m.novaGroup === 4) n.ultraProcessedServings = 1
   if (m.heavyMetalRisk) n.heavyMetalServings = 1

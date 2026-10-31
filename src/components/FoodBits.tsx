@@ -41,7 +41,6 @@ export function FoodFlags({ food, portion }: { food: Food | NewFood; portion?: N
       warn: MERCURY_PPM[m.fishSpecies].ppm >= 0.3,
     })
   }
-  if (m.processedMeat) chips.push({ text: 'Processed meat', warn: true })
   if (m.partiallyHydrogenated) chips.push({ text: 'Trans fat (partially hydrogenated)', warn: true })
   if (m.sweeteners?.length) chips.push({ text: `Sweeteners: ${m.sweeteners.join(', ')}` })
   if (m.novaGroup === 4) chips.push({ text: 'Ultra-processed (NOVA 4)' })

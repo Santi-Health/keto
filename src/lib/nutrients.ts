@@ -46,7 +46,6 @@ export interface Nutrients {
   seleniumUg?: number
   // Watch list amounts, filled in on log entries only.
   mercuryUg?: number
-  processedMeatG?: number
   sweetenerServings?: number
   ultraProcessedServings?: number
   heavyMetalServings?: number
@@ -104,7 +103,6 @@ export const NUTRIENT_INFO: Record<NutrientKey, { label: string; unit: string }>
   zincMg: { label: 'Zinc', unit: 'mg' },
   seleniumUg: { label: 'Selenium', unit: 'µg' },
   mercuryUg: { label: 'Mercury', unit: 'µg' },
-  processedMeatG: { label: 'Processed meat', unit: 'g' },
   sweetenerServings: { label: 'Artificial sweeteners', unit: 'servings' },
   ultraProcessedServings: { label: 'Ultra-processed foods', unit: 'servings' },
   heavyMetalServings: { label: 'Lead/cadmium risk foods', unit: 'servings' },

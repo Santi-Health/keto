@@ -192,7 +192,7 @@ export function computeRecipe(ingredients: RecipeIngredient[], servings: number,
   }
 }
 
-/** The recipe as a food that can be logged by the serving. Mercury and processed meat are folded into its nutrients. */
+/** The recipe as a food that can be logged by the serving. Mercury is folded into its nutrients. */
 export function recipeToFood(name: string, recipe: RecipeMeta, existing?: Food): NewFood | Food {
   const t = computeRecipe(recipe.ingredients, recipe.servings, recipe.cookedWeightG)
   const servingG = Number(t.servingGrams.toFixed(1))

@@ -38,7 +38,7 @@ export function WatchListCard({ items, period = 'today' }: { items: WatchItem[];
         shown.map((i) => <WatchRow key={i.key} item={i} />)
       ) : (
         <p className="muted small" style={{ margin: 0 }}>
-          Nothing near its limit {period}: saturated and trans fat, added sugar, mercury, processed meat and more.
+          Nothing near its limit {period}: saturated and trans fat, added sugar, mercury and more.
         </p>
       )}
       {showAll && flagged.length > 0 && (
