@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import { NumberField, Segmented } from '../components/Fields'
+import { InstallCard } from '../components/InstallCard'
 import type { SyncState } from '../lib/profileStore'
 import { supabase } from '../lib/supabase'
 import { ACTIVITY_FACTORS, CM_PER_IN, MAX_DEFICIT, kgToLb, lbToKg, type Targets } from '../lib/targets'
@@ -188,6 +189,7 @@ export function Settings({ profile, update, targets, session, sync, recovering, 
         </div>
 
         <div className="grid">
+          <InstallCard />
           <TargetMath profile={profile} targets={targets} />
           <WatchSettingsCard profile={profile} update={update} targets={targets} />
           <Account session={session} sync={sync} recovering={recovering} onPassphraseChanged={onPassphraseChanged} />

@@ -12,6 +12,7 @@ export default defineConfig(({ command }) => ({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.svg', 'apple-touch-icon.png'],
       manifest: {
+        id: '/keto-tracker/',
         name: 'Keto Tracker',
         short_name: 'Keto',
         description: 'Track food, macros, electrolytes, glucose and ketones.',

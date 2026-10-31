@@ -1,4 +1,6 @@
 import { useMemo } from 'react'
+import { useInstall } from '../lib/install'
+import { InstallCard } from '../components/InstallCard'
 import { Bar, Ring } from '../components/Progress'
 import { WatchListCard } from '../components/WatchListCard'
 import { useData } from '../lib/data'
@@ -13,6 +15,11 @@ interface Props {
   onOpenSettings: () => void
   onToggleRefeed: () => void
   onNavigate: (hash: string) => void
+}
+
+/** Offer installing on Today only when Chrome says it's possible, so it's not a permanent nag. */
+function useInstallOffer() {
+  return useInstall().state === 'available'
 }
 
 export function Today({ profile, targets, onOpenSettings, onToggleRefeed, onNavigate }: Props) {
@@ -129,6 +136,7 @@ export function Today({ profile, targets, onOpenSettings, onToggleRefeed, onNavi
         </div>
 
         <div className="grid">
+          {useInstallOffer() && <InstallCard compact />}
           <section className="card">
             <h2>Quick add</h2>
             <div className="quick">
