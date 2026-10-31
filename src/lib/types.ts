@@ -17,6 +17,10 @@ export interface Profile {
   proteinPerLb: number
   /** Calorie deficit applied to daily burn, 0–0.20. */
   deficitPct: number
+  /** Daily calorie ceiling, lifted on refeed days. Null for no ceiling. */
+  calorieCapKcal: number | null
+  /** Local date (YYYY-MM-DD) marked as a refeed day. */
+  refeedDate: string | null
   netCarbLimitG: number
   sodiumMg: number
   potassiumMg: number
@@ -38,6 +42,8 @@ export const DEFAULT_PROFILE: Profile = {
   activityLevel: 'active',
   proteinPerLb: 1,
   deficitPct: 0.12,
+  calorieCapKcal: 2000,
+  refeedDate: null,
   netCarbLimitG: 25,
   sodiumMg: 4000,
   potassiumMg: 4000,

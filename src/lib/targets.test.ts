@@ -34,14 +34,14 @@ describe('computeTargets', () => {
   })
 
   it('leaves calories and fat empty without height and warns', () => {
-    const t = computeTargets(profile({ heightCm: null }), oct30)
+    const t = computeTargets(profile({ heightCm: null, calorieCapKcal: null }), oct30)
     expect(t.calories).toBeNull()
     expect(t.fatG).toBeNull()
     expect(t.warnings.some((w) => w.includes('height'))).toBe(true)
   })
 
   it('prefers the Fitbit burn over the estimate', () => {
-    const t = computeTargets(profile({ heightCm: 175, deficitPct: 0.1 }), oct30, 3000)
+    const t = computeTargets(profile({ heightCm: 175, deficitPct: 0.1, calorieCapKcal: null }), oct30, 3000)
     expect(t.burnSource).toBe('fitbit')
     expect(t.calories).toBe(2700)
     // (2700 − 150×4 − 25×4) / 9 = 222.2
@@ -49,8 +49,42 @@ describe('computeTargets', () => {
   })
 
   it('caps the deficit at 20%', () => {
-    const t = computeTargets(profile({ heightCm: 175, deficitPct: 0.5 }), oct30, 3000)
+    const t = computeTargets(profile({ heightCm: 175, deficitPct: 0.5, calorieCapKcal: null }), oct30, 3000)
     expect(t.calories).toBe(2400)
+  })
+
+  it('never goes above the calorie ceiling', () => {
+    const t = computeTargets(profile({ heightCm: 175, deficitPct: 0.1, calorieCapKcal: 2000 }), oct30, 3000)
+    expect(t.calories).toBe(2000)
+    expect(t.capped).toBe(true)
+    // (2000 − 150×4 − 25×4) / 9 = 144.4
+    expect(t.fatG).toBe(144)
+  })
+
+  it('applies the ceiling even without height', () => {
+    const t = computeTargets(profile({ heightCm: null, calorieCapKcal: 2000 }), oct30)
+    expect(t.calories).toBe(2000)
+  })
+
+  it('eats at maintenance with no ceiling on a refeed day', () => {
+    const t = computeTargets(
+      profile({ heightCm: 175, deficitPct: 0.1, calorieCapKcal: 2000, refeedDate: '2026-10-30' }),
+      oct30,
+      3000,
+    )
+    expect(t.isRefeed).toBe(true)
+    expect(t.calories).toBe(3000)
+    expect(t.netCarbsG).toBe(25)
+  })
+
+  it('only treats the marked date as a refeed day', () => {
+    const t = computeTargets(
+      profile({ heightCm: 175, calorieCapKcal: 2000, refeedDate: '2026-10-29' }),
+      oct30,
+      3000,
+    )
+    expect(t.isRefeed).toBe(false)
+    expect(t.calories).toBe(2000)
   })
 
   it('estimates burn from BMR and activity when Fitbit is missing', () => {

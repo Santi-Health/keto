@@ -16,6 +16,12 @@ export const ACTIVITY_FACTORS: Record<ActivityLevel, { factor: number; label: st
 
 export const MAX_DEFICIT = 0.2
 
+/** YYYY-MM-DD in the device's time zone. */
+export function localDate(d: Date = new Date()): string {
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+}
+
 /** Whole years between birthDate and today. */
 export function ageOn(birthDate: string, today: Date = new Date()): number {
   const [y, m, d] = birthDate.split('-').map(Number)
@@ -45,6 +51,9 @@ export interface Targets {
   burn: number | null
   burnSource: 'fitbit' | 'estimate' | 'none'
   calories: number | null
+  /** True when the calorie ceiling lowered today's target. */
+  capped: boolean
+  isRefeed: boolean
   proteinG: number
   netCarbsG: number
   /** Null when calories can't be computed. */
@@ -83,8 +92,16 @@ export function computeTargets(
   const burn = actualBurn ?? estimatedBurn
   const burnSource = actualBurn != null ? 'fitbit' : estimatedBurn != null ? 'estimate' : 'none'
 
-  const deficit = Math.min(Math.max(profile.deficitPct, 0), MAX_DEFICIT)
-  const calories = burn != null ? burn * (1 - deficit) : null
+  // Refeed days eat at maintenance (no deficit, no ceiling); carbs stay at the keto limit.
+  const isRefeed = profile.refeedDate === localDate(today)
+  const deficit = isRefeed ? 0 : Math.min(Math.max(profile.deficitPct, 0), MAX_DEFICIT)
+  let calories = burn != null ? burn * (1 - deficit) : null
+  const cap = isRefeed ? null : profile.calorieCapKcal
+  let capped = false
+  if (cap != null && (calories == null || calories > cap)) {
+    calories = cap
+    capped = true
+  }
   const proteinG = kgToLb(profile.weightKg) * profile.proteinPerLb
   const netCarbsG = profile.netCarbLimitG
   const fatG = calories != null ? Math.max(0, (calories - proteinG * 4 - netCarbsG * 4) / 9) : null
@@ -96,6 +113,8 @@ export function computeTargets(
     burn: burn != null ? Math.round(burn) : null,
     burnSource,
     calories: calories != null ? Math.round(calories) : null,
+    capped,
+    isRefeed,
     proteinG: Math.round(proteinG),
     netCarbsG,
     fatG: fatG != null ? Math.round(fatG) : null,

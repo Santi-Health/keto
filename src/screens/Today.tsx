@@ -4,6 +4,7 @@ import type { Targets } from '../lib/targets'
 interface Props {
   targets: Targets
   onOpenSettings: () => void
+  onToggleRefeed: () => void
 }
 
 // Food logging arrives in phase 2; until then every total is zero.
@@ -18,7 +19,7 @@ const EMPTY_TOTALS = {
   magnesium: 0,
 }
 
-export function Today({ targets, onOpenSettings }: Props) {
+export function Today({ targets, onOpenSettings, onToggleRefeed }: Props) {
   const totals = EMPTY_TOTALS
   const date = new Date().toLocaleDateString('en-US', {
     weekday: 'long',
@@ -49,15 +50,22 @@ export function Today({ targets, onOpenSettings }: Props) {
               <Ring label="Net carbs" value={totals.netCarbs} target={targets.netCarbsG} unit="g" color="var(--carbs)" isLimit />
               <Ring label="Protein" value={totals.protein} target={targets.proteinG} unit="g" color="var(--protein)" />
               <Ring label="Fat" value={totals.fat} target={targets.fatG} unit="g" color="var(--fat)" />
-              <Ring label="Calories" value={totals.calories} target={targets.calories} unit="" color="var(--calories)" />
+              <Ring label="Calories" value={totals.calories} target={targets.calories} unit="" color="var(--calories)" isLimit />
             </div>
-            <p className="muted small" style={{ marginBottom: 0 }}>
-              {targets.burnSource === 'fitbit'
-                ? `Calories based on ${targets.burn?.toLocaleString()} kcal burned (Fitbit).`
-                : targets.burn != null
-                  ? `Calories based on an estimated ${targets.burn.toLocaleString()} kcal burn. Fitbit will replace this in phase 6.`
-                  : 'Add your height in Settings to get a calorie target.'}
+            <p className="muted small">
+              {targets.isRefeed
+                ? `Refeed day: eat at maintenance (${targets.burn?.toLocaleString() ?? '?'} kcal), net carbs still under ${targets.netCarbsG} g.`
+                : targets.capped
+                  ? `Capped at your ${targets.calories?.toLocaleString()} kcal daily ceiling${targets.burn != null ? ` (estimated burn ${targets.burn.toLocaleString()} kcal).` : '.'}`
+                  : targets.burnSource === 'fitbit'
+                    ? `Calories based on ${targets.burn?.toLocaleString()} kcal burned (Fitbit).`
+                    : targets.burn != null
+                      ? `Calories based on an estimated ${targets.burn.toLocaleString()} kcal burn. Fitbit will replace this in phase 6.`
+                      : 'Add your height in Settings to get a calorie target.'}
             </p>
+            <button type="button" className={`btn ${targets.isRefeed ? '' : 'secondary'}`} onClick={onToggleRefeed} aria-pressed={targets.isRefeed}>
+              {targets.isRefeed ? 'Refeed day ✓ (tap to undo)' : 'Make today a refeed day'}
+            </button>
           </section>
 
           <section className="card">

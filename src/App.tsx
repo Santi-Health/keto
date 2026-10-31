@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import { useProfile, useSession } from './lib/profileStore'
-import { computeTargets } from './lib/targets'
+import { computeTargets, localDate } from './lib/targets'
 import { supabase } from './lib/supabase'
 import { Lock, NotConfigured } from './screens/Lock'
 import { Settings } from './screens/Settings'
@@ -79,7 +79,13 @@ function Tracker({ session, recovering = false, onPassphraseChanged = () => {} }
   return (
     <div className="app">
       <main className="main">
-        {tab === 'today' && <Today targets={targets} onOpenSettings={() => go('settings')} />}
+        {tab === 'today' && (
+          <Today
+            targets={targets}
+            onOpenSettings={() => go('settings')}
+            onToggleRefeed={() => update({ refeedDate: targets.isRefeed ? null : localDate() })}
+          />
+        )}
         {tab === 'settings' && (
           <Settings
             profile={profile}

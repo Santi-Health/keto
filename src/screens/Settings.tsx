@@ -161,6 +161,15 @@ export function Settings({ profile, update, targets, session, sync, recovering, 
                 For losing fat while keeping muscle, 10–15% is a common range. Capped at {MAX_DEFICIT * 100}%.
               </div>
             </div>
+            <NumberField
+              label="Daily calorie ceiling"
+              value={profile.calorieCapKcal}
+              suffix="kcal"
+              step={50}
+              min={1200}
+              hint="Your target never goes above this, except on refeed days (mark one from the Today screen). Set 0 to turn the ceiling off."
+              onChange={(n) => update({ calorieCapKcal: n > 0 ? n : null })}
+            />
             <div className="row">
               <NumberField label="Sodium" value={profile.sodiumMg} suffix="mg" step={100} onChange={(sodiumMg) => update({ sodiumMg })} />
               <NumberField label="Potassium" value={profile.potassiumMg} suffix="mg" step={100} onChange={(potassiumMg) => update({ potassiumMg })} />
@@ -216,8 +225,23 @@ function TargetMath({ profile, targets }: { profile: Profile; targets: Targets }
           </tr>
           <tr>
             <td>
-              − {Math.round(profile.deficitPct * 100)}% deficit = calorie target
+              {targets.isRefeed ? 'Refeed day: no deficit' : `− ${Math.round(profile.deficitPct * 100)}% deficit`}
               {targets.burnSource === 'fitbit' && <div className="muted small">using Fitbit burn {fmt(targets.burn)}</div>}
+            </td>
+            <td>
+              {fmt(
+                targets.burn != null
+                  ? Math.round(targets.burn * (1 - (targets.isRefeed ? 0 : Math.min(profile.deficitPct, MAX_DEFICIT))))
+                  : null,
+                ' kcal',
+              )}
+            </td>
+          </tr>
+          <tr>
+            <td>
+              Calorie target
+              {targets.capped && <div className="muted small">limited by your {profile.calorieCapKcal?.toLocaleString()} kcal ceiling</div>}
+              {targets.isRefeed && profile.calorieCapKcal != null && <div className="muted small">ceiling lifted for today's refeed</div>}
             </td>
             <td>{fmt(targets.calories, ' kcal')}</td>
           </tr>

@@ -6,8 +6,8 @@ The full feature spec is in `../keto-tracker-build-prompt.md`. This repo is bein
 
 | Phase | What | Status |
 |---|---|---|
-| 1 | Project setup, cloud database + sign-in, installable app shell, Settings with calculated targets, GitHub Pages deploy | ✅ Done |
-| 2 | Food logging: search, barcode scan, units, My Foods, live Today totals | Next |
+| 1 | Project setup, cloud database + passphrase lock, installable app shell, Settings with calculated targets, 2,000 kcal ceiling + refeed days, GitHub Pages deploy | ✅ Done |
+| 2 | Food logging: search, barcode scan, units, My Foods, live Today totals, watch list (sat fat, trans fat, mercury, processed meat…) | Next |
 | 3 | JSON import + "copy prompt for Claude chat" (no API), then AI label photos | |
 | 4 | Saved meals + recipe builder | |
 | 5 | Readings (glucose, ketones, urine), GKI, weight, labs, exercise, fasting timer, water | |
