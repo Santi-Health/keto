@@ -80,4 +80,21 @@ describe('suggestions from your usual foods', () => {
     expect(salmon[0].effect).toMatch(/Vitamin D \(reaches/)
     expect(salmon[0].effect).toMatch(/Vitamin B12 \(reaches/)
   })
+  it('avoids a food that would push saturated fat over, and warns when nothing else works', () => {
+    const egg = food('egg2', 'Eggs', { kcal: 143, protein: 12.6, fat: 9.5, satFat: 3.1, netCarbs: 0.7, leuG: 1.09 }, '1 egg', 50)
+    const whites = food('wh', 'Egg whites', { kcal: 52, protein: 10.9, fat: 0.2, satFat: 0, netCarbs: 0.7, leuG: 0.95 }, 'oz', 28.35)
+    const butter = food('bu', 'Butter', { kcal: 717, fat: 81, satFat: 51, protein: 0.9 }, 'tbsp', 14)
+    const h = [log(egg, 2, '1 egg', 'breakfast', 7), log(egg, 2, '1 egg', 'lunch', 12), log(whites, 8, 'oz', 'breakfast', 7), log(whites, 8, 'oz', 'lunch', 12)]
+    // About 20 g saturated fat already; the limit at 2,000 kcal is 22 g. 2 more eggs add 3.1 g, egg whites add none.
+    const day = [log(butter, 2.1, 'tbsp', 'lunch', 12), log(egg, 3, '1 egg', 'breakfast', 7)]
+    const watch = { ctx: { calorieTarget: 2000, weightKg: 68 }, weekItems: [] }
+    const tips = suggestFixes({ dayLogs: day, history: h, foods: [egg, whites, butter], targets, muscleGoal: 'build', fatBudget: null, past: false, watch })
+    const breakfast = tips.find((t) => t.goal === 'leucine' && t.text.includes('breakfast'))!
+    expect(breakfast.text).toContain('Egg whites')
+    expect(breakfast.warning).toBeUndefined()
+    // With only whole eggs to choose from, it still helps but says what it costs.
+    const onlyEggs = suggestFixes({ dayLogs: day, history: h.filter((l) => l.food_id === 'egg2'), foods: [egg, butter], targets, muscleGoal: 'build', fatBudget: null, past: false, watch })
+    const w = onlyEggs.find((t) => t.text.includes('breakfast'))!
+    expect(w.warning).toMatch(/^Puts you over saturated fat \(\d+ of 22 g\)/)
+  })
 })

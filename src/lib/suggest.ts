@@ -1,10 +1,11 @@
 import { LEUCINE_PER_MEAL_G, estimateAminos, type MuscleGoal } from './aminoAcids'
 import { MEALS, portionNutrients, type Food, type LogEntry, type Meal } from './foods'
 import { addNutrients, type Nutrients } from './nutrients'
-import { microStatus, vitaminCoverage } from './micros'
+import { MICROS, microStatus, vitaminCoverage } from './micros'
 import type { Targets } from './targets'
 import type { Sex } from './types'
 import { formatAmount, toGrams } from './units'
+import { computeWatchList, type WatchContext, type WatchSettings } from './watchlist'
 
 /**
  * Small, practical fixes for the day built only from ingredients you actually eat: "add 1 egg to
@@ -40,11 +41,14 @@ export interface Suggestion {
   effect: string
   /** What it fixes, for grouping: leucine, protein, fiber, potassium, magnesium, netCarbs, calories, fat. */
   goal: string
+  /** A limit it would push you past, when no food could close the gap without that. */
+  warning?: string
 }
 
 const isRestaurant = (f: Food) => f.fields_estimated.includes('restaurant portions')
 const isDrink = (f: Food) => !!f.meta.externalId?.startsWith('drink:') && !f.meta.externalId.startsWith('drink:milk')
 const round1 = (n: number) => Math.round(n * 10) / 10
+const fmtN = (v: number) => (v >= 100 ? Math.round(v).toLocaleString() : v >= 10 ? v.toFixed(0) : String(round1(v)))
 
 /** Units you count rather than weigh ("1 egg", "slice", "pod"); weighed units step by half an ounce. */
 const WEIGHED = new Set(['g', 'oz', 'ml', 'fl oz', 'cup', 'tbsp', 'tsp'])
@@ -113,8 +117,10 @@ const MAX_ADD_KCAL = 200
  * `need` of a nutrient, within one more of your usual portion and about 200 kcal (seasonings: a couple of grams, full fixes only). Prefers foods
  * you eat at `meal`. When nothing covers all of it, the best one that covers at least half (`partial`).
  */
-function bestAddition(usual: UsualFood[], key: keyof Nutrients, need: number, meal?: Meal) {
+function bestAddition(usual: UsualFood[], key: keyof Nutrients, need: number, meal?: Meal, crosses: (n: Nutrients) => boolean = () => false) {
   type Pick = { u: UsualFood; steps: number; gain: number; kcal: number; carbs: number; score: number; partial: boolean }
+  // Foods that would push you past a limit (saturated fat, carbs, calories…) only win when nothing else works.
+  const pick = (clean: boolean) => {
   let best: Pick | null = null
   let bestPartial: Pick | null = null
   for (const u of usual) {
@@ -125,6 +131,7 @@ function bestAddition(usual: UsualFood[], key: keyof Nutrients, need: number, me
     const n = per(u, steps)
     const kcal = n.kcal ?? 0
     if (kcal > MAX_ADD_KCAL && full > 1) continue
+    if (clean && crosses(n)) continue
     const carbs = n.netCarbs ?? 0
     const gain = n[key] ?? 0
     // Calories first, net carbs weigh 20× (a keto budget), a small bonus for foods you eat at this meal.
@@ -138,6 +145,8 @@ function bestAddition(usual: UsualFood[], key: keyof Nutrients, need: number, me
     }
   }
   return best ?? bestPartial
+  }
+  return pick(true) ?? pick(false)
 }
 
 export interface SuggestInput {
@@ -151,9 +160,18 @@ export interface SuggestInput {
   past: boolean
   /** For vitamin targets; without it vitamins are skipped. */
   sex?: Sex
+  /** Your watch list (saturated fat, added sugar, caffeine…), so additions that would pass a limit are avoided or flagged.
+   * weekItems: the 6 days before this one, for weekly limits like mercury. */
+  watch?: { ctx: WatchContext; settings?: WatchSettings; weekItems: Nutrients[] }
 }
 
-export function suggestFixes({ dayLogs, history, foods, targets, muscleGoal, fatBudget, past, sex }: SuggestInput): Suggestion[] {
+/** A limit an addition would push you past: "saturated fat (24 of 22 g)". */
+interface Crossing {
+  label: string
+  text: string
+}
+
+export function suggestFixes({ dayLogs, history, foods, targets, muscleGoal, fatBudget, past, sex, watch }: SuggestInput): Suggestion[] {
   if (!dayLogs.length) return []
   const usual = usualFoods(foods, history)
   if (!usual.length) return []
@@ -168,6 +186,35 @@ export function suggestFixes({ dayLogs, history, foods, targets, muscleGoal, fat
   type Gap = { goal: string; key: keyof Nutrients; label: string; unit: string; target: number; meal?: Meal; have: () => number; partialOk: boolean }
   type Plan = { u: UsualFood; steps: number; meal?: Meal; already: boolean; goals: Gap[] }
   const plans: Plan[] = []
+  // Every limit the day has: net carbs, calories, fat, your watch list, and vitamin upper limits.
+  const crossings = (extra: Nutrients[], mine: Nutrients): Crossing[] => {
+    const after = addNutrients([total, ...extra])
+    const before = addNutrients([total, ...extra.filter((n) => n !== mine)])
+    const out: Crossing[] = []
+    const check = (label: string, limit: number | null | undefined, get: (t: Nutrients) => number | null | undefined, unit: string) => {
+      if (limit == null) return
+      const a = get(after) ?? 0
+      if (a > limit && a > (get(before) ?? 0) + 1e-6) out.push({ label, text: `${label} (${fmtN(a)} of ${fmtN(limit)}${unit ? ` ${unit}` : ''})` })
+    }
+    check('net carbs', targets.netCarbsG, (t) => t.netCarbs, 'g')
+    check('calories', targets.calories, (t) => t.kcal, 'kcal')
+    check('fat', fatBudget, (t) => t.fat, 'g')
+    if (watch) {
+      const items = (n: Nutrients[]) => computeWatchList([total, ...n], [...watch.weekItems, total, ...n], watch.ctx, watch.settings)
+      const was = new Map(items(extra.filter((n) => n !== mine)).map((w) => [w.key, w.value ?? 0]))
+      for (const w of items(extra))
+        if (w.limit != null && w.value != null && w.value > w.limit && w.value > (was.get(w.key) ?? 0) + 1e-6)
+          out.push({
+            label: w.label.toLowerCase(),
+            text: w.unit === ': 1'
+              ? `${w.label.toLowerCase()} (${fmtN(w.value)}:1, limit ${fmtN(w.limit)}:1)`
+              : `${w.label.toLowerCase()} (${fmtN(w.value)} of ${fmtN(w.limit)} ${w.unit}${w.period === 'week' ? ' this week' : ''})`,
+          })
+    }
+    for (const m of MICROS) check(m.label, m.upper, (t) => t[m.key] as number | undefined, m.unit)
+    return out
+  }
+  const plannedItems = () => plans.map((p) => per(p.u, p.steps))
   const planned = (key: keyof Nutrients, meal?: Meal) =>
     plans.filter((p) => !meal || p.meal === meal).reduce((sum, p) => sum + ((per(p.u, p.steps)[key] as number) ?? 0), 0)
   const dayHave = (key: keyof Nutrients) => () => ((total[key] as number) ?? 0) + planned(key)
@@ -208,7 +255,11 @@ export function suggestFixes({ dayLogs, history, foods, targets, muscleGoal, fat
         return u.maxSteps > p.steps ? { ...u, maxSteps: u.maxSteps - p.steps } : null
       })
       .filter((u): u is UsualFood => !!u)
-    const pick = bestAddition(room, gap.key, need, gap.meal)
+    const pick = bestAddition(room, gap.key, need, gap.meal, (n) => {
+      // Judge the food together with everything already planned (and any portion of it already planned).
+      const others = plannedItems()
+      return crossings([...others, n], n).length > 0
+    })
     if (!pick || (pick.partial && !gap.partialOk)) continue
     const p = planFor(pick.u.food.id)
     if (p) {
@@ -221,10 +272,11 @@ export function suggestFixes({ dayLogs, history, foods, targets, muscleGoal, fat
     }
   }
 
-  const kcalRoom = targets.calories != null ? targets.calories - total.kcal : Infinity
-  const fmt = (v: number) => (v >= 100 ? Math.round(v).toLocaleString() : v >= 10 ? v.toFixed(0) : String(round1(v)))
-  for (const p of plans) {
-    const n = per(p.u, p.steps)
+  const fmt = fmtN
+  const all = plannedItems()
+  for (const [i, p] of plans.entries()) {
+    const n = all[i]
+    const over = crossings(all, n)
     // Everything this food helps: the gaps it was picked for, plus any other open gap it closes a real part of.
     const helps = gaps.filter((g) => {
       if (g.meal && g.meal !== p.meal) return false
@@ -244,7 +296,8 @@ export function suggestFixes({ dayLogs, history, foods, targets, muscleGoal, fat
       text: p.meal
         ? `${add} ${amountText(p.u, p.steps)}${p.already ? ' more' : ''} ${p.u.food.name} ${p.already ? 'at' : 'to'} ${mealLabel(p.meal)}${would}`
         : `${add} ${amountText(p.u, p.steps)} ${p.u.food.name}${would}`,
-      effect: `${parts.join(' · ')} · +${kcal} kcal${kcal > kcalRoom ? ' (over your calorie target)' : ''}`,
+      effect: `${parts.join(' · ')} · +${kcal} kcal`,
+      warning: over.length ? `${past ? 'Would have put' : 'Puts'} you over ${over.map((c) => c.text).join(', ')}` : undefined,
     })
   }
 

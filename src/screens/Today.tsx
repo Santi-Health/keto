@@ -209,6 +209,10 @@ export function Today({ profile, targets, onOpenSettings, onToggleRefeed, onNavi
   const sinceStrength = daysSinceStrength(exercises)
   const readiness = isToday ? readinessFor(today, activity) : null
   const [morning, doneMorning] = useMorningReadiness()
+  const suggestWatch = useMemo(
+    () => ({ ctx: { calorieTarget: targets.calories, weightKg: profile.weightKg }, settings: profile.watchList, weekItems: weekLogs.filter((l) => !dayLogs.includes(l)).map((l) => l.nutrients) }),
+    [targets.calories, profile.weightKg, profile.watchList, weekLogs, dayLogs],
+  )
   const trainWarnings = !isToday ? [] : [...(readiness?.band === 'low' ? [{ level: 'yellow' as const, text: `Readiness is ${readiness.score}: ${READINESS_TEXT.low}` }] : []), ...trainingWarnings({
     exercisesToday: sessionsToday,
     daysSinceStrength: sinceStrength,
@@ -383,7 +387,7 @@ export function Today({ profile, targets, onOpenSettings, onToggleRefeed, onNavi
             )}
           </section>
 
-          {!isWeek && <SuggestionsCard dayLogs={dayLogs} targets={targets} muscleGoal={profile.muscleGoal} fatBudget={fatBudget} past={!isToday} sex={profile.sex} />}
+          {!isWeek && <SuggestionsCard dayLogs={dayLogs} targets={targets} muscleGoal={profile.muscleGoal} fatBudget={fatBudget} past={!isToday} sex={profile.sex} watch={suggestWatch} />}
 
           <section className="card">
             <h2>Electrolytes &amp; fiber</h2>

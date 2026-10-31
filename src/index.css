@@ -1846,6 +1846,11 @@ input[type='time'] {
   line-height: 1.3;
 }
 
+.tip-warn {
+  display: block;
+  margin-top: 4px;
+  color: var(--warn, #e0a33a);
+}
 .tip-icon {
   flex: none;
   display: grid;
