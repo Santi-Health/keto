@@ -1,9 +1,12 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import type { Session } from '@supabase/supabase-js'
+import { DataProvider } from './lib/data'
 import { useProfile, useSession } from './lib/profileStore'
 import { computeTargets, localDate } from './lib/targets'
 import { supabase } from './lib/supabase'
+import { Add } from './screens/Add'
 import { Lock, NotConfigured } from './screens/Lock'
+import { Log } from './screens/Log'
 import { Settings } from './screens/Settings'
 import { Today } from './screens/Today'
 
@@ -23,16 +26,13 @@ const TABS: { id: Tab; label: string; icon: ReactNode }[] = [
   { id: 'settings', label: 'Settings', icon: icon('M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0M14 4v4M8 10v4M16 16v4') },
 ]
 
-const COMING: Record<Exclude<Tab, 'today' | 'settings'>, { title: string; text: string }> = {
-  log: { title: 'Log', text: 'Your daily timeline of meals, readings and exercise arrives in phase 2.' },
-  add: { title: 'Add food', text: 'Search, barcode scan, label photos and saved meals arrive in phases 2–4.' },
-  trends: { title: 'Trends', text: 'Charts for weight, macros, ketones and glucose arrive in phase 8.' },
+/** Routes look like #log/2026-10-29 or #add/scan: a tab plus an optional detail. */
+const getRoute = (): { tab: Tab; param: string | null } => {
+  const [tab, param = null] = window.location.hash.slice(1).split('/') as [Tab, string?]
+  return TABS.some((t) => t.id === tab) ? { tab, param } : { tab: 'today', param: null }
 }
 
-const getTab = (): Tab => {
-  const hash = window.location.hash.slice(1) as Tab
-  return TABS.some((t) => t.id === hash) ? hash : 'today'
-}
+const isDate = (s: string | null): s is string => !!s && /^\d{4}-\d{2}-\d{2}$/.test(s)
 
 export default function App() {
   const { session, recovering, doneRecovering } = useSession()
@@ -52,11 +52,11 @@ interface TrackerProps {
 
 function Tracker({ session, recovering = false, onPassphraseChanged = () => {} }: TrackerProps) {
   const { profile, update, sync } = useProfile(session)
-  const [tab, setTab] = useState<Tab>(getTab)
+  const [{ tab, param }, setRoute] = useState(getRoute)
   const targets = useMemo(() => computeTargets(profile), [profile])
 
   useEffect(() => {
-    const onHash = () => setTab(getTab())
+    const onHash = () => setRoute(getRoute())
     window.addEventListener('hashchange', onHash)
     return () => window.removeEventListener('hashchange', onHash)
   }, [])
@@ -71,19 +71,22 @@ function Tracker({ session, recovering = false, onPassphraseChanged = () => {} }
     else document.documentElement.dataset.theme = profile.theme
   }, [profile.theme])
 
-  const go = (t: Tab) => {
-    window.location.hash = t
+  const go = (hash: string) => {
+    window.location.hash = hash
     window.scrollTo(0, 0)
   }
 
   return (
+    <DataProvider session={session}>
     <div className="app">
       <main className="main">
         {tab === 'today' && (
           <Today
+            profile={profile}
             targets={targets}
             onOpenSettings={() => go('settings')}
             onToggleRefeed={() => update({ refeedDate: targets.isRefeed ? null : localDate() })}
+            onNavigate={go}
           />
         )}
         {tab === 'settings' && (
@@ -97,13 +100,28 @@ function Tracker({ session, recovering = false, onPassphraseChanged = () => {} }
             onPassphraseChanged={onPassphraseChanged}
           />
         )}
-        {tab !== 'today' && tab !== 'settings' && (
+        {tab === 'log' && (
+          <Log
+            date={isDate(param) ? param : localDate()}
+            onDateChange={(d) => go(d === localDate() ? 'log' : `log/${d}`)}
+            onAdd={(d) => go(d === localDate() ? 'add' : `add/${d}`)}
+          />
+        )}
+        {tab === 'add' && (
+          <Add
+            key={param ?? ''}
+            startScan={param === 'scan'}
+            date={isDate(param) ? param : undefined}
+            onLogged={() => go(isDate(param) ? `log/${param}` : 'today')}
+          />
+        )}
+        {tab === 'trends' && (
           <>
             <header className="page-header">
-              <h1>{COMING[tab].title}</h1>
+              <h1>Trends</h1>
             </header>
             <div className="card empty">
-              <p className="muted" style={{ margin: 0 }}>{COMING[tab].text}</p>
+              <p className="muted" style={{ margin: 0 }}>Charts for weight, macros, ketones and glucose arrive in phase 8.</p>
             </div>
           </>
         )}
@@ -117,5 +135,6 @@ function Tracker({ session, recovering = false, onPassphraseChanged = () => {} }
         ))}
       </nav>
     </div>
+    </DataProvider>
   )
 }

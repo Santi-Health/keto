@@ -1,26 +1,48 @@
+import { useMemo } from 'react'
 import { Bar, Ring } from '../components/Progress'
-import type { Targets } from '../lib/targets'
+import { WatchListCard } from '../components/WatchListCard'
+import { useData } from '../lib/data'
+import { addNutrients } from '../lib/nutrients'
+import { localDate, type Targets } from '../lib/targets'
+import type { Profile } from '../lib/types'
+import { computeWatchList } from '../lib/watchlist'
 
 interface Props {
+  profile: Profile
   targets: Targets
   onOpenSettings: () => void
   onToggleRefeed: () => void
+  onNavigate: (hash: string) => void
 }
 
-// Food logging arrives in phase 2; until then every total is zero.
-const EMPTY_TOTALS = {
-  netCarbs: 0,
-  protein: 0,
-  fat: 0,
-  calories: 0,
-  fiber: 0,
-  sodium: 0,
-  potassium: 0,
-  magnesium: 0,
-}
-
-export function Today({ targets, onOpenSettings, onToggleRefeed }: Props) {
-  const totals = EMPTY_TOTALS
+export function Today({ profile, targets, onOpenSettings, onToggleRefeed, onNavigate }: Props) {
+  const { logsOn, logsWeekEnding, pending, syncError } = useData()
+  const day = localDate()
+  const dayLogs = logsOn(day)
+  const weekLogs = logsWeekEnding(day)
+  const n = useMemo(() => addNutrients(dayLogs.map((l) => l.nutrients)), [dayLogs])
+  const totals = {
+    netCarbs: n.netCarbs,
+    protein: n.protein,
+    fat: n.fat,
+    calories: n.kcal,
+    fiber: n.fiber,
+    sodium: n.sodiumMg,
+    potassium: n.potassiumMg,
+    magnesium: n.magnesiumMg,
+  }
+  const watch = useMemo(
+    () =>
+      computeWatchList(
+        dayLogs.map((l) => l.nutrients),
+        weekLogs.map((l) => l.nutrients),
+        { calorieTarget: targets.calories, weightKg: profile.weightKg },
+        profile.watchList,
+      ),
+    [dayLogs, weekLogs, targets.calories, profile.weightKg, profile.watchList],
+  )
+  const carbsLeft = targets.netCarbsG - totals.netCarbs
+  const proteinLeft = targets.proteinG - totals.protein
   const date = new Date().toLocaleDateString('en-US', {
     weekday: 'long',
     month: 'long',
@@ -34,6 +56,11 @@ export function Today({ targets, onOpenSettings, onToggleRefeed }: Props) {
           <h1>Today</h1>
           <div className="muted small">{date}</div>
         </div>
+        {(pending > 0 || syncError) && (
+          <span className={`badge ${syncError ? 'warn' : ''}`} title={syncError ?? undefined}>
+            {syncError ? 'Sync problem' : `${pending} waiting to sync`}
+          </span>
+        )}
       </header>
 
       <div className="grid two">
@@ -52,6 +79,25 @@ export function Today({ targets, onOpenSettings, onToggleRefeed }: Props) {
               <Ring label="Fat" value={totals.fat} target={targets.fatG} unit="g" color="var(--fat)" />
               <Ring label="Calories" value={totals.calories} target={targets.calories} unit="" color="var(--calories)" isLimit />
             </div>
+            {dayLogs.length > 0 && (
+              <p className="small" style={{ marginBottom: 0 }}>
+                {carbsLeft >= 0 ? (
+                  <>
+                    <strong>{carbsLeft.toFixed(1)} g</strong> net carbs left
+                  </>
+                ) : (
+                  <strong style={{ color: 'var(--warn)' }}>{(-carbsLeft).toFixed(1)} g over your net carb limit</strong>
+                )}
+                {' · '}
+                {proteinLeft > 0 ? (
+                  <>
+                    <strong>{Math.round(proteinLeft)} g</strong> protein to go
+                  </>
+                ) : (
+                  'protein target reached ✓'
+                )}
+              </p>
+            )}
             <p className="muted small">
               {targets.isRefeed
                 ? `Refeed day: eat at maintenance (${targets.burn?.toLocaleString() ?? '?'} kcal), net carbs still under ${targets.netCarbsG} g.`
@@ -84,22 +130,33 @@ export function Today({ targets, onOpenSettings, onToggleRefeed }: Props) {
 
         <div className="grid">
           <section className="card">
-            <h2>Ketosis</h2>
-            <p className="muted small" style={{ margin: 0 }}>
-              Predicted blood ketones will show here once food logging (phase 2) and the ketosis engine (phase 7) are built.
-            </p>
-          </section>
-
-          <section className="card">
             <h2>Quick add</h2>
             <div className="quick">
-              {['Search food', 'Scan barcode', 'Label photo', 'Saved meal', 'Reading', 'Exercise'].map((label) => (
+              <button type="button" style={{ color: 'var(--text)' }} onClick={() => onNavigate('add')}>
+                Search food
+              </button>
+              <button type="button" style={{ color: 'var(--text)' }} onClick={() => onNavigate('add/scan')}>
+                Scan barcode
+              </button>
+              {['Label photo', 'Saved meal', 'Reading', 'Exercise'].map((label) => (
                 <button key={label} type="button" disabled title="Coming in a later phase">
                   {label}
                 </button>
               ))}
             </div>
-            <p className="muted small" style={{ marginBottom: 0 }}>These turn on as each phase is built.</p>
+            <p className="muted small" style={{ marginBottom: 0 }}>The grayed-out buttons turn on in later phases.</p>
+          </section>
+
+          <WatchListCard items={watch} />
+
+          <section className="card">
+            <h2>Ketosis</h2>
+            <p className="muted small" style={{ margin: 0 }}>
+              {totals.netCarbs <= targets.netCarbsG
+                ? `Today's net carbs (${totals.netCarbs.toFixed(1)} g) are within your ${targets.netCarbsG} g limit.`
+                : `Today's net carbs (${totals.netCarbs.toFixed(1)} g) are over your ${targets.netCarbsG} g limit.`}{' '}
+              Predicted blood ketones arrive with the ketosis engine (phase 7).
+            </p>
           </section>
         </div>
       </div>

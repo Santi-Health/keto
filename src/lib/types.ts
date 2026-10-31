@@ -1,3 +1,5 @@
+import type { WatchSettings } from './watchlist'
+
 export type Sex = 'male' | 'female' | 'unspecified'
 
 export type ActivityLevel = 'sedentary' | 'light' | 'moderate' | 'active' | 'very_active'
@@ -30,6 +32,7 @@ export interface Profile {
   weightUnit: WeightUnit
   heightUnit: HeightUnit
   theme: Theme
+  watchList: WatchSettings
   /** ISO timestamp of the last local edit, used to resolve sync conflicts. */
   updatedAt: string
 }
@@ -53,5 +56,6 @@ export const DEFAULT_PROFILE: Profile = {
   weightUnit: 'lb',
   heightUnit: 'cm',
   theme: 'system',
+  watchList: {},
   updatedAt: new Date(0).toISOString(),
 }

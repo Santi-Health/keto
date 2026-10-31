@@ -5,6 +5,7 @@ import type { SyncState } from '../lib/profileStore'
 import { supabase } from '../lib/supabase'
 import { ACTIVITY_FACTORS, CM_PER_IN, MAX_DEFICIT, kgToLb, lbToKg, type Targets } from '../lib/targets'
 import type { ActivityLevel, Profile } from '../lib/types'
+import { WATCH_LIST, type WatchKey } from '../lib/watchlist'
 
 interface Props {
   profile: Profile
@@ -188,6 +189,7 @@ export function Settings({ profile, update, targets, session, sync, recovering, 
 
         <div className="grid">
           <TargetMath profile={profile} targets={targets} />
+          <WatchSettingsCard profile={profile} update={update} targets={targets} />
           <Account session={session} sync={sync} recovering={recovering} onPassphraseChanged={onPassphraseChanged} />
           <section className="card">
             <h2>Appearance</h2>
@@ -205,6 +207,60 @@ export function Settings({ profile, update, targets, session, sync, recovering, 
         </div>
       </div>
     </>
+  )
+}
+
+function WatchSettingsCard({ profile, update, targets }: Pick<Props, 'profile' | 'update' | 'targets'>) {
+  const ctx = { calorieTarget: targets.calories, weightKg: profile.weightKg }
+  const set = (key: WatchKey, change: { enabled?: boolean; limit?: number | null }) =>
+    update({ watchList: { ...profile.watchList, [key]: { ...profile.watchList[key], ...change } } })
+  return (
+    <section className="card">
+      <h2>Watch list</h2>
+      <p className="muted small" style={{ marginTop: 0 }}>
+        Turn items on or off and change limits. Leave a limit empty to go back to the default.
+      </p>
+      {(Object.keys(WATCH_LIST) as WatchKey[]).map((key) => {
+        const def = WATCH_LIST[key]
+        const s = profile.watchList[key] ?? {}
+        const enabled = s.enabled !== false
+        const defaultLimit = def.limit(ctx)
+        return (
+          <div key={key} className="watch-row" style={{ alignItems: 'center' }}>
+            <label className="check" style={{ margin: 0, flex: 1 }} title={def.guidance}>
+              <input type="checkbox" checked={enabled} onChange={(e) => set(key, { enabled: e.target.checked })} />
+              <span>
+                {def.label}
+                <span className="muted small"> {def.period === 'week' ? '/ week' : '/ day'}</span>
+              </span>
+            </label>
+            {(defaultLimit != null || s.limit != null) && (
+              <span className="row" style={{ flex: '0 0 130px' }}>
+                <input
+                  type="number"
+                  inputMode="decimal"
+                  aria-label={`${def.label} limit`}
+                  disabled={!enabled}
+                  placeholder={defaultLimit != null ? String(defaultLimit) : ''}
+                  value={s.limit ?? ''}
+                  onChange={(e) => {
+                    const { limit: _drop, ...rest } = profile.watchList[key] ?? {}
+                    void _drop
+                    if (e.target.value === '') update({ watchList: { ...profile.watchList, [key]: rest } })
+                    else set(key, { limit: Number(e.target.value) })
+                  }}
+                  style={{ minHeight: 36, padding: '4px 8px' }}
+                />
+                <span className="muted small" style={{ flex: '0 0 auto' }}>{def.unit}</span>
+              </span>
+            )}
+          </div>
+        )
+      })}
+      <p className="muted small" style={{ marginBottom: 0 }}>
+        Purines and arsenic are not tracked yet; they need data the food databases don't provide.
+      </p>
+    </section>
   )
 }
 

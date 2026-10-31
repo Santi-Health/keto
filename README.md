@@ -7,8 +7,8 @@ The full feature spec is in `../keto-tracker-build-prompt.md`. This repo is bein
 | Phase | What | Status |
 |---|---|---|
 | 1 | Project setup, cloud database + passphrase lock, installable app shell, Settings with calculated targets, 2,000 kcal ceiling + refeed days, GitHub Pages deploy | ✅ Done |
-| 2 | Food logging: search, barcode scan, units, My Foods, live Today totals, watch list (sat fat, trans fat, mercury, processed meat…) | Next |
-| 3 | JSON import + "copy prompt for Claude chat" (no API), then AI label photos | |
+| 2 | Food logging: search, barcode scan, units, My Foods, live Today totals, watch list (sat fat, trans fat, mercury, processed meat…) | ✅ Done |
+| 3 | JSON import + "copy prompt for Claude chat" (no API), then AI label photos | Next |
 | 4 | Saved meals + recipe builder | |
 | 5 | Readings (glucose, ketones, urine), GKI, weight, labs, exercise, fasting timer, water, muscle guard (deficit, protein, lifting, weight-loss rate) | |
 | 6 | Fitbit integration | |
@@ -35,7 +35,7 @@ runs the tests for the calculations (targets, net carbs, GKI).
 ### 1. Supabase (cloud database + sign-in, free)
 
 1. Create an account at https://supabase.com and create a new project (any name, pick a region near you, save the database password somewhere safe).
-2. In the project, open **SQL Editor → New query**, paste everything from `supabase/migrations/0001_initial_schema.sql`, and click **Run**.
+2. In the project, open **SQL Editor → New query**, paste each file from `supabase/migrations/` in order (`0001_…`, then `0002_…`), and click **Run** for each.
 3. Open **Project Settings → API** and copy the **Project URL** and the **anon public** key.
 4. For local use: copy `.env.example` to `.env.local` and paste both values.
 5. Open **Authentication → Sign In / Providers** and turn **off** "Allow new users to sign up". Nobody can create an account on the public site.
@@ -58,6 +58,10 @@ The published app shows only a lock screen until you sign in with that email and
 4. **Settings → Secrets and variables → Actions → Variables** tab: add `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` with the same values as above.
 5. **Actions** tab: re-run the "Deploy to GitHub Pages" workflow. When it's green, the app is at `https://<your-username>.github.io/keto-tracker/`.
 
+### Optional: USDA food search key (free)
+
+Food search uses USDA FoodData Central. Without a key it uses the shared `DEMO_KEY`, which only allows a few searches per hour. Get a free key at https://fdc.nal.usda.gov/api-key-signup (name + email, instant), then add it in GitHub → **Settings → Secrets and variables → Actions → Variables** as `VITE_USDA_API_KEY` and re-run the deploy. (It's a public, rate-limited key; it moves behind a server function in phase 3.)
+
 ### 3. Install on your Pixel Fold
 
 Open the URL in Chrome → menu (⋮) → **Add to home screen → Install**. Then unlock it with your email and passphrase.
@@ -67,6 +71,9 @@ Open the URL in Chrome → menu (⋮) → **Add to home screen → Install**. Th
 - `src/lib/targets.ts`: calorie, protein, fat targets (Mifflin-St Jeor, activity factor, deficit, Fitbit burn when available)
 - `src/lib/nutrition.ts`: net carbs (fiber + sugar alcohol rules), GKI
 - `src/lib/profileStore.ts`: profile saved on the device first, synced to Supabase when signed in
+- `src/lib/syncTable.ts`: foods and food logs kept on the device, queued while offline, synced when online
+- `src/lib/foodApi.ts`: USDA search and Open Food Facts barcode lookup, mapped to the app's nutrient fields
+- `src/lib/watchlist.ts`: mercury by fish (FDA averages), processed meat, sweeteners, and the watch-list limits
 - `supabase/migrations/`: database tables for all phases, each locked to your account with row-level security
 
 ## Notes
