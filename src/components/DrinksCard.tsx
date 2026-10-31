@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useData } from '../lib/data'
 import { ALL_DRINKS, CAFFEINE_FREE_MG, DRINKS, MILKS, asksForMilk, drinkFood, drinkPortion, hydration, milkFood, type Drink, type DrinkKey, type MilkKey } from '../lib/drinks'
-import { portionNutrients, type Food } from '../lib/foods'
+import { buildLogEntry, portionNutrients, type Food, type LogEntry } from '../lib/foods'
 import { mealForTime } from '../lib/foods'
 import { localDate } from '../lib/targets'
 import { deviceTz } from '../lib/time'
@@ -15,11 +15,11 @@ interface Props {
   waterTargetOz: number
 }
 
-type Undo = { kind: 'reading' | 'log'; ids: string[]; label: string }
+type Undo = { kind: 'reading' | 'log'; ids: string[]; label: string; can?: { entry: LogEntry; food: Food } }
 
 /** One tap per drink. Every drink fills the water goal by volume; sodas, coffee and tea also log caffeine, sodium and sweeteners. */
 export function DrinksCard({ days, waterTargetOz }: Props) {
-  const { readingsOn, saveReading, deleteReading, logsOn, deleteLog, foods, foodById, saveFood, logFood } = useData()
+  const { readingsOn, saveReading, deleteReading, logsOn, deleteLog, updateLog, foods, foodById, saveFood, logFood } = useData()
   const [undo, setUndo] = useState<Undo | null>(null)
   const [espresso, setEspresso] = useState<Drink | null>(null)
   const isToday = days.length === 1 && days[0] === localDate()
@@ -45,7 +45,8 @@ export function DrinksCard({ days, waterTargetOz }: Props) {
   for (const l of drinkLogs) {
     const ext = foodById[l.food_id!].meta.externalId!.slice('drink:'.length)
     const key = (ext === 'espresso' ? (l.amount >= 2 ? 'espresso_double' : 'espresso_single') : ext) as DrinkKey
-    counts[key] = (counts[key] ?? 0) + 1
+    // Cans count by amount, so half a can shows as ½.
+    counts[key] = (counts[key] ?? 0) + (l.unit === 'can' ? l.amount : 1)
   }
   const caffeine = drinkLogs.reduce((s, l) => s + (l.nutrients.caffeineMg ?? 0), 0)
   const label = (d: Drink) => (d.key.startsWith('espresso') ? `${d.serving.split(' ')[0]} espresso` : d.label)
@@ -75,7 +76,12 @@ export function DrinksCard({ days, waterTargetOz }: Props) {
       setEspresso(d)
       return
     }
-    const ids = [logDrinkFood(d, now).id]
+    const { entry, food } = logDrinkFood(d, now)
+    const ids = [entry.id]
+    if (entry.unit === 'can') {
+      setUndo({ kind: 'log', ids, label: label(d), can: { entry, food } })
+      return
+    }
     // Teas that always take milk log it in the same tap, as its own entry.
     const milk = d.milk && MILKS.find((m) => m.key === d.milk!.key)
     if (milk) ids.push(logFood(findOrSave(milkFood(milk)), d.milk!.oz, 'fl oz', mealForTime(now), now).id)
@@ -102,12 +108,20 @@ export function DrinksCard({ days, waterTargetOz }: Props) {
 
   function logDrinkFood(d: Drink, at: Date) {
     const { amount, unit } = drinkPortion(d)
-    return logFood(findOrSave(drinkFood(d)), amount, unit, mealForTime(at), at)
+    const food = findOrSave(drinkFood(d))
+    return { entry: logFood(food, amount, unit, mealForTime(at), at), food }
+  }
+
+  /** You only had half the can: same entry, half the amount (and half the caffeine, sodium and fluid). */
+  function halfCan(u: NonNullable<Undo['can']>) {
+    const half = buildLogEntry(u.food, 0.5, 'can', u.entry.meal, new Date(u.entry.eaten_at))
+    updateLog({ ...u.entry, ...half, id: u.entry.id })
+    setUndo((x) => (x ? { ...x, label: `½ ${x.label}`, can: undefined } : x))
   }
 
   function logEspresso(d: Drink, milk: MilkKey | null, oz: number) {
     const now = new Date()
-    const ids = [logDrinkFood(d, now).id]
+    const ids = [logDrinkFood(d, now).entry.id]
     const m = MILKS.find((x) => x.key === milk)
     if (m && oz > 0) ids.push(logFood(findOrSave(milkFood(m)), oz, 'fl oz', mealForTime(now), now).id)
     setUndo({ kind: 'log', ids, label: m && oz > 0 ? `${label(d)} with milk` : label(d) })
@@ -146,10 +160,15 @@ export function DrinksCard({ days, waterTargetOz }: Props) {
         ))}
       </div>}
       {undo && isToday && (
+        <div className="row-btns" style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 8 }}>
+        {undo.can && (
+          <button type="button" className="btn secondary small-btn" onClick={() => halfCan(undo.can!)}>
+            Make it ½ can
+          </button>
+        )}
         <button
           type="button"
           className="btn secondary small-btn"
-          style={{ marginTop: 8 }}
           onClick={() => {
             for (const id of undo.ids) {
               if (undo.kind === 'reading') deleteReading(id)
@@ -160,6 +179,7 @@ export function DrinksCard({ days, waterTargetOz }: Props) {
         >
           Undo {undo.label}
         </button>
+        </div>
       )}
       {espresso && (
         <EspressoSheet drink={espresso} foods={foods} onLog={logEspresso} onClose={() => setEspresso(null)} />
