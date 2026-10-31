@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useMemo, type ReactNode } from 'react'
 import type { Session } from '@supabase/supabase-js'
+import type { Exercise } from './exercise'
 import { buildLogEntry, type Food, type LogEntry, type Meal, type NewFood } from './foods'
 import { supabase } from './supabase'
 import { localDate } from './targets'
@@ -21,6 +22,10 @@ interface Data {
   logsOn: (date: string) => LogEntry[]
   /** Logs from the 7 days ending on `date`. */
   logsWeekEnding: (date: string) => LogEntry[]
+  exercises: Exercise[]
+  saveExercise: (e: Exercise) => void
+  deleteExercise: (id: string) => void
+  exercisesOn: (date: string) => Exercise[]
 }
 
 const DataContext = createContext<Data | null>(null)
@@ -28,6 +33,7 @@ const DataContext = createContext<Data | null>(null)
 export function DataProvider({ session, children }: { session: Session | null; children: ReactNode }) {
   const foodsTable = useSyncedTable<Food>('foods', session)
   const logsTable = useSyncedTable<LogEntry>('food_logs', session)
+  const exerciseTable = useSyncedTable<Exercise>('exercises', session)
 
   const saveFood = useCallback(
     (food: NewFood | Food): Food => {
@@ -96,14 +102,22 @@ export function DataProvider({ session, children }: { session: Session | null; c
     [logsTable.rows],
   )
 
+  const exercisesOn = useCallback(
+    (date: string) =>
+      exerciseTable.rows
+        .filter((e) => localDate(new Date(e.started_at)) === date)
+        .sort((a, b) => a.started_at.localeCompare(b.started_at)),
+    [exerciseTable.rows],
+  )
+
   const value = useMemo<Data>(
     () => ({
       foods: foodsTable.rows,
       foodById: foodsTable.byId,
       logs: logsTable.rows,
       // Without a database (local development) nothing is waiting to sync.
-      pending: supabase ? foodsTable.pending + logsTable.pending : 0,
-      syncError: foodsTable.error ?? logsTable.error,
+      pending: supabase ? foodsTable.pending + logsTable.pending + exerciseTable.pending : 0,
+      syncError: foodsTable.error ?? logsTable.error ?? exerciseTable.error,
       saveFood,
       updateFood: foodsTable.upsert,
       deleteFood: foodsTable.remove,
@@ -112,8 +126,12 @@ export function DataProvider({ session, children }: { session: Session | null; c
       deleteLog: logsTable.remove,
       logsOn,
       logsWeekEnding,
+      exercises: exerciseTable.rows,
+      saveExercise: exerciseTable.upsert,
+      deleteExercise: exerciseTable.remove,
+      exercisesOn,
     }),
-    [foodsTable, logsTable, saveFood, logFood, logsOn, logsWeekEnding],
+    [foodsTable, logsTable, exerciseTable, saveFood, logFood, logsOn, logsWeekEnding, exercisesOn],
   )
 
   return <DataContext.Provider value={value}>{children}</DataContext.Provider>

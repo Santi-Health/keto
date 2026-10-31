@@ -1,15 +1,18 @@
 import { useMemo, useState } from 'react'
 import { MacroStrip } from '../components/FoodBits'
 import { FoodForm } from '../components/FoodForm'
+import { ExerciseSheet } from '../components/ExerciseSheet'
 import { LogFoodSheet } from '../components/LogFoodSheet'
 import { RecipeBuilder } from '../components/RecipeBuilder'
 import { useData } from '../lib/data'
+import { EXERCISE_KINDS, type Exercise } from '../lib/exercise'
 import { MEALS, type Food, type LogEntry, type NewFood } from '../lib/foods'
 import { addNutrients, type NutrientKey, type Nutrients } from '../lib/nutrients'
 import { localDate } from '../lib/targets'
 import { formatAmount } from '../lib/units'
 
 interface Props {
+  weightKg: number
   date: string
   onDateChange: (date: string) => void
   onAdd: (date: string) => void
@@ -47,8 +50,10 @@ function foodFromEntry(e: LogEntry): NewFood {
   }
 }
 
-export function Log({ date, onDateChange, onAdd }: Props) {
-  const { logsOn, foodById } = useData()
+export function Log({ weightKg, date, onDateChange, onAdd }: Props) {
+  const { logsOn, foodById, exercisesOn } = useData()
+  const [exerciseSheet, setExerciseSheet] = useState<{ exercise?: Exercise } | null>(null)
+  const sessions = exercisesOn(date)
   const [editing, setEditing] = useState<{ entry: LogEntry; food: Food | NewFood } | null>(null)
   const [editingFood, setEditingFood] = useState<Food | NewFood | null>(null)
   const entries = logsOn(date)
@@ -92,13 +97,50 @@ export function Log({ date, onDateChange, onAdd }: Props) {
       <div className="card">
         <div className="page-header" style={{ marginBottom: 0 }}>
           <h2>{label}</h2>
-          <button type="button" className="btn" onClick={() => onAdd(date)}>
-            + Add food
-          </button>
+          <div className="row" style={{ flex: 'none' }}>
+            <button type="button" className="btn secondary" onClick={() => setExerciseSheet({})}>
+              + Exercise
+            </button>
+            <button type="button" className="btn" onClick={() => onAdd(date)}>
+              + Food
+            </button>
+          </div>
         </div>
         <MacroStrip n={total} />
 
-        {entries.length === 0 && <p className="muted small">Nothing logged for this day yet.</p>}
+        {entries.length === 0 && sessions.length === 0 && <p className="muted small">Nothing logged for this day yet.</p>}
+        {sessions.length > 0 && (
+          <div>
+            <div className="section-label" style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <span>Exercise</span>
+              <span>{sessions.reduce((sum, e) => sum + (e.calories ?? 0), 0)} active kcal</span>
+            </div>
+            <div className="list">
+              {sessions.map((e) => {
+                const k = EXERCISE_KINDS.find((x) => x.value === e.kind)!
+                return (
+                  <button key={e.id} type="button" className="list-item" onClick={() => setExerciseSheet({ exercise: e })}>
+                    <span className="grow">
+                      <span className="title" style={{ display: 'block' }}>
+                        {k.emoji} {k.label} · {e.duration_min} min
+                      </span>
+                      <span className="sub" style={{ display: 'block' }}>
+                        {new Date(e.started_at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })} · {e.intensity === 'low' ? 'easy' : e.intensity === 'high' ? 'hard' : 'moderate'}
+                        {e.meta.fasted ? ' · fasted' : ''}
+                        {e.meta.lifts?.length ? ` · ${e.meta.lifts.map((l) => l.name).join(', ')}` : ''}
+                        {e.note ? ` · ${e.note}` : ''}
+                      </span>
+                    </span>
+                    <span className="right">
+                      {e.meta.caloriesEstimated ? '~' : ''}
+                      {e.calories ?? 0} kcal
+                    </span>
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        )}
         {MEALS.map((m) => {
           const items = entries.filter((e) => e.meal === m.value)
           if (!items.length) return null
@@ -153,6 +195,9 @@ export function Log({ date, onDateChange, onAdd }: Props) {
             setEditingFood(food)
           }}
         />
+      )}
+      {exerciseSheet && (
+        <ExerciseSheet weightKg={weightKg} exercise={exerciseSheet.exercise} date={date} onClose={() => setExerciseSheet(null)} />
       )}
       {editingFood &&
         ('id' in editingFood && editingFood.source === 'recipe' ? (

@@ -102,6 +102,7 @@ function Tracker({ session, recovering = false, onPassphraseChanged = () => {} }
         )}
         {tab === 'log' && (
           <Log
+            weightKg={profile.weightKg}
             date={isDate(param) ? param : localDate()}
             onDateChange={(d) => go(d === localDate() ? 'log' : `log/${d}`)}
             onAdd={(d) => go(d === localDate() ? 'add' : `add/${d}`)}

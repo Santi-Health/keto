@@ -836,3 +836,32 @@ input[type='date'] {
   background: var(--accent-soft);
   color: var(--accent);
 }
+
+/* Exercise */
+.chip-btn {
+  border: 1px solid var(--border);
+  background: var(--surface);
+  border-radius: 99px;
+  padding: 7px 12px;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.chip-btn.on {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.lift-row {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) repeat(3, minmax(0, 1fr)) auto;
+  gap: 6px;
+  margin-bottom: 8px;
+  align-items: center;
+}
+
+.lift-row input {
+  padding: 8px;
+  min-height: 40px;
+}

@@ -1,6 +1,9 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
+import { daysSinceStrength, trainingWarnings } from '../lib/exercise'
 import { useInstall } from '../lib/install'
 import { AminoCard } from '../components/AminoCard'
+import { ExerciseSheet } from '../components/ExerciseSheet'
+import { TrainingCard } from '../components/TrainingCard'
 import { InstallCard } from '../components/InstallCard'
 import { Molecule } from '../components/Molecules'
 import { Bar, Ring } from '../components/Progress'
@@ -25,7 +28,8 @@ function useInstallOffer() {
 }
 
 export function Today({ profile, targets, onOpenSettings, onToggleRefeed, onNavigate }: Props) {
-  const { logsOn, logsWeekEnding, pending, syncError } = useData()
+  const { logsOn, logsWeekEnding, pending, syncError, exercises, exercisesOn } = useData()
+  const [logExercise, setLogExercise] = useState(false)
   const day = localDate()
   const dayLogs = logsOn(day)
   const weekLogs = logsWeekEnding(day)
@@ -52,6 +56,14 @@ export function Today({ profile, targets, onOpenSettings, onToggleRefeed, onNavi
   )
   // Fat fills what's left: protein or carbs over plan shrink it, never below the minimum.
   const fatBudget = liveFatBudget(targets, { protein: totals.protein, netCarbs: totals.netCarbs })
+  const sessionsToday = exercisesOn(day)
+  const sinceStrength = daysSinceStrength(exercises)
+  const trainWarnings = trainingWarnings({
+    exercisesToday: sessionsToday,
+    daysSinceStrength: sinceStrength,
+    effectiveDeficit: targets.effectiveDeficit,
+    isRefeed: targets.isRefeed,
+  })
   const carbsLeft = targets.netCarbsG - totals.netCarbs
   const proteinLeft = targets.proteinG - totals.protein
   const date = new Date().toLocaleDateString('en-US', {
@@ -165,7 +177,10 @@ export function Today({ profile, targets, onOpenSettings, onToggleRefeed, onNavi
               <button type="button" style={{ color: 'var(--text)' }} onClick={() => onNavigate('add/scan')}>
                 Scan barcode
               </button>
-              {['Label photo', 'Saved meal', 'Reading', 'Exercise'].map((label) => (
+              <button type="button" style={{ color: 'var(--text)' }} onClick={() => setLogExercise(true)}>
+                Exercise
+              </button>
+              {['Label photo', 'Saved meal', 'Reading'].map((label) => (
                 <button key={label} type="button" disabled title="Coming in a later phase">
                   {label}
                 </button>
@@ -173,6 +188,8 @@ export function Today({ profile, targets, onOpenSettings, onToggleRefeed, onNavi
             </div>
             <p className="muted small" style={{ marginBottom: 0 }}>The grayed-out buttons turn on in later phases.</p>
           </section>
+
+          <TrainingCard today={sessionsToday} daysSinceStrength={sinceStrength} warnings={trainWarnings} onLog={() => setLogExercise(true)} />
 
           <AminoCard logs={dayLogs} weightKg={profile.weightKg} goal={profile.muscleGoal} />
 
@@ -195,6 +212,7 @@ export function Today({ profile, targets, onOpenSettings, onToggleRefeed, onNavi
           </section>
         </div>
       </div>
+      {logExercise && <ExerciseSheet weightKg={profile.weightKg} onClose={() => setLogExercise(false)} />}
     </>
   )
 }
