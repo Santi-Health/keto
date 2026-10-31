@@ -36,6 +36,13 @@ declare global {
             callback: (r: TokenResponse) => void
             error_callback?: (e: { type: string; message?: string }) => void
           }) => TokenClient
+          initCodeClient: (cfg: {
+            client_id: string
+            scope: string
+            ux_mode: 'popup'
+            callback: (r: { code?: string; error?: string; error_description?: string }) => void
+            error_callback?: (e: { type: string; message?: string }) => void
+          }) => { requestCode: () => void }
         }
       }
     }
@@ -92,6 +99,24 @@ export async function getGoogleToken(forceConsent = false, scope = SCOPE): Promi
       error_callback: (e) => reject(new Error(e.type === 'popup_closed' ? 'Google sign-in was closed.' : e.message || e.type)),
     })
     client.requestAccessToken({ prompt: forceConsent ? 'consent' : '' })
+  })
+}
+
+/**
+ * Asks Google for a one-time code (popup) that the server trades for background access, so it can
+ * sync every few hours without the app open. Must run from a tap.
+ */
+export async function getGoogleCode(withDrive = true): Promise<string> {
+  await loadGis()
+  return new Promise((resolve, reject) => {
+    const client = window.google!.accounts.oauth2.initCodeClient({
+      client_id: GOOGLE_CLIENT_ID,
+      scope: withDrive ? `${SCOPE} ${DRIVE_SCOPE}` : SCOPE,
+      ux_mode: 'popup',
+      callback: (r) => (r.code ? resolve(r.code) : reject(new Error(r.error_description || r.error || 'Google sign-in was cancelled.'))),
+      error_callback: (e) => reject(new Error(e.type === 'popup_closed' ? 'Google sign-in was closed.' : e.message || e.type)),
+    })
+    client.requestCode()
   })
 }
 

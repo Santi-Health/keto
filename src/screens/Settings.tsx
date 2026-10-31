@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import { NumberField, Segmented } from '../components/Fields'
+import { BackgroundSyncCard } from '../components/BackgroundSyncCard'
 import { ExportCard } from '../components/ExportCard'
 import { InstallCard } from '../components/InstallCard'
 import type { SyncState } from '../lib/profileStore'
@@ -208,6 +209,8 @@ export function Settings({ profile, update, targets, session, sync, recovering, 
           <RoutineCard profile={profile} update={update} />
           <TargetMath profile={profile} targets={targets} />
           <WatchSettingsCard profile={profile} update={update} targets={targets} />
+          <BackgroundSyncCard />
+
           <ExportCard profile={profile} update={update} onOpenReport={() => (window.location.hash = 'report/30')} />
 
           <Account session={session} sync={sync} recovering={recovering} onPassphraseChanged={onPassphraseChanged} />

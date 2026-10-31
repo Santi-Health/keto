@@ -6,6 +6,7 @@ import { useInstall } from '../lib/install'
 import { STATUS_TEXT, estimateKetosis, tomorrowMorning } from '../lib/ketosis'
 import { AminoCard } from '../components/AminoCard'
 import { ActivityCard } from '../components/ActivityCard'
+import { RelinkBanner } from '../components/BackgroundSyncCard'
 import { DrinksCard } from '../components/DrinksCard'
 import { ExerciseSheet } from '../components/ExerciseSheet'
 import { TrainingCard } from '../components/TrainingCard'
@@ -258,6 +259,7 @@ export function Today({ profile, targets, onOpenSettings, onToggleRefeed, onNavi
 
       <div className="grid two">
         <div className="grid">
+          {isToday && <RelinkBanner />}
           {isToday && hasData && backupDue(profile.lastBackupAt) && (
             <div className="notice small" role="status">
               {profile.lastBackupAt
