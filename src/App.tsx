@@ -123,7 +123,13 @@ function Tracker({ session, recovering = false, onPassphraseChanged = () => {} }
             onLogged={() => go(isDate(param) ? `log/${param}` : 'today')}
           />
         )}
-        {tab === 'insights' && <Insights />}
+        {tab === 'insights' && (
+          <Insights
+            netCarbLimit={targets.netCarbsG}
+            proteinTarget={targets.proteinG}
+            onApplyLimit={(g) => update({ netCarbLimitG: g })}
+          />
+        )}
       </main>
       <nav className="nav" aria-label="Main">
         {TABS.map((t) => (

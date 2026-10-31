@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { toReadings } from '../lib/cgm'
 import { useData } from '../lib/data'
 import { estimateKetosis } from '../lib/ketosis'
+import { useKetoModel } from '../lib/useKetoModel'
 import {
   CONTEXTS,
   KG_PER_LB,
@@ -51,6 +52,7 @@ const showValue = (r: ReadingRow | undefined, unit: WeightUnit) => {
 
 export function ReadingSheet({ weightUnit, netCarbLimit, proteinTarget, reading, kind: initialKind, date, onClose }: Props) {
   const { saveReading, deleteReading, readings, logs, exercises, cgmDays } = useData()
+  const ketoModel = useKetoModel(netCarbLimit, proteinTarget)
   const [kind, setKind] = useState<ReadingKind>(reading?.kind ?? initialKind ?? 'blood_ketone')
   const [time, setTime] = useState(toLocalInput(reading ? new Date(reading.taken_at) : defaultTime(date)))
   const takenAt = new Date(time)
@@ -88,7 +90,8 @@ export function ReadingSheet({ weightUnit, netCarbLimit, proteinTarget, reading,
     }
     // Remember what the estimate said, so readings can personalize it later.
     if (kind === 'blood_ketone' && base.predicted_value == null) {
-      const e = estimateKetosis({ at: takenAt.getTime(), logs, exercises, netCarbLimit, proteinTarget })
+      // What the app would have shown at that moment, personal model included.
+      const e = estimateKetosis({ at: takenAt.getTime(), logs, exercises, netCarbLimit, proteinTarget, model: ketoModel.adjuster })
       base.predicted_value = e.mid
       base.meta.predictedLow = e.low
       base.meta.predictedHigh = e.high

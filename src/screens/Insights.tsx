@@ -1,5 +1,7 @@
 import { useMemo, useState } from 'react'
 import { GlucoseChart } from '../components/GlucoseChart'
+import { KetoModelCard } from '../components/KetoModelCard'
+import { useKetoModel } from '../lib/useKetoModel'
 import { mergeIntoDays, parseGlucosePoint, toReadings } from '../lib/cgm'
 import { useData } from '../lib/data'
 import { sessionLabel } from '../lib/exercise'
@@ -19,7 +21,14 @@ const LEVEL: Record<ResponseLevel, { label: string; cls: string }> = {
   spike: { label: 'Spike', cls: 'warn' },
 }
 
-export function Insights() {
+interface Props {
+  netCarbLimit: number
+  proteinTarget: number
+  onApplyLimit: (g: number) => void
+}
+
+export function Insights({ netCarbLimit, proteinTarget, onApplyLimit }: Props) {
+  const ketoModel = useKetoModel(netCarbLimit, proteinTarget)
   const { cgmDays, saveCgmDay, logsOn, exercisesOn, logs, exercises } = useData()
   const today = localDate()
   const [day, setDay] = useState(today)
@@ -77,7 +86,7 @@ export function Insights() {
   return (
     <>
       <header className="page-header">
-        <h1>Glucose insights</h1>
+        <h1>Insights</h1>
         <button type="button" className="btn secondary" onClick={() => void importGlucose()} disabled={importing}>
           {importing ? 'Importing…' : '🩸 Import'}
         </button>
@@ -155,6 +164,8 @@ export function Insights() {
         </div>
 
         <div className="grid">
+          <KetoModelCard model={ketoModel} netCarbLimit={netCarbLimit} onApplyLimit={onApplyLimit} />
+
           <section className="card">
             <h2>How meals hit you</h2>
             {responses.length ? (

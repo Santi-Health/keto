@@ -19,6 +19,7 @@ import { liveFatBudget, localDate, type Targets } from '../lib/targets'
 import type { Profile } from '../lib/types'
 import { computeWatchList } from '../lib/watchlist'
 import { ketoneBand, latest, type ReadingKind } from '../lib/readings'
+import { useKetoModel } from '../lib/useKetoModel'
 
 interface Props {
   profile: Profile
@@ -102,8 +103,10 @@ export function Today({ profile, targets, onOpenSettings, onToggleRefeed, onNavi
     effectiveDeficit: targets.effectiveDeficit,
     isRefeed: targets.isRefeed,
   })
-  const keto = estimateKetosis({ at: Date.now(), logs, exercises, netCarbLimit: targets.netCarbsG, proteinTarget: targets.proteinG })
-  const ketoTomorrow = estimateKetosis({ at: tomorrowMorning(), logs, exercises, netCarbLimit: targets.netCarbsG, proteinTarget: targets.proteinG })
+  const ketoModel = useKetoModel(targets.netCarbsG, targets.proteinG)
+  const ketoOpts = { logs, exercises, netCarbLimit: targets.netCarbsG, proteinTarget: targets.proteinG, model: ketoModel.adjuster }
+  const keto = estimateKetosis({ ...ketoOpts, at: Date.now() })
+  const ketoTomorrow = estimateKetosis({ ...ketoOpts, at: tomorrowMorning() })
   // A blood reading from the last 3 hours beats the estimate.
   const lastKetone = latest(readings, 'blood_ketone')
   const measured = lastKetone?.value != null && Date.now() - Date.parse(lastKetone.taken_at) < 3 * 3_600_000 ? lastKetone : null
@@ -286,8 +289,14 @@ export function Today({ profile, targets, onOpenSettings, onToggleRefeed, onNavi
               {keto.status === 'out' && ketoTomorrow.status === 'out' && ' Back under 25 g a day, it usually takes 1–3 days to return to ketosis.'}
             </p>
             <p className="muted small" style={{ marginBottom: 0 }}>
-              Estimate from general research (carbs, fasting, exercise, protein). Ketosis means about 0.5+ mmol/L. Each blood ketone reading is
-              saved next to what the estimate said; after about 10 readings it will start learning your own pattern.
+              {ketoModel.n === 0
+                ? 'Estimate from general research (carbs, fasting, exercise, protein). Ketosis means about 0.5+ mmol/L. Add blood ketone readings and it learns your own pattern.'
+                : `Personal model from ${ketoModel.n} blood reading${ketoModel.n > 1 ? 's' : ''} (${ketoModel.confidence === 'solid' ? 'solid' : 'still learning'}). Ketosis means about 0.5+ mmol/L. `}
+              {ketoModel.n > 0 && (
+                <button type="button" className="link-btn" onClick={() => onNavigate('insights')}>
+                  See how it's doing
+                </button>
+              )}
             </p>
           </section>
         </div>
