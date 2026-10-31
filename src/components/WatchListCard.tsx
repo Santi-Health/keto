@@ -22,7 +22,7 @@ function WatchRow({ item }: { item: WatchItem }) {
 }
 
 /** Quiet when everything is fine; lists anything near or over its limit. */
-export function WatchListCard({ items }: { items: WatchItem[] }) {
+export function WatchListCard({ items, period = 'today' }: { items: WatchItem[]; period?: string }) {
   const [showAll, setShowAll] = useState(false)
   const flagged = items.filter((i) => i.status === 'near' || i.status === 'over')
   const shown = showAll ? items : flagged
@@ -38,7 +38,7 @@ export function WatchListCard({ items }: { items: WatchItem[] }) {
         shown.map((i) => <WatchRow key={i.key} item={i} />)
       ) : (
         <p className="muted small" style={{ margin: 0 }}>
-          Nothing near its limit today: saturated and trans fat, added sugar, mercury, processed meat and more.
+          Nothing near its limit {period}: saturated and trans fat, added sugar, mercury, processed meat and more.
         </p>
       )}
       {showAll && flagged.length > 0 && (

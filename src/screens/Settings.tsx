@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import { NumberField, Segmented } from '../components/Fields'
+import { ExportCard } from '../components/ExportCard'
 import { InstallCard } from '../components/InstallCard'
 import type { SyncState } from '../lib/profileStore'
 import { supabase } from '../lib/supabase'
@@ -35,6 +36,10 @@ export function Settings({ profile, update, targets, session, sync, recovering, 
         <div className="grid">
           <section className="card">
             <h2>About you</h2>
+            <div className="field">
+              <label htmlFor="report-name">Name (only for the doctor summary)</label>
+              <input id="report-name" type="text" value={profile.reportName ?? ''} onChange={(e) => update({ reportName: e.target.value })} />
+            </div>
             <div className="field">
               <label htmlFor="birth">Birth date</label>
               <input
@@ -203,6 +208,8 @@ export function Settings({ profile, update, targets, session, sync, recovering, 
           <RoutineCard profile={profile} update={update} />
           <TargetMath profile={profile} targets={targets} />
           <WatchSettingsCard profile={profile} update={update} targets={targets} />
+          <ExportCard profile={profile} onOpenReport={() => (window.location.hash = 'report/30')} />
+
           <Account session={session} sync={sync} recovering={recovering} onPassphraseChanged={onPassphraseChanged} />
           <section className="card">
             <h2>Appearance</h2>

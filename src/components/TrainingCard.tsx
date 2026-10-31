@@ -5,6 +5,8 @@ interface Props {
   daysSinceStrength: number | null
   warnings: { level: 'yellow' | 'red'; text: string }[]
   onLog: () => void
+  /** Words for the period shown: "today", "yesterday" or "in these 7 days". */
+  period?: string
   /** Shown when today is a routine day and it isn't logged yet. */
   routine: Routine | null
   onLogRoutine: () => void
@@ -13,7 +15,7 @@ interface Props {
   importMessage: string | null
 }
 
-export function TrainingCard({ today, daysSinceStrength, warnings, onLog, routine, onLogRoutine, onImportFitbit, importing, importMessage }: Props) {
+export function TrainingCard({ today, daysSinceStrength, warnings, onLog, period = 'today', routine, onLogRoutine, onImportFitbit, importing, importMessage }: Props) {
   const active = today.reduce((s, e) => s + (e.calories ?? 0), 0)
   const minutes = today.reduce((s, e) => s + e.duration_min, 0)
   return (
@@ -48,7 +50,7 @@ export function TrainingCard({ today, daysSinceStrength, warnings, onLog, routin
               </div>
             ))}
             <div className="session-row session-total">
-              <span className="grow">Extra burned today · {minutes} min</span>
+              <span className="grow">Extra burned {period} · {minutes} min</span>
               <span className="session-kcal">+{active} kcal</span>
             </div>
           </div>
@@ -58,7 +60,7 @@ export function TrainingCard({ today, daysSinceStrength, warnings, onLog, routin
           </p>
         </>
       ) : (
-        <p className="muted small" style={{ margin: 0 }}>No exercise logged today.</p>
+        <p className="muted small" style={{ margin: 0 }}>No exercise logged {period}.</p>
       )}
       {warnings.map((w) => (
         <p key={w.text} className={w.level === 'red' ? 'notice small' : 'small'} style={w.level === 'yellow' ? { color: 'var(--carbs)' } : undefined}>

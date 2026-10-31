@@ -9,20 +9,22 @@ import { Bar } from './Progress'
 import { Sheet } from './Sheet'
 
 interface Props {
+  /** Days to show: one day, or a week (counts are totals, water is a daily average). */
+  days: string[]
   waterTargetOz: number
 }
 
 type Undo = { kind: 'reading' | 'log'; ids: string[]; label: string }
 
 /** One tap per drink. Water and sparkling water fill the water goal; the rest log caffeine, sodium and sweeteners. */
-export function DrinksCard({ waterTargetOz }: Props) {
+export function DrinksCard({ days, waterTargetOz }: Props) {
   const { readingsOn, saveReading, deleteReading, logsOn, deleteLog, foods, foodById, saveFood, logFood } = useData()
   const [undo, setUndo] = useState<Undo | null>(null)
   const [espresso, setEspresso] = useState<Drink | null>(null)
-  const day = localDate()
-  const water = readingsOn(day).filter((r) => r.kind === 'water')
-  const waterOz = water.reduce((s, r) => s + (r.value ?? 0), 0)
-  const drinkLogs = logsOn(day).filter((l) => l.food_id && foodById[l.food_id]?.meta.externalId?.startsWith('drink:'))
+  const isToday = days.length === 1 && days[0] === localDate()
+  const water = days.flatMap((d) => readingsOn(d)).filter((r) => r.kind === 'water')
+  const waterOz = water.reduce((s, r) => s + (r.value ?? 0), 0) / days.length
+  const drinkLogs = days.flatMap((d) => logsOn(d)).filter((l) => l.food_id && foodById[l.food_id]?.meta.externalId?.startsWith('drink:'))
 
   const counts: Partial<Record<DrinkKey, number>> = {}
   for (const r of water) {
@@ -87,15 +89,16 @@ export function DrinksCard({ waterTargetOz }: Props) {
 
   return (
     <section className="card">
-      <h2>Drinks</h2>
-      <Bar label="Water" value={waterOz / 8} target={Math.round((waterTargetOz / 8) * 10) / 10} unit="cups" color="var(--water)" />
+      <h2>Drinks{days.length > 1 ? ' (7-day totals)' : ''}</h2>
+      <Bar label={days.length > 1 ? 'Water, daily average' : 'Water'} value={waterOz / 8} target={Math.round((waterTargetOz / 8) * 10) / 10} unit="cups" color="var(--water)" />
       {(tally.length > 0 || counts.sparkling_water) && (
         <p className="muted small" style={{ margin: '0 0 8px' }}>
           {counts.sparkling_water ? `${counts.sparkling_water} cup${counts.sparkling_water > 1 ? 's' : ''} sparkling in the water total. ` : ''}
-          {tally.length > 0 && `Also today: ${tally.join(' · ')}${caffeine > 0 ? ` · ${Math.round(caffeine)} mg caffeine` : ''}.`}
+          {tally.length > 0 && `${isToday ? 'Also today' : 'Also'}: ${tally.join(' · ')}${caffeine > 0 ? ` · ${Math.round(caffeine)} mg caffeine` : ''}.`}
         </p>
       )}
-      <div className="drink-grid">
+      {!isToday && !tally.length && !water.length && <p className="muted small">No drinks logged.</p>}
+      {isToday && <div className="drink-grid">
         {DRINKS.map((d) => (
           <button key={d.key} type="button" className="drink-btn" onClick={() => add(d)} aria-label={`Log ${label(d)}, ${d.serving}`}>
             <span className="drink-dot" style={{ background: d.color }} aria-hidden="true" />
@@ -104,8 +107,8 @@ export function DrinksCard({ waterTargetOz }: Props) {
             {counts[d.key] ? <span className="drink-count">{counts[d.key]}</span> : null}
           </button>
         ))}
-      </div>
-      {undo && (
+      </div>}
+      {undo && isToday && (
         <button
           type="button"
           className="btn secondary small-btn"

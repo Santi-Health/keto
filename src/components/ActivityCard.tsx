@@ -12,11 +12,24 @@ const shift = (date: string, days: number) => {
 const avg = (xs: number[]) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : null)
 
 /** Steps, sleep, resting heart rate, and the last 7 days of calories eaten vs. burned (from Fitbit). */
-export function ActivityCard({ onImport, importing }: { onImport: () => void; importing: boolean }) {
+export function ActivityCard({ days, onImport, importing }: { days: string[]; onImport: () => void; importing: boolean }) {
   const { activity, logsOn } = useData()
   const today = localDate()
-  const t = activity[today]
-  const week = useMemo(() => Array.from({ length: 7 }, (_, i) => shift(today, i - 7)), [today])
+  const last = days[days.length - 1]
+  const isToday = days.length === 1 && last === today
+  const isWeek = days.length > 1
+  // One day shows that day; a week shows the per-day averages.
+  const t: Partial<ActivityDay> | undefined = useMemo(() => {
+    if (!isWeek) return activity[last]
+    const rows = days.map((d) => activity[d]).filter((a): a is ActivityDay => !!a)
+    const mean = (get: (a: ActivityDay) => number | null) => {
+      const xs = rows.map(get).filter((x): x is number => x != null && x > 0)
+      return xs.length ? Math.round(xs.reduce((a, b) => a + b, 0) / xs.length) : null
+    }
+    return { steps: mean((a) => a.steps), sleep_minutes: mean((a) => a.sleep_minutes), resting_hr: mean((a) => a.resting_hr), calories_out: mean((a) => a.calories_out), meta: {} }
+  }, [isWeek, activity, days, last])
+  // The chart covers the 7 days before today, or the 7 days ending on the day being viewed.
+  const week = useMemo(() => (isToday ? Array.from({ length: 7 }, (_, i) => shift(today, i - 7)) : Array.from({ length: 7 }, (_, i) => shift(last, i - 6))), [isToday, today, last])
   const rows = week.map((day) => ({ day, a: activity[day] as ActivityDay | undefined, eaten: addNutrients(logsOn(day).map((l) => l.nutrients)).kcal }))
   const rhrWeek = avg(rows.map((r) => r.a?.resting_hr).filter((x): x is number => x != null))
   const sleepWeek = avg(rows.map((r) => r.a?.sleep_minutes).filter((x): x is number => x != null && x > 0))
@@ -41,32 +54,32 @@ export function ActivityCard({ onImport, importing }: { onImport: () => void; im
       <div className="stat-grid two-col">
         <div>
           <b>{t?.steps != null ? t.steps.toLocaleString() : '—'}</b>
-          <span>Steps today</span>
+          <span>{isToday ? 'Steps today' : isWeek ? 'Steps/day avg' : 'Steps'}</span>
         </div>
         <div>
           <b>{t?.sleep_minutes ? formatSleep(t.sleep_minutes) : '—'}</b>
           <span>
-            Sleep last night
-            {sleepWeek != null ? ` · 7-day ${formatSleep(sleepWeek)}` : ''}
+            {isWeek ? 'Sleep avg' : isToday ? 'Sleep last night' : 'Sleep the night before'}
+            {sleepWeek != null && !isWeek ? ` · 7-day ${formatSleep(sleepWeek)}` : ''}
           </span>
         </div>
         <div>
           <b>{t?.resting_hr ?? '—'}</b>
-          <span>Resting HR{rhrWeek != null ? ` · 7-day ${Math.round(rhrWeek)}` : ''}</span>
+          <span>Resting HR{rhrWeek != null && !isWeek ? ` · 7-day ${Math.round(rhrWeek)}` : isWeek ? ' avg' : ''}</span>
         </div>
         <div>
           <b>{t?.calories_out != null ? t.calories_out.toLocaleString() : '—'}</b>
-          <span>kcal burned so far</span>
+          <span>{isToday ? 'kcal burned so far' : isWeek ? 'kcal burned/day avg' : 'kcal burned'}</span>
         </div>
       </div>
-      {t?.meta.deepMin != null && (
+      {t?.meta?.deepMin != null && (
         <p className="muted small" style={{ margin: '6px 0 0' }}>
-          Last night: {t.meta.deepMin} min deep · {t.meta.remMin ?? 0} min REM · {t.meta.lightMin ?? 0} min light · awake {t.meta.awakeMin ?? 0} min
+          {isToday ? 'Last night' : 'That night'}: {t.meta.deepMin} min deep · {t.meta.remMin ?? 0} min REM · {t.meta.lightMin ?? 0} min light · awake {t.meta.awakeMin ?? 0} min
           {t.sleep_minutes != null && t.sleep_minutes < 360 ? '. Under 6 h of sleep tends to raise appetite and morning glucose.' : '.'}
         </p>
       )}
 
-      <div className="section-label">Eaten vs. burned, last 7 days</div>
+      <div className="section-label">Eaten vs. burned, {isToday ? 'last 7 days' : `7 days to ${new Date(`${last}T12:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`}</div>
       <div className="burn-chart" role="img" aria-label="Calories eaten and burned per day">
         {rows.map((r) => (
           <div key={r.day} className="burn-day">

@@ -11,10 +11,11 @@ import { Add } from './screens/Add'
 import { Lock, NotConfigured } from './screens/Lock'
 import { Insights } from './screens/Insights'
 import { Log } from './screens/Log'
+import { Report } from './screens/Report'
 import { Settings } from './screens/Settings'
 import { Today } from './screens/Today'
 
-type Tab = 'today' | 'log' | 'add' | 'insights' | 'settings'
+type Tab = 'today' | 'log' | 'add' | 'insights' | 'settings' | 'report'
 
 const icon = (d: string) => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -33,7 +34,7 @@ const TABS: { id: Tab; label: string; icon: ReactNode }[] = [
 /** Routes look like #log/2026-10-29 or #add/scan: a tab plus an optional detail. */
 const getRoute = (): { tab: Tab; param: string | null } => {
   const [tab, param = null] = window.location.hash.slice(1).split('/') as [Tab, string?]
-  return TABS.some((t) => t.id === tab) ? { tab, param } : { tab: 'today', param: null }
+  return TABS.some((t) => t.id === tab) || tab === 'report' ? { tab, param } : { tab: 'today', param: null }
 }
 
 const isDate = (s: string | null): s is string => !!s && /^\d{4}-\d{2}-\d{2}$/.test(s)
@@ -126,17 +127,27 @@ function Tracker({ session, recovering = false, onPassphraseChanged = () => {} }
             onLogged={() => go(isDate(param) ? `log/${param}` : 'today')}
           />
         )}
+        {tab === 'report' && (
+          <Report
+            profile={profile}
+            targets={targets}
+            days={param === '7' || param === '90' ? (Number(param) as 7 | 90) : 30}
+            onRange={(d) => go(`report/${d}`)}
+            onBack={() => go('insights')}
+          />
+        )}
         {tab === 'insights' && (
           <Insights
-            netCarbLimit={targets.netCarbsG}
-            proteinTarget={targets.proteinG}
+            targets={targets}
+            weightUnit={profile.weightUnit}
             onApplyLimit={(g) => update({ netCarbLimitG: g })}
+            onOpenReport={(days) => go(`report/${days}`)}
           />
         )}
       </main>
-      <nav className="nav" aria-label="Main">
+      <nav className="nav no-print" aria-label="Main">
         {TABS.map((t) => (
-          <button key={t.id} type="button" aria-current={tab === t.id ? 'page' : undefined} onClick={() => go(t.id)}>
+          <button key={t.id} type="button" aria-current={tab === t.id || (tab === 'report' && t.id === 'insights') ? 'page' : undefined} onClick={() => go(t.id)}>
             {t.icon}
             {t.label}
           </button>

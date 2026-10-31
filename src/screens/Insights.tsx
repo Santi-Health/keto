@@ -2,6 +2,10 @@ import { useMemo, useState } from 'react'
 import { GlucoseChart } from '../components/GlucoseChart'
 import { BodyScanCard } from '../components/BodyScan'
 import { KetoModelCard } from '../components/KetoModelCard'
+import { TrendsCard } from '../components/TrendsCard'
+import type { RangeDays } from '../lib/trends'
+import type { Targets } from '../lib/targets'
+import type { WeightUnit } from '../lib/types'
 import { useKetoModel } from '../lib/useKetoModel'
 import { mergeIntoDays, parseGlucosePoint, toReadings } from '../lib/cgm'
 import { useData } from '../lib/data'
@@ -23,12 +27,15 @@ const LEVEL: Record<ResponseLevel, { label: string; cls: string }> = {
 }
 
 interface Props {
-  netCarbLimit: number
-  proteinTarget: number
+  targets: Targets
+  weightUnit: WeightUnit
   onApplyLimit: (g: number) => void
+  onOpenReport: (days: RangeDays) => void
 }
 
-export function Insights({ netCarbLimit, proteinTarget, onApplyLimit }: Props) {
+export function Insights({ targets, weightUnit, onApplyLimit, onOpenReport }: Props) {
+  const netCarbLimit = targets.netCarbsG
+  const proteinTarget = targets.proteinG
   const ketoModel = useKetoModel(netCarbLimit, proteinTarget)
   const { cgmDays, saveCgmDay, logsOn, exercisesOn, logs, exercises } = useData()
   const today = localDate()
@@ -165,6 +172,8 @@ export function Insights({ netCarbLimit, proteinTarget, onApplyLimit }: Props) {
         </div>
 
         <div className="grid">
+          <TrendsCard targets={targets} weightUnit={weightUnit} onOpenReport={onOpenReport} />
+
           <KetoModelCard model={ketoModel} netCarbLimit={netCarbLimit} onApplyLimit={onApplyLimit} />
 
           <BodyScanCard />

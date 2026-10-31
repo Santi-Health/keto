@@ -1411,3 +1411,200 @@ input[type='time'] {
   stroke: var(--text-2);
   stroke-width: 1;
 }
+
+/* Trend charts */
+.trend {
+  margin: 0 0 12px;
+}
+
+.trend figcaption {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px 10px;
+  font-size: 0.85rem;
+}
+
+.trend-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 0.7rem;
+  color: var(--text-2);
+}
+
+.trend-legend i {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: 4px;
+  border-radius: 2px;
+}
+
+/* Doctor summary */
+.report {
+  max-width: 820px;
+  margin: 0 auto;
+}
+
+.report-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 14px;
+}
+
+.report-head h1 {
+  margin: 0 0 4px;
+  font-size: 1.35rem;
+}
+
+.report-head p {
+  margin: 0 0 4px;
+  font-size: 0.85rem;
+}
+
+.report h2 {
+  margin: 14px 0 6px;
+  font-size: 0.95rem;
+}
+
+.report-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 0 20px;
+}
+
+.report-charts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 0 20px;
+  margin-top: 12px;
+}
+
+.report-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.82rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.report-table td,
+.report-table th {
+  padding: 4px 0;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+}
+
+.report-table td:last-child {
+  text-align: right;
+}
+
+.report-table.wide th,
+.report-table.wide td {
+  text-align: right;
+}
+
+.report-table.wide th:first-child,
+.report-table.wide td:first-child {
+  text-align: left;
+}
+
+.report-foot {
+  margin-top: 14px;
+  font-size: 0.7rem;
+  color: var(--text-2);
+}
+
+@media print {
+  .no-print {
+    display: none !important;
+  }
+
+  :root,
+  :root:not([data-theme='light']),
+  :root[data-theme='dark'] {
+    --bg: #fff;
+    --surface: #fff;
+    --surface-2: #f3f3f3;
+    --text: #111;
+    --text-2: #555;
+    --border: #ddd;
+  }
+
+  body {
+    background: #fff !important;
+    color: #111;
+  }
+
+  .main {
+    padding: 0 !important;
+  }
+
+  .report {
+    max-width: none;
+    font-size: 11px;
+  }
+
+  .report-grid,
+  .report-charts {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .report section,
+  .trend {
+    break-inside: avoid;
+  }
+
+  @page {
+    margin: 12mm;
+  }
+}
+
+/* Today / Yesterday / Last 7 days */
+.day-switch {
+  margin: -4px 0 14px;
+}
+
+.keto-week {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+  margin-bottom: 8px;
+}
+
+.keto-day {
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  padding: 6px 0;
+  border-radius: 8px;
+  background: var(--surface-2);
+  border-bottom: 3px solid var(--border);
+  font-size: 0.75rem;
+}
+
+.keto-day b {
+  font-size: 0.7rem;
+  color: var(--text-2);
+}
+
+.keto-day span {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.keto-day.out {
+  border-bottom-color: var(--warn);
+}
+
+.keto-day.light {
+  border-bottom-color: var(--carbs);
+}
+
+.keto-day.in,
+.keto-day.deep {
+  border-bottom-color: var(--ketone);
+}
