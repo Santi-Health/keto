@@ -14,7 +14,7 @@ export default defineConfig(({ command }) => ({
       manifest: {
         id: '/keto-tracker/',
         name: 'Keto Tracker',
-        short_name: 'Keto',
+        short_name: 'Keto Tracker',
         description: 'Track food, macros, electrolytes, glucose and ketones.',
         theme_color: '#1f5c43',
         background_color: '#f6f5f1',
