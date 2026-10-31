@@ -1,8 +1,8 @@
 import { useEffect, useId, useState } from 'react'
 import type { ActivityDay } from '../lib/activity'
 import { deficitSoFar } from '../lib/deficit'
-import type { Exercise } from '../lib/exercise'
-import type { LogEntry } from '../lib/foods'
+import { sessionLabel, type Exercise } from '../lib/exercise'
+import { MEALS, type LogEntry } from '../lib/foods'
 
 interface Props {
   day: string
@@ -41,6 +41,18 @@ function smoothPath(pts: [number, number][]): string {
   return out
 }
 
+function Row({ label, sub, kcal }: { label: string; sub?: string; kcal: number }) {
+  return (
+    <div className="deficit-row">
+      <div>
+        <div>{label}</div>
+        {sub && <div className="muted small deficit-sub">{sub}</div>}
+      </div>
+      <b>{kcal.toLocaleString()}</b>
+    </div>
+  )
+}
+
 /** Burned minus eaten so far today, updated every minute, with how it built up hour by hour. */
 export function DeficitNow({ day, bmr, logs, exercises, activity, goal, calorieLimit }: Props) {
   const [now, setNow] = useState(() => new Date())
@@ -75,6 +87,18 @@ export function DeficitNow({ day, bmr, logs, exercises, activity, goal, calorieL
     if (v !== 0 && ticks.every((t) => Math.abs(y(t.v) - y(v)) >= 11)) ticks.push({ v, label: `${signed(v)} ${name}` })
   }
   const [hover, setHover] = useState<number | null>(null)
+  const [open, setOpen] = useState<'burned' | 'eaten' | null>(null)
+  const toggle = (which: 'burned' | 'eaten') => setOpen(open === which ? null : which)
+  // Calories by meal, with what was eaten (names without the brand).
+  const meals = MEALS.map(({ value, label }) => {
+    const items = logs.filter((l) => l.meal === value)
+    return {
+      meal: value,
+      label,
+      kcal: Math.round(items.reduce((s, l) => s + (l.nutrients.kcal ?? 0), 0)),
+      foods: [...new Set(items.map((l) => l.food_name.replace(/\s*\(.*\)$/, '')))].join(', '),
+    }
+  }).filter((m) => m.foods)
   const gid = useId()
   const shown = hover != null ? d.hours[hover] : null
 
@@ -85,31 +109,31 @@ export function DeficitNow({ day, bmr, logs, exercises, activity, goal, calorieL
   return (
     <>
       <section className="card deficit-summary">
-        <div className="deficit-stat">
+        <button type="button" className="deficit-stat tap" aria-expanded={open === 'burned'} onClick={() => toggle('burned')}>
           <div className="deficit-big" style={{ color: 'var(--accent)' }}>
             {d.burned.toLocaleString()} <span className="deficit-unit">kcal</span>
           </div>
-          <div className="muted small">Burned</div>
-        </div>
+          <div className="muted small">Burned {open === 'burned' ? '▴' : '▾'}</div>
+        </button>
         <div className="deficit-stat end wide">
           <div className="deficit-mid" style={{ color: surplus ? 'var(--warn)' : 'var(--accent)' }}>
             {fmt(d.deficit)} <span className="deficit-unit">kcal</span>
           </div>
           <div className="muted small">{surplus ? 'Surplus' : 'Deficit'} so far</div>
         </div>
-        <div className="deficit-stat">
+        <button type="button" className="deficit-stat tap" aria-expanded={open === 'eaten'} onClick={() => toggle('eaten')}>
           <div className="deficit-big" style={{ color: 'var(--warn)' }}>
             {d.eaten.toLocaleString()} <span className="deficit-unit">kcal</span>
           </div>
           <div className="muted small">
-            Eaten
+            Eaten {open === 'eaten' ? '▴' : '▾'}
             {calorieLimit != null && (
               <span style={d.eaten > calorieLimit ? { color: 'var(--warn)' } : undefined}>
                 {' '}· limit {Math.round(calorieLimit).toLocaleString()}
               </span>
             )}
           </div>
-        </div>
+        </button>
         <div className="deficit-stat end">
           {toGoal == null ? (
             <div className="deficit-mid">—</div>
@@ -131,6 +155,24 @@ export function DeficitNow({ day, bmr, logs, exercises, activity, goal, calorieL
             <span>kcal</span>
           </div>
         </div>
+        {open === 'burned' && (
+          <div className="deficit-detail">
+            <Row label="Resting (being alive)" kcal={d.parts.resting} />
+            <Row label={d.burnSource === 'fitbit' ? 'Everyday movement (Fitbit)' : 'Everyday movement (estimate)'} kcal={d.parts.movement} />
+            {d.parts.workouts.map((w) => (
+              <Row key={w.exercise.id} label={`${sessionLabel(w.exercise)} · ${w.exercise.duration_min} min`} kcal={w.kcal} />
+            ))}
+          </div>
+        )}
+        {open === 'eaten' && (
+          <div className="deficit-detail">
+            {meals.length ? (
+              meals.map((m) => <Row key={m.meal} label={m.label} sub={m.foods} kcal={m.kcal} />)
+            ) : (
+              <p className="muted small" style={{ margin: 0 }}>Nothing logged yet today.</p>
+            )}
+          </div>
+        )}
       </section>
 
       <section className="card">

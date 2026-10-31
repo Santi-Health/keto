@@ -22,6 +22,8 @@ export interface DeficitSoFar {
   burnSource: 'fitbit' | 'estimate'
   /** When Fitbit's number was imported, when it's used. */
   fitbitAt: Date | null
+  /** What the burn so far is made of: resting (being alive), everyday movement, and each workout. */
+  parts: { resting: number; movement: number; workouts: { exercise: Exercise; kcal: number }[] }
   /** Deficit by midnight if nothing more is eaten and no more workouts happen. */
   byMidnight: number
   hours: DeficitPoint[]
@@ -83,9 +85,19 @@ export function deficitSoFar(opts: {
   const burned = Math.round(burnedAt(nowMs))
   // Everything logged for the day counts, even if its time is set later than now.
   const eaten = Math.round(logs.reduce((s, l) => s + (l.nutrients.kcal ?? 0), 0))
+  // Resting is the body's own burn (BMR) for the time passed; workouts as done so far; movement is the rest
+  // (the everyday allowance, or with Fitbit whatever its total holds beyond resting and workouts).
+  const elapsed = minutesBetween(midnight, nowMs)
+  const resting = Math.round((bmr / 1440) * elapsed)
+  const workouts = live
+    .map((exercise) => ({ exercise, kcal: Math.round(workoutKcalBetween(exercise, midnight, nowMs)) }))
+    .filter((w) => w.kcal > 0)
+    .sort((a, b) => a.exercise.started_at.localeCompare(b.exercise.started_at))
+  const movement = burned - resting - workouts.reduce((s, w) => s + w.kcal, 0)
   return {
     burned,
     eaten,
+    parts: { resting, movement, workouts },
     deficit: burned - eaten,
     burnSource: useFitbit ? 'fitbit' : 'estimate',
     fitbitAt: useFitbit ? new Date(fitbitAtMs) : null,

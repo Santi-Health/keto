@@ -20,6 +20,10 @@ describe('deficit so far today', () => {
     // Hour by hour: at the end of 8 AM breakfast is in, the ride isn't yet.
     expect(d.hours[8]).toMatchObject({ burned: 9 * 72, eaten: 400 })
     expect(d.hours).toHaveLength(15)
+    // Resting 1 kcal a minute, the everyday 20% on top, and the ride.
+    expect(d.parts.resting).toBe(15 * 60)
+    expect(d.parts.movement).toBe(15 * 12)
+    expect(d.parts.workouts.map((w) => w.kcal)).toEqual([500])
     // Nothing more eaten: another 9 hours of resting burn by midnight.
     expect(d.byMidnight).toBe(d.deficit + 9 * 72)
   })
@@ -36,6 +40,8 @@ describe('deficit so far today', () => {
     expect(d.burned).toBe(1500 + 2 * 72 + 200)
     expect(d.burnSource).toBe('fitbit')
     expect(d.hours[11].burned).toBe(1500)
+    // Fitbit's extra beyond resting and workouts is everyday movement.
+    expect(d.parts.resting + d.parts.movement + d.parts.workouts.reduce((s, w) => s + w.kcal, 0)).toBe(d.burned)
   })
 
   it("ignores Fitbit's number from before today", () => {
