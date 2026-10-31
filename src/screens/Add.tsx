@@ -103,7 +103,7 @@ export function Add({ startScan, date, onLogged }: Props) {
         {!q && recipes.length > 0 && (
           <>
             <div className="section-label">My recipes</div>
-            <div className="list">
+            <div className="food-grid">
               {recipes.map((f) => (
                 <FoodRow key={f.id} food={f} onPick={() => setOverlay({ kind: 'log', food: f })} />
               ))}
@@ -113,7 +113,7 @@ export function Add({ startScan, date, onLogged }: Props) {
 
         <div className="section-label">{q ? 'My foods' : 'My foods: favorites and most used'}</div>
         {mine.length ? (
-          <div className="list">
+          <div className="food-grid">
             {(q ? mine : mine.filter((f) => f.source !== 'recipe')).map((f) => (
               <FoodRow key={f.id} food={f} onPick={() => setOverlay({ kind: 'log', food: f })} />
             ))}
@@ -130,7 +130,7 @@ export function Add({ startScan, date, onLogged }: Props) {
             {searching && <p className="muted small">Searching…</p>}
             {error && <p className="notice small">{error}</p>}
             {!searching && !error && !results.length && <p className="muted small">No matches. Try fewer words, or enter it from the label.</p>}
-            <div className="list">
+            <div className="food-grid">
               {results.map((f) => (
                 <FoodRow key={f.meta.externalId} food={f} onPick={() => setOverlay({ kind: 'log', food: f })} />
               ))}

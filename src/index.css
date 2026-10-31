@@ -874,3 +874,74 @@ input[type='time'] {
   background: var(--surface);
   min-height: 44px;
 }
+
+/* Compact food cards with label-style numbers per serving */
+.food-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
+}
+
+@media (min-width: 720px) {
+  .food-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.food-card {
+  display: grid;
+  gap: 2px;
+  width: 100%;
+  text-align: left;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 10px 12px;
+  cursor: pointer;
+}
+
+.food-card:active {
+  background: var(--surface-2);
+}
+
+.food-card-name {
+  font-weight: 600;
+  font-size: 0.95rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.food-card-name .star {
+  color: var(--fat);
+  margin-right: 4px;
+}
+
+.food-card-serving {
+  font-size: 0.75rem;
+  color: var(--text-2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.food-card-label {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin-top: 6px;
+  border-top: 2px solid var(--text);
+  padding-top: 5px;
+}
+
+.food-card-label span {
+  display: flex;
+  flex-direction: column;
+  font-size: 0.68rem;
+  color: var(--text-2);
+}
+
+.food-card-label b {
+  font-size: 1rem;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}

@@ -26,7 +26,7 @@ export function FoodPicker({ title = 'Choose a food', initialQuery = '', onPick,
       </div>
       <div className="section-label">My foods</div>
       {mine.length ? (
-        <div className="list">
+        <div className="food-grid">
           {mine.map((f) => (
             <FoodRow key={f.id} food={f} onPick={() => onPick(f)} />
           ))}
@@ -39,7 +39,7 @@ export function FoodPicker({ title = 'Choose a food', initialQuery = '', onPick,
           <div className="section-label">USDA food database</div>
           {searching && <p className="muted small">Searching…</p>}
           {error && <p className="notice small">{error}</p>}
-          <div className="list">
+          <div className="food-grid">
             {results.map((f) => (
               <FoodRow key={f.meta.externalId} food={f} onPick={() => onPick(f)} />
             ))}
