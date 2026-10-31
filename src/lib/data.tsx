@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useMemo, type ReactNode } from 'react'
 import type { Session } from '@supabase/supabase-js'
+import type { CgmDay } from './cgm'
 import type { Exercise } from './exercise'
 import { buildLogEntry, type Food, type LogEntry, type Meal, type NewFood } from './foods'
 import { supabase } from './supabase'
@@ -26,6 +27,8 @@ interface Data {
   saveExercise: (e: Exercise) => void
   deleteExercise: (id: string) => void
   exercisesOn: (date: string) => Exercise[]
+  cgmDays: Record<string, CgmDay>
+  saveCgmDay: (d: CgmDay) => void
 }
 
 const DataContext = createContext<Data | null>(null)
@@ -34,6 +37,7 @@ export function DataProvider({ session, children }: { session: Session | null; c
   const foodsTable = useSyncedTable<Food>('foods', session)
   const logsTable = useSyncedTable<LogEntry>('food_logs', session)
   const exerciseTable = useSyncedTable<Exercise>('exercises', session)
+  const cgmTable = useSyncedTable<CgmDay>('cgm_days', session)
 
   const saveFood = useCallback(
     (food: NewFood | Food): Food => {
@@ -116,8 +120,8 @@ export function DataProvider({ session, children }: { session: Session | null; c
       foodById: foodsTable.byId,
       logs: logsTable.rows,
       // Without a database (local development) nothing is waiting to sync.
-      pending: supabase ? foodsTable.pending + logsTable.pending + exerciseTable.pending : 0,
-      syncError: foodsTable.error ?? logsTable.error ?? exerciseTable.error,
+      pending: supabase ? foodsTable.pending + logsTable.pending + exerciseTable.pending + cgmTable.pending : 0,
+      syncError: foodsTable.error ?? logsTable.error ?? exerciseTable.error ?? cgmTable.error,
       saveFood,
       updateFood: foodsTable.upsert,
       deleteFood: foodsTable.remove,
@@ -130,8 +134,10 @@ export function DataProvider({ session, children }: { session: Session | null; c
       saveExercise: exerciseTable.upsert,
       deleteExercise: exerciseTable.remove,
       exercisesOn,
+      cgmDays: cgmTable.byId,
+      saveCgmDay: cgmTable.upsert,
     }),
-    [foodsTable, logsTable, exerciseTable, saveFood, logFood, logsOn, logsWeekEnding, exercisesOn],
+    [foodsTable, logsTable, exerciseTable, cgmTable, saveFood, logFood, logsOn, logsWeekEnding, exercisesOn],
   )
 
   return <DataContext.Provider value={value}>{children}</DataContext.Provider>

@@ -1005,3 +1005,39 @@ input[type='time'] {
   border-top: 2px solid var(--text);
   font-weight: 600;
 }
+
+/* Glucose insights */
+.glucose-chart {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+  text-align: center;
+}
+
+.stat-grid b {
+  display: block;
+  font-size: 1.25rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.stat-grid span {
+  font-size: 0.7rem;
+  color: var(--text-2);
+}
+
+.insight-row {
+  display: grid;
+  gap: 2px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.insight-row:last-child {
+  border-bottom: 0;
+}

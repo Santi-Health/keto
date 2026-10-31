@@ -5,7 +5,10 @@ export const GOOGLE_CLIENT_ID =
   (import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined) ||
   '579706392010-f9v75bfl95tcgbuftcvodajimck9dv37.apps.googleusercontent.com'
 
-const SCOPE = 'https://www.googleapis.com/auth/googlehealth.activity_and_fitness.readonly'
+const SCOPE = [
+  'https://www.googleapis.com/auth/googlehealth.activity_and_fitness.readonly',
+  'https://www.googleapis.com/auth/googlehealth.health_metrics_and_measurements.readonly',
+].join(' ')
 const API = 'https://health.googleapis.com/v4/users/me'
 
 // --- Sign-in (Google Identity Services token flow: no secret, no server) ---------------
@@ -142,6 +145,36 @@ export async function listExercises(token: string, fromDate: string, toDate: str
       throw new Error(`Google Health returned ${res.status}. ${body.slice(0, 300)}`)
     }
     const data = (await res.json()) as { dataPoints?: HealthExercise[]; nextPageToken?: string }
+    out.push(...(data.dataPoints ?? []))
+    pageToken = data.nextPageToken
+  } while (pageToken)
+  return out
+}
+
+// --- Reading glucose (Lingo and other CGMs connected to Google Health) ---------------
+
+export async function listGlucose(token: string, from: Date, to: Date): Promise<unknown[]> {
+  const out: unknown[] = []
+  let pageToken: string | undefined
+  do {
+    const params = new URLSearchParams({ startTime: from.toISOString(), endTime: to.toISOString(), pageSize: '1000' })
+    if (pageToken) params.set('pageToken', pageToken)
+    const res = await fetch(`${API}/dataTypes/blood-glucose/dataPoints?${params}`, {
+      headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
+    })
+    if (res.status === 401) {
+      forgetGoogleToken()
+      throw new Error('Google sign-in expired. Tap Import again.')
+    }
+    if (res.status === 403) {
+      forgetGoogleToken()
+      throw new Error('Google needs your OK to read glucose. Tap Import again and allow "health metrics".')
+    }
+    if (!res.ok) {
+      const body = await res.text().catch(() => '')
+      throw new Error(`Google Health returned ${res.status}. ${body.slice(0, 300)}`)
+    }
+    const data = (await res.json()) as { dataPoints?: unknown[]; nextPageToken?: string }
     out.push(...(data.dataPoints ?? []))
     pageToken = data.nextPageToken
   } while (pageToken)

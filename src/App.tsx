@@ -6,11 +6,12 @@ import { computeTargets, localDate } from './lib/targets'
 import { supabase } from './lib/supabase'
 import { Add } from './screens/Add'
 import { Lock, NotConfigured } from './screens/Lock'
+import { Insights } from './screens/Insights'
 import { Log } from './screens/Log'
 import { Settings } from './screens/Settings'
 import { Today } from './screens/Today'
 
-type Tab = 'today' | 'log' | 'add' | 'trends' | 'settings'
+type Tab = 'today' | 'log' | 'add' | 'insights' | 'settings'
 
 const icon = (d: string) => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -22,7 +23,7 @@ const TABS: { id: Tab; label: string; icon: ReactNode }[] = [
   { id: 'today', label: 'Today', icon: icon('M12 3a9 9 0 1 0 9 9M12 3v9l6 3') },
   { id: 'log', label: 'Log', icon: icon('M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01') },
   { id: 'add', label: 'Add', icon: icon('M12 5v14M5 12h14') },
-  { id: 'trends', label: 'Trends', icon: icon('M3 17l6-6 4 4 8-8M15 7h6v6') },
+  { id: 'insights', label: 'Insights', icon: icon('M3 17l6-6 4 4 8-8M15 7h6v6') },
   { id: 'settings', label: 'Settings', icon: icon('M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0M14 4v4M8 10v4M16 16v4') },
 ]
 
@@ -116,16 +117,7 @@ function Tracker({ session, recovering = false, onPassphraseChanged = () => {} }
             onLogged={() => go(isDate(param) ? `log/${param}` : 'today')}
           />
         )}
-        {tab === 'trends' && (
-          <>
-            <header className="page-header">
-              <h1>Trends</h1>
-            </header>
-            <div className="card empty">
-              <p className="muted" style={{ margin: 0 }}>Charts for weight, macros, ketones and glucose arrive in phase 8.</p>
-            </div>
-          </>
-        )}
+        {tab === 'insights' && <Insights />}
       </main>
       <nav className="nav" aria-label="Main">
         {TABS.map((t) => (
