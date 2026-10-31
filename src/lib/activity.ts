@@ -117,3 +117,13 @@ export const formatSleep = (min: number) => {
   const m = Math.round(min)
   return `${Math.floor(m / 60)}h ${String(m % 60).padStart(2, '0')}m`
 }
+
+/**
+ * How many days back an import should reach: from the last day already imported (so a week or two
+ * away gets filled in), at least `min` days (recent days are still filling in), at most 90.
+ */
+export function catchUpDays(lastDay: string | null, today: string, opts: { min: number; first: number; max?: number }): number {
+  if (!lastDay) return opts.first
+  const gap = Math.round((Date.parse(`${today}T12:00:00`) - Date.parse(`${lastDay}T12:00:00`)) / 86_400_000) + 1
+  return Math.min(opts.max ?? 90, Math.max(opts.min, gap))
+}

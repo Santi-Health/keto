@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { daysSinceStrength, routineDue, routineSession, sessionLabel, trainingWarnings } from '../lib/exercise'
-import { mergeActivity, weightReadings } from '../lib/activity'
+import { catchUpDays, mergeActivity, weightReadings } from '../lib/activity'
 import { fetchActivity, getGoogleToken, heartRateCalories, learnTypes, listExercises, mergeImported, toAppExercise } from '../lib/googleHealth'
 import { useInstall } from '../lib/install'
 import { STATUS_TEXT, estimateKetosis, tomorrowMorning } from '../lib/ketosis'
@@ -22,6 +22,8 @@ import type { Profile } from '../lib/types'
 import { computeWatchList } from '../lib/watchlist'
 import { KG_PER_LB, ketoneBand, latest, type ReadingKind } from '../lib/readings'
 import { useKetoModel } from '../lib/useKetoModel'
+import { useBackup } from '../lib/useBackup'
+import { backupDue } from '../lib/driveBackup'
 import { READINESS_TEXT, readinessFor } from '../lib/readiness'
 import { dailySeries, lastDays } from '../lib/trends'
 import { formatSleep } from '../lib/activity'
@@ -39,6 +41,7 @@ interface Props {
   onOpenSettings: () => void
   onToggleRefeed: () => void
   onNavigate: (hash: string) => void
+  onUpdateProfile: (changes: Partial<Profile>) => void
 }
 
 /** Offer installing on Today only when Chrome says it's possible, so it's not a permanent nag. */
@@ -46,9 +49,12 @@ function useInstallOffer() {
   return useInstall().state === 'available'
 }
 
-export function Today({ profile, targets, onOpenSettings, onToggleRefeed, onNavigate }: Props) {
+export function Today({ profile, targets, onOpenSettings, onToggleRefeed, onNavigate, onUpdateProfile }: Props) {
   const { logsOn, logsWeekEnding, pending, syncError, exercises, exercisesOn, saveExercise, logs, readings, activity, saveActivity, saveReading, cgmDays } = useData()
   const [view, setView] = useState<View>('today')
+  const backup = useBackup(profile, onUpdateProfile)
+  const hasData = logs.length > 0 || readings.length > 0
+  const [weekMode, setWeekMode] = useState<'average' | 'total'>('average')
   const [logExercise, setLogExercise] = useState(false)
   const [readingSheet, setReadingSheet] = useState<{ kind?: ReadingKind } | null>(null)
   const [importing, setImporting] = useState(false)
@@ -62,8 +68,10 @@ export function Today({ profile, targets, onOpenSettings, onToggleRefeed, onNavi
     setImportMessage(null)
     try {
       const token = await getGoogleToken()
+      // Workouts since the last Fitbit one already here (at least 3 days), so time away gets filled in.
+      const lastWorkout = exercises.filter((e) => e.source === 'fitbit').map((e) => localDate(new Date(e.started_at))).sort().pop() ?? null
       const from = new Date()
-      from.setDate(from.getDate() - 2)
+      from.setDate(from.getDate() - (catchUpDays(lastWorkout, today, { min: 3, first: 14 }) - 1))
       const points = await listExercises(token, localDate(from), today)
       const mapped = points
         .map((p) => toAppExercise(p, profile.weightKg, targets.bmr, learnTypes(exercises)))
@@ -91,9 +99,10 @@ export function Today({ profile, targets, onOpenSettings, onToggleRefeed, onNavi
 
       // Steps, calories burned, resting heart rate, sleep and weigh-ins: 30 days the first time, then the last week.
       const actFrom = new Date()
-      // A month the first time (and once more to backfill HRV for readiness), then the last week.
+      // A month the first time (and once more to backfill HRV for readiness), then everything since the last import.
       const hasHistory = Object.values(activity).some((d) => d.meta.hrvMs != null)
-      actFrom.setDate(actFrom.getDate() - (hasHistory ? 7 : 30))
+      const lastDay = hasHistory ? Object.values(activity).filter((d) => d.steps != null).map((d) => d.day).sort().pop() ?? null : null
+      actFrom.setDate(actFrom.getDate() - (catchUpDays(lastDay, today, { min: 7, first: 30 }) - 1))
       // Workouts are already saved; a problem here is reported without losing them.
       let actMessage: string
       try {
@@ -110,6 +119,16 @@ export function Today({ profile, targets, onOpenSettings, onToggleRefeed, onNavi
         actMessage = `Couldn't read steps/sleep: ${(e as Error).message}`
       }
 
+      // The weekly Drive backup rides along with the import, since Google sign-in is already done.
+      let backupMessage = ''
+      if (backupDue(profile.lastBackupAt)) {
+        try {
+          backupMessage = await backup.backUp(token)
+        } catch (e) {
+          backupMessage = (e as Error).message
+        }
+      }
+
       setImportMessage(
         [
           points.length === 0
@@ -117,6 +136,7 @@ export function Today({ profile, targets, onOpenSettings, onToggleRefeed, onNavi
             : `Workouts: ${added.length} new, ${matched.length} matched, ${updated.length} refreshed.${names.length ? ` ${names.join(' · ')}` : ''}`,
           hrUpdated ? `${hrUpdated} hand-logged workout${hrUpdated > 1 ? 's' : ''} now use${hrUpdated > 1 ? '' : 's'} your heart rate for calories.` : '',
           actMessage,
+          backupMessage,
         ]
           .filter(Boolean)
           .join(' '),
@@ -145,16 +165,20 @@ export function Today({ profile, targets, onOpenSettings, onToggleRefeed, onNavi
     for (const k of Object.keys(avg) as NutrientKey[]) avg[k] = sum[k] / loggedDays
     return avg
   }, [dayLogs, isWeek, loggedDays])
+  // Week totals compare the sum with the daily targets × the days with food logged.
+  const showTotals = isWeek && weekMode === 'total'
+  const mult = showTotals ? loggedDays : 1
   const totals = {
-    netCarbs: n.netCarbs,
-    protein: n.protein,
-    fat: n.fat,
-    calories: n.kcal,
-    fiber: n.fiber,
-    sodium: n.sodiumMg,
-    potassium: n.potassiumMg,
-    magnesium: n.magnesiumMg,
+    netCarbs: n.netCarbs * mult,
+    protein: n.protein * mult,
+    fat: n.fat * mult,
+    calories: n.kcal * mult,
+    fiber: n.fiber * mult,
+    sodium: n.sodiumMg * mult,
+    potassium: n.potassiumMg * mult,
+    magnesium: n.magnesiumMg * mult,
   }
+  const t = (x: number | null) => (x == null ? x : x * mult)
   const watch = useMemo(
     () =>
       computeWatchList(
@@ -166,7 +190,8 @@ export function Today({ profile, targets, onOpenSettings, onToggleRefeed, onNavi
     [dayLogs, weekLogs, isWeek, n, targets.calories, profile.weightKg, profile.watchList],
   )
   // Fat fills what's left: protein or carbs over plan shrink it, never below the minimum.
-  const fatBudget = liveFatBudget(targets, { protein: totals.protein, netCarbs: totals.netCarbs })
+  const dailyFat = liveFatBudget(targets, { protein: n.protein, netCarbs: n.netCarbs })
+  const fatBudget = dailyFat == null ? null : dailyFat * mult
   const sessionsToday = viewDays.flatMap((d) => exercisesOn(d))
   const sinceStrength = daysSinceStrength(exercises)
   const readiness = isToday ? readinessFor(today, activity) : null
@@ -190,11 +215,11 @@ export function Today({ profile, targets, onOpenSettings, onToggleRefeed, onNavi
     () => (isToday ? [] : dailySeries({ days: viewDays, logs, readings, exercises, activity, cgmDays })),
     [isToday, viewDays, logs, readings, exercises, activity, cgmDays],
   )
-  const carbsLeft = targets.netCarbsG - totals.netCarbs
+  const carbsLeft = targets.netCarbsG * mult - totals.netCarbs
   const proteinLeft = targets.proteinG - totals.protein
   const fmtDay = (d: string, opts: Intl.DateTimeFormatOptions) => new Date(`${d}T12:00:00`).toLocaleDateString('en-US', opts)
   const date = isWeek
-    ? `${fmtDay(viewDays[0], { month: 'short', day: 'numeric' })} – ${fmtDay(day, { month: 'short', day: 'numeric' })} · averages per day (${loggedDays} with food logged)`
+    ? `${fmtDay(viewDays[0], { month: 'short', day: 'numeric' })} – ${fmtDay(day, { month: 'short', day: 'numeric' })} · ${showTotals ? `totals vs. targets × ${loggedDays} days` : 'averages per day'} (${loggedDays} with food logged)`
     : fmtDay(day, { weekday: 'long', month: 'long', day: 'numeric' })
 
   return (
@@ -218,8 +243,30 @@ export function Today({ profile, targets, onOpenSettings, onToggleRefeed, onNavi
         ))}
       </div>
 
+      {isWeek && (
+        <div className="segmented week-mode" role="group" aria-label="Show the week as">
+          <button type="button" aria-pressed={weekMode === 'average'} onClick={() => setWeekMode('average')}>
+            Daily average
+          </button>
+          <button type="button" aria-pressed={weekMode === 'total'} onClick={() => setWeekMode('total')}>
+            Week total
+          </button>
+        </div>
+      )}
+
       <div className="grid two">
         <div className="grid">
+          {isToday && hasData && backupDue(profile.lastBackupAt, Date.now() - 86_400_000) && (
+            <div className="notice small" role="status">
+              {profile.lastBackupAt
+                ? `Your weekly Google Drive backup is overdue (last ${new Date(profile.lastBackupAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}).`
+                : 'Back up your data to Google Drive once a week. It also runs on its own when you import from Fitbit.'}{' '}
+              <button type="button" className="link-btn" disabled={backup.busy} onClick={() => void backup.backUp().catch(() => {})}>
+                {backup.busy ? 'Backing up…' : 'Back up now'}
+              </button>
+              {backup.message && <div>{backup.message}</div>}
+            </div>
+          )}
           {isToday && targets.warnings.length > 0 && (
             <button type="button" className="notice" onClick={onOpenSettings} style={{ border: 0, textAlign: 'left', cursor: 'pointer' }}>
               {targets.warnings.join(' ')} <u>Open settings</u>
@@ -229,10 +276,10 @@ export function Today({ profile, targets, onOpenSettings, onToggleRefeed, onNavi
           <section className="card">
             <h2>Macros</h2>
             <div className="rings">
-              <Ring label="Net carbs" value={totals.netCarbs} target={targets.netCarbsG} unit="g" color="var(--carbs)" isLimit molecule="glucose" />
-              <Ring label="Protein" value={totals.protein} target={targets.proteinG} unit="g" color="var(--protein)" molecule="protein" />
+              <Ring label="Net carbs" value={totals.netCarbs} target={targets.netCarbsG * mult} unit="g" color="var(--carbs)" isLimit molecule="glucose" />
+              <Ring label="Protein" value={totals.protein} target={targets.proteinG * mult} unit="g" color="var(--protein)" molecule="protein" />
               <Ring label="Fat" value={totals.fat} target={fatBudget} unit="g" color="var(--fat)" isLimit caption="Fat budget" molecule="fat" />
-              <Ring label="Calories" value={totals.calories} target={targets.calories} unit="" color="var(--calories)" isLimit molecule="energy" />
+              <Ring label="Calories" value={totals.calories} target={t(targets.calories)} unit="" color="var(--calories)" isLimit molecule="energy" />
             </div>
             {!isToday && (
               <p className="small" style={{ marginBottom: 0 }}>
@@ -240,9 +287,9 @@ export function Today({ profile, targets, onOpenSettings, onToggleRefeed, onNavi
                   'No food logged.'
                 ) : (
                   <>
-                    {isWeek ? 'Average ' : ''}
+                    {isWeek ? (showTotals ? 'Total ' : 'Average ') : ''}
                     <strong style={carbsLeft < 0 ? { color: 'var(--warn)' } : undefined}>{totals.netCarbs.toFixed(1)} g</strong> net carbs (limit{' '}
-                    {targets.netCarbsG} g) · <strong>{Math.round(totals.protein)} g</strong> protein (target {targets.proteinG} g) ·{' '}
+                    {targets.netCarbsG * mult} g) · <strong>{Math.round(totals.protein)} g</strong> protein (target {targets.proteinG * mult} g) ·{' '}
                     <strong>{Math.round(totals.calories).toLocaleString()}</strong> kcal
                     {isWeek && ` · ${past.filter((p) => p.logged && p.netCarbs <= targets.netCarbsG).length} of ${loggedDays} days under the carb limit`}
                   </>
@@ -310,10 +357,10 @@ export function Today({ profile, targets, onOpenSettings, onToggleRefeed, onNavi
 
           <section className="card">
             <h2>Electrolytes &amp; fiber</h2>
-            <Bar label="Sodium" value={totals.sodium} target={targets.sodiumMg} unit="mg" molecule="sodium" color="var(--atom-na)" />
-            <Bar label="Potassium" value={totals.potassium} target={targets.potassiumMg} unit="mg" molecule="potassium" color="var(--atom-k)" />
-            <Bar label="Magnesium" value={totals.magnesium} target={targets.magnesiumMg} unit="mg" molecule="magnesium" color="var(--atom-mg)" />
-            <Bar label="Fiber" value={totals.fiber} target={targets.fiberG} unit="g" molecule="fiber" color="var(--fiber)" />
+            <Bar label="Sodium" value={totals.sodium} target={targets.sodiumMg * mult} unit="mg" molecule="sodium" color="var(--atom-na)" />
+            <Bar label="Potassium" value={totals.potassium} target={targets.potassiumMg * mult} unit="mg" molecule="potassium" color="var(--atom-k)" />
+            <Bar label="Magnesium" value={totals.magnesium} target={targets.magnesiumMg * mult} unit="mg" molecule="magnesium" color="var(--atom-mg)" />
+            <Bar label="Fiber" value={totals.fiber} target={targets.fiberG * mult} unit="g" molecule="fiber" color="var(--fiber)" />
           </section>
         </div>
 

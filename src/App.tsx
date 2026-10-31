@@ -94,6 +94,7 @@ function Tracker({ session, recovering = false, onPassphraseChanged = () => {} }
             onOpenSettings={() => go('settings')}
             onToggleRefeed={() => update({ refeedDate: targets.isRefeed ? null : localDate() })}
             onNavigate={go}
+            onUpdateProfile={update}
           />
         )}
         {tab === 'settings' && (

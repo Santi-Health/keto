@@ -9,6 +9,8 @@ const SCOPE = [
   'https://www.googleapis.com/auth/googlehealth.activity_and_fitness.readonly',
   'https://www.googleapis.com/auth/googlehealth.health_metrics_and_measurements.readonly',
   'https://www.googleapis.com/auth/googlehealth.sleep.readonly',
+  // Weekly backups: only files this app creates in Drive.
+  'https://www.googleapis.com/auth/drive.file',
 ].join(' ')
 const API = 'https://health.googleapis.com/v4/users/me'
 

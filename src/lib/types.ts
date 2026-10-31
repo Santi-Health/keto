@@ -38,6 +38,9 @@ export interface Profile {
   muscleGoal: 'maintain' | 'build'
   /** Usual yoga days and time, for one-tap logging. Null turns the reminder off. */
   yogaRoutine: Routine | null
+  /** Last weekly backup to Google Drive, and the folder it lives in. */
+  lastBackupAt?: string | null
+  backupFolderId?: string | null
   /** Name printed on the doctor summary. */
   reportName?: string
   /** Average daily burn from Fitbit (last 7 full days), used instead of the estimate. */

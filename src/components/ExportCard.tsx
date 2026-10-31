@@ -1,22 +1,12 @@
-import { useData } from '../lib/data'
-import { csvFiles, download, type ExportBundle } from '../lib/exportData'
+import { csvFiles, download } from '../lib/exportData'
+import { BACKUP_FOLDER, KEEP_BACKUPS } from '../lib/driveBackup'
 import { localDate } from '../lib/targets'
 import type { Profile } from '../lib/types'
+import { useBackup } from '../lib/useBackup'
 
-/** Download everything as JSON (full backup) or as spreadsheet-friendly CSV files. */
-export function ExportCard({ profile, onOpenReport }: { profile: Profile; onOpenReport: () => void }) {
-  const { foods, logs, savedMeals, exercises, readings, activity, cgmDays } = useData()
-  const bundle = (): ExportBundle => ({
-    exportedAt: new Date().toISOString(),
-    profile,
-    foods,
-    foodLogs: logs,
-    savedMeals,
-    exercises,
-    readings,
-    activity: Object.values(activity).filter((a) => !a.deleted_at),
-    cgmDays: Object.values(cgmDays).filter((d) => !d.deleted_at),
-  })
+/** Weekly Google Drive backup, plus downloads as JSON (full backup) or spreadsheet-friendly CSV files. */
+export function ExportCard({ profile, update, onOpenReport }: { profile: Profile; update: (p: Partial<Profile>) => void; onOpenReport: () => void }) {
+  const { bundle, backUp, busy, message } = useBackup(profile, update)
   const stamp = localDate()
   const files = csvFiles(bundle())
 
@@ -24,10 +14,19 @@ export function ExportCard({ profile, onOpenReport }: { profile: Profile; onOpen
     <section className="card">
       <h2>Your data</h2>
       <p className="muted small" style={{ marginTop: 0 }}>
-        Everything is stored in your Supabase account and on this phone. Download a copy any time.
+        Everything is stored in your Supabase account and on this phone. A full copy also goes to Google Drive (“{BACKUP_FOLDER}”) once a week when you import
+        from Fitbit; the newest {KEEP_BACKUPS} are kept.
       </p>
+      <p className="small" style={{ marginTop: 0 }}>
+        Last Drive backup:{' '}
+        <b>{profile.lastBackupAt ? new Date(profile.lastBackupAt).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : 'never'}</b>
+      </p>
+      {message && <p className="notice small">{message}</p>}
       <div className="row" style={{ flexWrap: 'wrap', gap: 8 }}>
-        <button type="button" className="btn" onClick={() => download(`keto-tracker-${stamp}.json`, JSON.stringify(bundle(), null, 2), 'application/json')}>
+        <button type="button" className="btn" disabled={busy} onClick={() => void backUp().catch(() => {})}>
+          {busy ? 'Backing up…' : 'Back up to Google Drive now'}
+        </button>
+        <button type="button" className="btn secondary" onClick={() => download(`keto-tracker-${stamp}.json`, JSON.stringify(bundle(), null, 2), 'application/json')}>
           Download everything (JSON)
         </button>
         <button type="button" className="btn secondary" onClick={onOpenReport}>

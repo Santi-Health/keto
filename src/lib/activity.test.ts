@@ -38,3 +38,13 @@ describe('activity import', () => {
     expect(await stableUuid('fitbit-weight:x')).toBe(a)
   })
 })
+
+describe('catching up after time away', () => {
+  it('reaches back to the last imported day, within limits', async () => {
+    const { catchUpDays } = await import('./activity')
+    expect(catchUpDays(null, '2026-11-20', { min: 7, first: 30 })).toBe(30)
+    expect(catchUpDays('2026-11-19', '2026-11-20', { min: 7, first: 30 })).toBe(7)
+    expect(catchUpDays('2026-11-01', '2026-11-20', { min: 7, first: 30 })).toBe(20)
+    expect(catchUpDays('2026-01-01', '2026-11-20', { min: 7, first: 30 })).toBe(90)
+  })
+})

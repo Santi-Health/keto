@@ -1706,3 +1706,7 @@ input[type='time'] {
 .readiness-days .low {
   border-bottom-color: var(--warn);
 }
+
+.week-mode {
+  margin: -6px 0 14px;
+}

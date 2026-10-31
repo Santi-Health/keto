@@ -208,7 +208,7 @@ export function Settings({ profile, update, targets, session, sync, recovering, 
           <RoutineCard profile={profile} update={update} />
           <TargetMath profile={profile} targets={targets} />
           <WatchSettingsCard profile={profile} update={update} targets={targets} />
-          <ExportCard profile={profile} onOpenReport={() => (window.location.hash = 'report/30')} />
+          <ExportCard profile={profile} update={update} onOpenReport={() => (window.location.hash = 'report/30')} />
 
           <Account session={session} sync={sync} recovering={recovering} onPassphraseChanged={onPassphraseChanged} />
           <section className="card">

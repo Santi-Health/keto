@@ -8,6 +8,7 @@ import type { RangeDays } from '../lib/trends'
 import type { Targets } from '../lib/targets'
 import type { WeightUnit } from '../lib/types'
 import { useKetoModel } from '../lib/useKetoModel'
+import { catchUpDays } from '../lib/activity'
 import { mergeIntoDays, parseGlucosePoint, toReadings } from '../lib/cgm'
 import { useData } from '../lib/data'
 import { sessionLabel } from '../lib/exercise'
@@ -67,9 +68,10 @@ export function Insights({ targets, weightUnit, onApplyLimit, onOpenReport }: Pr
     setMessage(null)
     try {
       const token = await getGoogleToken()
-      const hasAny = Object.keys(cgmDays).length > 0
+      // Everything since the last CGM day already here (at least 3 days), 14 days the first time.
+      const lastDay = Object.values(cgmDays).filter((d) => !d.deleted_at).map((d) => d.day).sort().pop() ?? null
       const from = new Date()
-      from.setDate(from.getDate() - (hasAny ? 3 : 14))
+      from.setDate(from.getDate() - (catchUpDays(lastDay, today, { min: 3, first: 14 }) - 1))
       from.setHours(0, 0, 0, 0)
       const raw = await listGlucose(token, from, new Date())
       const parsed = raw.map(parseGlucosePoint).filter((r): r is NonNullable<typeof r> => !!r)
