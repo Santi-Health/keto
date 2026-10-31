@@ -818,7 +818,10 @@ const DEFAULT_PROFILE = {
 	updatedAt: (/* @__PURE__ */ new Date(0)).toISOString()
 };
 function db(env) {
-	const headers = {
+	const headers = env.serviceKey.startsWith("sb_") ? {
+		apikey: env.serviceKey,
+		"Content-Type": "application/json"
+	} : {
 		apikey: env.serviceKey,
 		Authorization: `Bearer ${env.serviceKey}`,
 		"Content-Type": "application/json"
@@ -1154,10 +1157,21 @@ function env() {
 		if (!v) throw new Error(`Missing setting ${k} in Supabase Edge Function secrets.`);
 		return v;
 	};
+	const fromMap = (k) => {
+		try {
+			const m = JSON.parse(Deno.env.get(k) ?? "{}");
+			return m.default ?? Object.values(m)[0];
+		} catch {
+			return;
+		}
+	};
+	const serviceKey = fromMap("SUPABASE_SECRET_KEYS") ?? Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+	const anonKey = fromMap("SUPABASE_PUBLISHABLE_KEYS") ?? Deno.env.get("SUPABASE_ANON_KEY");
+	if (!serviceKey || !anonKey) throw new Error("Supabase keys are not available to the function.");
 	return {
 		supabaseUrl: get("SUPABASE_URL"),
-		serviceKey: get("SUPABASE_SERVICE_ROLE_KEY"),
-		anonKey: get("SUPABASE_ANON_KEY"),
+		serviceKey,
+		anonKey,
 		googleClientId: GOOGLE_CLIENT_ID,
 		googleClientSecret: get("GOOGLE_CLIENT_SECRET")
 	};

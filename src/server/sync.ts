@@ -31,7 +31,10 @@ export const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.file'
 // --- Database (PostgREST with the service key, which bypasses row-level security) ---------
 
 function db(env: Env) {
-  const headers = { apikey: env.serviceKey, Authorization: `Bearer ${env.serviceKey}`, 'Content-Type': 'application/json' }
+  // New-style secret keys (sb_secret_…) go in the apikey header only; legacy JWT keys also as a bearer token.
+  const headers: Record<string, string> = env.serviceKey.startsWith('sb_')
+    ? { apikey: env.serviceKey, 'Content-Type': 'application/json' }
+    : { apikey: env.serviceKey, Authorization: `Bearer ${env.serviceKey}`, 'Content-Type': 'application/json' }
   const base = `${env.supabaseUrl}/rest/v1`
   return {
     async select<T>(table: string, query: string): Promise<T[]> {

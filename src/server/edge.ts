@@ -18,10 +18,22 @@ function env(): Env {
     if (!v) throw new Error(`Missing setting ${k} in Supabase Edge Function secrets.`)
     return v
   }
+  // Projects on the new API keys get them as JSON maps; older ones as single legacy keys.
+  const fromMap = (k: string) => {
+    try {
+      const m = JSON.parse(Deno.env.get(k) ?? '{}') as Record<string, string>
+      return m.default ?? Object.values(m)[0]
+    } catch {
+      return undefined
+    }
+  }
+  const serviceKey = fromMap('SUPABASE_SECRET_KEYS') ?? Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+  const anonKey = fromMap('SUPABASE_PUBLISHABLE_KEYS') ?? Deno.env.get('SUPABASE_ANON_KEY')
+  if (!serviceKey || !anonKey) throw new Error('Supabase keys are not available to the function.')
   return {
     supabaseUrl: get('SUPABASE_URL'),
-    serviceKey: get('SUPABASE_SERVICE_ROLE_KEY'),
-    anonKey: get('SUPABASE_ANON_KEY'),
+    serviceKey,
+    anonKey,
     googleClientId: GOOGLE_CLIENT_ID,
     googleClientSecret: get('GOOGLE_CLIENT_SECRET'),
   }
