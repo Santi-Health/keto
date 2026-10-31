@@ -15,6 +15,8 @@ describe('server time zones', () => {
   })
 })
 
+const HEALTH = 'https://www.googleapis.com/auth/googlehealth.sleep.readonly'
+
 describe('scheduled run', () => {
   const env = { supabaseUrl: 'https://x.supabase.co', serviceKey: 's', anonKey: 'a', googleClientId: 'c', googleClientSecret: 'g' }
 
@@ -24,7 +26,7 @@ describe('scheduled run', () => {
       'fetch',
       vi.fn(async (url: string, init: RequestInit = {}) => {
         const json = (b: unknown, status = 200) => new Response(JSON.stringify(b), { status })
-        if (url.includes('/google_tokens?select')) return json([{ user_id: 'u1', refresh_token: 'r1', scopes: '' }, { user_id: 'u2', refresh_token: 'r2', scopes: '' }])
+        if (url.includes('/google_tokens?select')) return json([{ user_id: 'u1', refresh_token: 'r1', scopes: HEALTH }, { user_id: 'u2', refresh_token: 'r2', scopes: HEALTH }])
         if (url.includes('/sync_status?select'))
           return json([
             { user_id: 'u1', time_zone: 'America/Los_Angeles', last_sync_at: new Date().toISOString() },
