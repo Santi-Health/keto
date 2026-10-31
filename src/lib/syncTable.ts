@@ -69,7 +69,9 @@ export function useSyncedTable<T extends SyncedRow>(table: string, session: Sess
         void _skip
         return rest
       })
-      const { data, error: err } = await supabase.from(table).upsert(payload).select('id, updated_at')
+      // Rows pulled from the cloud carry user_id and new ones don't. defaultToNull: false lets a new row in a mixed
+      // batch take the column default (your account) instead of null, which the owner-only rule rejects.
+      const { data, error: err } = await supabase.from(table).upsert(payload, { defaultToNull: false }).select('id, updated_at')
       if (err) throw err
       const now = stateRef.current
       const nextRows = { ...now.rows }
