@@ -4,6 +4,7 @@ import { DataProvider, useData } from './lib/data'
 import { averageBurn } from './lib/activity'
 import { useSyncOnOpen } from './lib/backgroundSync'
 import { recordZone } from './lib/time'
+import { fillFood, fillLog, fillRecipe, needsVitamins } from './lib/vitaminFill'
 import { latest } from './lib/readings'
 import type { Profile } from './lib/types'
 import { useProfile, useSession } from './lib/profileStore'
@@ -89,6 +90,7 @@ function Tracker({ session, recovering = false, onPassphraseChanged = () => {} }
     <BurnFromActivity kcal={profile.fitbitBurnKcal ?? null} update={update} />
     <SyncOnOpen enabled={!!session} />
     <ZoneTracker log={profile.zoneLog} update={update} />
+    <VitaminFiller />
     <div className="app">
       <main className="main">
         {tab === 'today' && (
@@ -203,5 +205,43 @@ function ZoneTracker({ log, update }: { log: Profile['zoneLog']; update: (p: Par
     document.addEventListener('visibilitychange', check)
     return () => document.removeEventListener('visibilitychange', check)
   }, [log, update])
+  return null
+}
+
+let vitaminRunStarted = false
+
+/**
+ * Once per app session, quietly fills in vitamins for foods that don't have them yet (a few at a time,
+ * one USDA lookup each), then for recipes built from them, then for logged meals.
+ */
+function VitaminFiller() {
+  const { foods, foodById, logs, updateFood, updateLog } = useData()
+  useEffect(() => {
+    if (vitaminRunStarted || !foods.length || !navigator.onLine) return
+    vitaminRunStarted = true
+    void (async () => {
+      const updated: Record<string, typeof foods[number]> = { ...foodById }
+      for (const f of foods.filter(needsVitamins).slice(0, 30)) {
+        try {
+          const filled = await fillFood(f)
+          updateFood(filled)
+          updated[f.id] = filled
+        } catch {
+          break // USDA busy or offline: try again next time the app opens
+        }
+      }
+      for (const r of Object.values(updated).filter((f) => f.source === 'recipe' && !f.deleted_at)) {
+        const filled = fillRecipe(r, updated)
+        if (filled) {
+          updateFood(filled)
+          updated[r.id] = filled
+        }
+      }
+      for (const l of logs) {
+        const filled = fillLog(l, l.food_id ? updated[l.food_id] : undefined)
+        if (filled) updateLog(filled)
+      }
+    })()
+  }, [foods, foodById, logs, updateFood, updateLog])
   return null
 }

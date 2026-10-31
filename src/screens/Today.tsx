@@ -8,6 +8,7 @@ import { AminoCard } from '../components/AminoCard'
 import { ActivityCard } from '../components/ActivityCard'
 import { RelinkBanner } from '../components/BackgroundSyncCard'
 import { SuggestionsCard } from '../components/SuggestionsCard'
+import { VitaminsCard } from '../components/VitaminsCard'
 import { useOpenSyncState } from '../lib/backgroundSync'
 import { deviceTz, travelDay, zoneLabel } from '../lib/time'
 import { DrinksCard } from '../components/DrinksCard'
@@ -380,7 +381,7 @@ export function Today({ profile, targets, onOpenSettings, onToggleRefeed, onNavi
             )}
           </section>
 
-          {!isWeek && <SuggestionsCard dayLogs={dayLogs} targets={targets} muscleGoal={profile.muscleGoal} fatBudget={fatBudget} past={!isToday} />}
+          {!isWeek && <SuggestionsCard dayLogs={dayLogs} targets={targets} muscleGoal={profile.muscleGoal} fatBudget={fatBudget} past={!isToday} sex={profile.sex} />}
 
           <section className="card">
             <h2>Electrolytes &amp; fiber</h2>
@@ -389,6 +390,8 @@ export function Today({ profile, targets, onOpenSettings, onToggleRefeed, onNavi
             <Bar label="Magnesium" value={totals.magnesium} target={targets.magnesiumMg * mult} unit="mg" molecule="magnesium" color="var(--atom-mg)" />
             <Bar label="Fiber" value={totals.fiber} target={targets.fiberG * mult} unit="g" molecule="fiber" color="var(--fiber)" />
           </section>
+
+          <VitaminsCard total={n as Nutrients} items={dayLogs.map((l) => l.nutrients)} sex={profile.sex} age={targets.age} week={isWeek} />
         </div>
 
         <div className="grid">

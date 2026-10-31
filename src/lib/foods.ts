@@ -39,6 +39,9 @@ export interface FoodMeta {
   meals?: Meal[]
   /** Meals the user said this food is NOT usual for; overrides what history suggests. */
   notMeals?: Meal[]
+  /** Vitamins were looked up for this food (so it isn't looked up again), and where they came from. */
+  vitaminsChecked?: boolean
+  vitaminsFrom?: string
 }
 
 /** Row shape of the `foods` table. */

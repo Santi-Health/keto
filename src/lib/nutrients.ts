@@ -27,6 +27,23 @@ export interface Nutrients {
   alcohol?: number
   /** Preformed vitamin A (retinol), µg. */
   retinolUg?: number
+  // Vitamins and trace minerals.
+  /** Vitamin A as retinol activity equivalents, µg. */
+  vitAUg?: number
+  vitCMg?: number
+  /** Vitamin D (D2 + D3), µg. */
+  vitDUg?: number
+  /** Vitamin E (alpha-tocopherol), mg. */
+  vitEMg?: number
+  vitKUg?: number
+  thiaminMg?: number
+  b6Mg?: number
+  /** Folate as dietary folate equivalents, µg. */
+  folateUg?: number
+  b12Ug?: number
+  cholineMg?: number
+  zincMg?: number
+  seleniumUg?: number
   // Watch list amounts, filled in on log entries only.
   mercuryUg?: number
   processedMeatG?: number
@@ -74,6 +91,18 @@ export const NUTRIENT_INFO: Record<NutrientKey, { label: string; unit: string }>
   caffeineMg: { label: 'Caffeine', unit: 'mg' },
   alcohol: { label: 'Alcohol', unit: 'g' },
   retinolUg: { label: 'Vitamin A (retinol)', unit: 'µg' },
+  vitAUg: { label: 'Vitamin A', unit: 'µg' },
+  vitCMg: { label: 'Vitamin C', unit: 'mg' },
+  vitDUg: { label: 'Vitamin D', unit: 'µg' },
+  vitEMg: { label: 'Vitamin E', unit: 'mg' },
+  vitKUg: { label: 'Vitamin K', unit: 'µg' },
+  thiaminMg: { label: 'Thiamin (B1)', unit: 'mg' },
+  b6Mg: { label: 'Vitamin B6', unit: 'mg' },
+  folateUg: { label: 'Folate', unit: 'µg' },
+  b12Ug: { label: 'Vitamin B12', unit: 'µg' },
+  cholineMg: { label: 'Choline', unit: 'mg' },
+  zincMg: { label: 'Zinc', unit: 'mg' },
+  seleniumUg: { label: 'Selenium', unit: 'µg' },
   mercuryUg: { label: 'Mercury', unit: 'µg' },
   processedMeatG: { label: 'Processed meat', unit: 'g' },
   sweetenerServings: { label: 'Artificial sweeteners', unit: 'servings' },

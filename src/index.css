@@ -1865,3 +1865,7 @@ input[type='time'] {
 .tip.swap .tip-icon {
   background: var(--protein);
 }
+
+.warn-text {
+  color: var(--warn);
+}

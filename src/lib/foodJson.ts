@@ -22,7 +22,8 @@ Reply with ONLY one JSON object, no other text, in exactly this shape:
     "carbs_total_g": 0, "fiber_g": 0, "sugars_g": 0, "added_sugars_g": 0,
     "sugar_alcohols": [{ "type": "erythritol|allulose|xylitol|maltitol|sorbitol|glycerin|other", "g": 0 }],
     "sodium_mg": 0, "potassium_mg": 0, "magnesium_mg": 0,
-    "cholesterol_mg": null, "calcium_mg": null, "iron_mg": null, "caffeine_mg": null
+    "cholesterol_mg": null, "calcium_mg": null, "iron_mg": null, "caffeine_mg": null,
+    "vitamin_d_ug": null, "vitamin_c_mg": null, "vitamin_a_ug": null, "vitamin_b12_ug": null, "folate_ug": null, "zinc_mg": null
   },
   "unit_conversions": [{ "unit": "1 piece", "grams": 40 }],
   "ingredients_text": "full ingredients or null",
@@ -96,6 +97,12 @@ const FIELD_MAP: Record<string, NutrientKey> = {
   cholesterol_mg: 'cholesterolMg',
   calcium_mg: 'calciumMg',
   iron_mg: 'ironMg',
+  vitamin_d_ug: 'vitDUg',
+  vitamin_c_mg: 'vitCMg',
+  vitamin_a_ug: 'vitAUg',
+  vitamin_b12_ug: 'b12Ug',
+  folate_ug: 'folateUg',
+  zinc_mg: 'zincMg',
   caffeine_mg: 'caffeineMg',
 }
 

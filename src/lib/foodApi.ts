@@ -58,6 +58,19 @@ const USDA_MAP: Partial<Record<string, keyof Nutrients>> = {
   '303': 'ironMg',
   '601': 'cholesterolMg',
   '319': 'retinolUg',
+  // Vitamins and trace minerals
+  '320': 'vitAUg',
+  '401': 'vitCMg',
+  '328': 'vitDUg',
+  '323': 'vitEMg',
+  '430': 'vitKUg',
+  '404': 'thiaminMg',
+  '415': 'b6Mg',
+  '435': 'folateUg',
+  '418': 'b12Ug',
+  '421': 'cholineMg',
+  '309': 'zincMg',
+  '317': 'seleniumUg',
   '262': 'caffeineMg',
   '221': 'alcohol',
   // Amino acids (USDA Foundation and SR Legacy foods)
@@ -129,6 +142,14 @@ export function mapUsdaFood(f: UsdaFood): NewFood {
   return { ...withMeta, keto_notes: ketoNotes(withMeta) }
 }
 
+/** One USDA food by id, full detail (used to fill in nutrients a search result left out). */
+export async function fetchUsdaFood(fdcId: string | number): Promise<NewFood> {
+  const res = await fetch(`https://api.nal.usda.gov/fdc/v1/food/${fdcId}?api_key=${USDA_KEY}`)
+  if (!res.ok) throw new Error(res.status === 429 ? 'The USDA database is busy (hourly limit reached).' : `USDA returned ${res.status}.`)
+  const d = (await res.json()) as Omit<UsdaFood, 'foodNutrients'> & { foodNutrients: { nutrient?: { number?: string }; amount?: number }[] }
+  return mapUsdaFood({ ...d, foodNutrients: d.foodNutrients.map((x) => ({ nutrientNumber: x.nutrient?.number, value: x.amount })) })
+}
+
 /** `ingredients` limits the search to plain foods (no branded products or mixed dishes). */
 export async function searchUsda(query: string, signal?: AbortSignal, opts: { ingredients?: boolean } = {}): Promise<NewFood[]> {
   const res = await fetch(`https://api.nal.usda.gov/fdc/v1/foods/search?api_key=${USDA_KEY}`, {
@@ -184,6 +205,7 @@ export function mapOffProduct(p: OffProduct): NewFood {
   }
   const grams = (k: string) => num(k)
   const mg = (k: string) => (num(k) != null ? num(k)! * 1000 : undefined) // OFF stores minerals in g
+  const ug = (k: string) => (num(k) != null ? num(k)! * 1_000_000 : undefined)
   const n: Nutrients = {
     kcal: num('energy-kcal'),
     protein: grams('proteins'),
@@ -200,6 +222,19 @@ export function mapOffProduct(p: OffProduct): NewFood {
     magnesiumMg: mg('magnesium'),
     calciumMg: mg('calcium'),
     ironMg: mg('iron'),
+    // Open Food Facts stores vitamins and trace minerals in grams.
+    vitAUg: ug('vitamin-a'),
+    vitCMg: mg('vitamin-c'),
+    vitDUg: ug('vitamin-d'),
+    vitEMg: mg('vitamin-e'),
+    vitKUg: ug('vitamin-k'),
+    thiaminMg: mg('vitamin-b1'),
+    b6Mg: mg('vitamin-b6'),
+    folateUg: ug('vitamin-b9') ?? ug('folates'),
+    b12Ug: ug('vitamin-b12'),
+    cholineMg: mg('choline'),
+    zincMg: mg('zinc'),
+    seleniumUg: ug('selenium'),
     cholesterolMg: mg('cholesterol'),
     omega3: grams('omega-3-fat'),
     omega6: grams('omega-6-fat'),

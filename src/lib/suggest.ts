@@ -1,7 +1,9 @@
 import { LEUCINE_PER_MEAL_G, estimateAminos, type MuscleGoal } from './aminoAcids'
 import { MEALS, portionNutrients, type Food, type LogEntry, type Meal } from './foods'
 import { addNutrients, type Nutrients } from './nutrients'
+import { microStatus, vitaminCoverage } from './micros'
 import type { Targets } from './targets'
+import type { Sex } from './types'
 import { formatAmount, toGrams } from './units'
 
 /**
@@ -76,25 +78,40 @@ const per = (u: UsualFood, steps: number): Nutrients => estimateAminos(portionNu
 const amountText = (u: UsualFood, steps: number) => formatAmount(round1(steps * u.step), u.unit)
 const mealLabel = (m: Meal) => MEALS.find((x) => x.value === m)!.label.toLowerCase()
 
+/** Additions above this many calories aren't "a little more of something". */
+const MAX_ADD_KCAL = 200
+
 /**
  * The cheapest (in calories, with net carbs counting extra) addition from your usual foods that covers
- * `need` of a nutrient, using at most twice your usual portion. Prefers foods you eat at `meal`.
+ * `need` of a nutrient, within twice your usual portion (at least 3) and about 200 kcal. Prefers foods
+ * you eat at `meal`. When nothing covers all of it, the best one that covers at least half (`partial`).
  */
 function bestAddition(usual: UsualFood[], key: keyof Nutrients, need: number, meal?: Meal) {
-  let best: { u: UsualFood; steps: number; gain: number; kcal: number; carbs: number; score: number } | null = null
+  type Pick = { u: UsualFood; steps: number; gain: number; kcal: number; carbs: number; score: number; partial: boolean }
+  let best: Pick | null = null
+  let bestPartial: Pick | null = null
   for (const u of usual) {
     const one = per(u, 1)[key] ?? 0
     if (one <= 0) continue
-    const steps = Math.ceil(need / one - 1e-9)
-    if (steps > Math.max(2, u.usualSteps * 2)) continue
+    const maxSteps = Math.max(3, u.usualSteps * 2)
+    const full = Math.ceil(need / one - 1e-9)
+    const steps = Math.min(full, maxSteps)
     const n = per(u, steps)
     const kcal = n.kcal ?? 0
+    if (kcal > MAX_ADD_KCAL && full > 1) continue
     const carbs = n.netCarbs ?? 0
+    const gain = n[key] ?? 0
     // Calories first, net carbs weigh 20× (a keto budget), a small bonus for foods you eat at this meal.
     const score = kcal + carbs * 20 - (meal && u.meals.has(meal) ? 15 : 0) - Math.min(u.timesLogged, 10)
-    if (!best || score < best.score) best = { u, steps, gain: n[key] ?? 0, kcal, carbs, score }
+    if (steps === full) {
+      if (!best || score < best.score) best = { u, steps, gain, kcal, carbs, score, partial: false }
+    } else if (gain >= need * 0.5) {
+      // Partial: rank by how much of the gap it closes per calorie.
+      const pscore = score / (gain / need)
+      if (!bestPartial || pscore < bestPartial.score) bestPartial = { u, steps, gain, kcal, carbs, score: pscore, partial: true }
+    }
   }
-  return best
+  return best ?? bestPartial
 }
 
 export interface SuggestInput {
@@ -106,9 +123,11 @@ export interface SuggestInput {
   fatBudget: number | null
   /** Past day: phrase as "would have done it". */
   past: boolean
+  /** For vitamin targets; without it vitamins are skipped. */
+  sex?: Sex
 }
 
-export function suggestFixes({ dayLogs, history, foods, targets, muscleGoal, fatBudget, past }: SuggestInput): Suggestion[] {
+export function suggestFixes({ dayLogs, history, foods, targets, muscleGoal, fatBudget, past, sex }: SuggestInput): Suggestion[] {
   if (!dayLogs.length) return []
   const usual = usualFoods(foods, history)
   if (!usual.length) return []
@@ -156,8 +175,27 @@ export function suggestFixes({ dayLogs, history, foods, targets, muscleGoal, fat
       kind: 'add',
       goal: s.goal,
       text: `${add} ${amountText(b.u, b.steps)} ${b.u.food.name}${would}`,
-      effect: `+${fmt(b.gain)} ${s.unit} ${s.name} (reaches ${fmt(have + b.gain)} of ${fmt(s.target)}) · +${Math.round(b.kcal)} kcal${b.kcal > kcalRoom ? ' (over your calorie target)' : ''}`,
+      effect: `+${fmt(b.gain)} ${s.unit} ${s.name} (${b.partial ? 'gets you to' : 'reaches'} ${fmt(have + b.gain)} of ${fmt(s.target)}) · +${Math.round(b.kcal)} kcal${b.kcal > kcalRoom ? ' (over your calorie target)' : ''}`,
     })
+  }
+
+  // 2b. Vitamins and trace minerals: the two furthest below target that one usual food can close
+  // (only counted once most of the day's food has vitamin data, so missing data isn't mistaken for a gap).
+  if (sex && vitaminCoverage(dayLogs.map((l) => l.nutrients)) >= 70) {
+    let added = 0
+    for (const st of microStatus(total, sex, targets.age)) {
+      if (added >= 2 || st.pct >= 80) break
+      const b = bestAddition(usual, st.micro.key, st.target - st.value)
+      if (!b) continue
+      const fmt = (v: number) => (v >= 100 ? Math.round(v).toLocaleString() : v >= 10 ? v.toFixed(0) : v.toFixed(1))
+      out.push({
+        kind: 'add',
+        goal: st.micro.key,
+        text: `${add} ${amountText(b.u, b.steps)} ${b.u.food.name}${would}`,
+        effect: `+${fmt(b.gain)} ${st.micro.unit} ${st.micro.label} (${b.partial ? 'gets you to' : 'reaches'} ${fmt(st.value + b.gain)} of ${fmt(st.target)}) · +${Math.round(b.kcal)} kcal`,
+      })
+      added++
+    }
   }
 
   // 3. Over a limit: trim the biggest contributor, or swap it for something you eat at that meal.

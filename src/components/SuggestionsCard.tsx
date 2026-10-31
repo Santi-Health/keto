@@ -4,6 +4,7 @@ import { useData } from '../lib/data'
 import type { LogEntry } from '../lib/foods'
 import { suggestFixes, usualFoods } from '../lib/suggest'
 import type { Targets } from '../lib/targets'
+import type { Sex } from '../lib/types'
 
 interface Props {
   dayLogs: LogEntry[]
@@ -11,16 +12,17 @@ interface Props {
   muscleGoal: MuscleGoal
   fatBudget: number | null
   past: boolean
+  sex: Sex
 }
 
 const ICON = { add: '＋', trim: '−', swap: '⇄' } as const
 
 /** Small fixes from the foods you usually eat: what to add, trim or swap to hit the day's targets. */
-export function SuggestionsCard({ dayLogs, targets, muscleGoal, fatBudget, past }: Props) {
+export function SuggestionsCard({ dayLogs, targets, muscleGoal, fatBudget, past, sex }: Props) {
   const { foods, logs } = useData()
   const tips = useMemo(
-    () => suggestFixes({ dayLogs, history: logs, foods, targets, muscleGoal, fatBudget, past }),
-    [dayLogs, logs, foods, targets, muscleGoal, fatBudget, past],
+    () => suggestFixes({ dayLogs, history: logs, foods, targets, muscleGoal, fatBudget, past, sex }),
+    [dayLogs, logs, foods, targets, muscleGoal, fatBudget, past, sex],
   )
   const learned = useMemo(() => usualFoods(foods, logs).length, [foods, logs])
   if (!dayLogs.length) return null

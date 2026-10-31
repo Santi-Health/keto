@@ -223,6 +223,7 @@ const OFF_TARGET = [
   'white', 'whites', 'yolk', 'yolks', 'substitute', 'powder', 'powdered', 'dried', 'dehydrated', 'imitation', 'baby',
   'sauce', 'soup', 'salad', 'lomi', 'smoked', 'canned', 'frozen', 'fried', 'breaded', 'flavored', 'mix', 'oil',
   'ghee', 'clarified', 'whipped', 'light', 'reduced', 'nonfat', 'juice', 'dressing', 'spread', 'sweetened',
+  'chocolate', 'yogurt',
 ]
 
 const singular = (w: string) => w.replace(/(ies)$/, 'y').replace(/(oes|ses|xes)$/, (m) => m.slice(0, -2)).replace(/s$/, '')
