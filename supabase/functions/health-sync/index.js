@@ -817,6 +817,30 @@ const DEFAULT_PROFILE = {
 	yogaRoutine: DEFAULT_YOGA_ROUTINE,
 	updatedAt: (/* @__PURE__ */ new Date(0)).toISOString()
 };
+// src/server/sync.ts
+/**
+* Background sync, run by the Supabase Edge Function "health-sync" every 4 hours (and once right after linking).
+* For each linked user: trade the stored Google refresh token for an access token, then pull the same data
+* the app's Import buttons pull (workouts, steps/burn/resting HR/HRV/sleep, weigh-ins, Lingo glucose) and,
+* once a week, save the Drive backup. It reuses the app's own import code, so results match a manual import.
+*
+* The server's clock is UTC, so anything grouped by "local day" is shifted into the user's time zone first.
+*/
+const DRIVE_SCOPE = "https://www.googleapis.com/auth/drive.file";
+/** Google Health rejects tokens that also carry other APIs' scopes, so health calls get a health-only token. */
+const HEALTH_SCOPES = [
+	"https://www.googleapis.com/auth/googlehealth.activity_and_fitness.readonly",
+	"https://www.googleapis.com/auth/googlehealth.health_metrics_and_measurements.readonly",
+	"https://www.googleapis.com/auth/googlehealth.sleep.readonly"
+];
+/** The granted scopes split into what the health token and the Drive token may carry. */
+function splitScopes(granted) {
+	const has = new Set(granted.split(/\s+/).filter(Boolean));
+	return {
+		health: HEALTH_SCOPES.filter((x) => has.has(x)).join(" "),
+		drive: has.has("https://www.googleapis.com/auth/drive.file") ? DRIVE_SCOPE : null
+	};
+}
 function db(env) {
 	const headers = env.serviceKey.startsWith("sb_") ? {
 		apikey: env.serviceKey,
@@ -900,7 +924,8 @@ async function exchangeCode(env, code) {
 		scopes: j.scope ?? ""
 	};
 }
-async function accessTokenFor(env, refreshToken) {
+/** A fresh access token, narrowed to `scope` (a subset of what was granted). */
+async function accessTokenFor(env, refreshToken, scope) {
 	const res = await fetch("https://oauth2.googleapis.com/token", {
 		method: "POST",
 		headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -908,7 +933,8 @@ async function accessTokenFor(env, refreshToken) {
 			refresh_token: refreshToken,
 			client_id: env.googleClientId,
 			client_secret: env.googleClientSecret,
-			grant_type: "refresh_token"
+			grant_type: "refresh_token",
+			scope
 		})
 	});
 	const j = await res.json();
@@ -916,7 +942,17 @@ async function accessTokenFor(env, refreshToken) {
 	if (!res.ok || !j.access_token) throw new Error(`Google token refresh failed: ${j.error_description ?? j.error ?? res.status}`);
 	return j.access_token;
 }
-async function syncUser(env, userId, token, scopes, tz) {
+/** Health-only and (if granted) Drive-only access tokens from the stored refresh token. */
+async function tokensFor(env, refreshToken, granted) {
+	const s = splitScopes(granted);
+	if (!s.health) throw new RelinkNeeded("Google health access is missing. Re-link and allow the health data.");
+	return {
+		health: await accessTokenFor(env, refreshToken, s.health),
+		drive: s.drive ? await accessTokenFor(env, refreshToken, s.drive) : null
+	};
+}
+async function syncUser(env, userId, tokens, tz) {
+	const token = tokens.health;
 	const d = db(env);
 	const today = localDateIn(tz);
 	const notes = [];
@@ -997,7 +1033,7 @@ async function syncUser(env, userId, token, scopes, tz) {
 	const cgmDays = mergeIntoDays(readings, cgm);
 	await d.upsert("cgm_days", forUser(userId, cgmDays), "user_id,id");
 	notes.push(`${readings.length} glucose readings`);
-	if (scopes.includes("https://www.googleapis.com/auth/drive.file") && backupDue(profile.lastBackupAt)) {
+	if (tokens.drive && backupDue(profile.lastBackupAt)) {
 		const all = async (table) => d.select(table, `user_id=eq.${userId}&deleted_at=is.null`);
 		const bundle = {
 			exportedAt: (/* @__PURE__ */ new Date()).toISOString(),
@@ -1010,7 +1046,7 @@ async function syncUser(env, userId, token, scopes, tz) {
 			activity: await all("daily_activity"),
 			cgmDays: await all("cgm_days")
 		};
-		const r = await backupToDrive(token, JSON.stringify(bundle), `keto-tracker-${today}.json`, profile.backupFolderId);
+		const r = await backupToDrive(tokens.drive, JSON.stringify(bundle), `keto-tracker-${today}.json`, profile.backupFolderId);
 		const now = (/* @__PURE__ */ new Date()).toISOString();
 		await d.upsert("profiles", [{
 			user_id: userId,
@@ -1047,8 +1083,7 @@ async function runAll(env, minGapMs = 3e6) {
 		const tz = st?.time_zone ?? "America/Los_Angeles";
 		const now = (/* @__PURE__ */ new Date()).toISOString();
 		try {
-			const access = await accessTokenFor(env, t.refresh_token);
-			const result = await syncUser(env, t.user_id, access, t.scopes, tz);
+			const result = await syncUser(env, t.user_id, await tokensFor(env, t.refresh_token, t.scopes), tz);
 			await d.upsert("sync_status", [{
 				user_id: t.user_id,
 				last_sync_at: now,
@@ -1104,7 +1139,7 @@ async function link(env, appJwt, code, tz) {
 		updated_at: now
 	}], "user_id");
 	try {
-		const result = await syncUser(env, userId, g.accessToken, g.scopes, tz);
+		const result = await syncUser(env, userId, await tokensFor(env, g.refreshToken, g.scopes), tz);
 		await d.upsert("sync_status", [{
 			user_id: userId,
 			last_sync_at: (/* @__PURE__ */ new Date()).toISOString(),

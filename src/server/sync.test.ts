@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { localDateIn, runAll, tzOffsetMs } from './sync'
+import { localDateIn, runAll, splitScopes, tzOffsetMs } from './sync'
 
 afterEach(() => vi.unstubAllGlobals())
 
@@ -43,5 +43,15 @@ describe('scheduled run', () => {
     expect(out[1].result).toMatch(/expired/)
     expect(writes.some((w) => w.url.includes('sync_status') && w.body.includes('"needs_relink":true'))).toBe(true)
     expect(writes.some((w) => w.url.includes('google_tokens?user_id=eq.u2'))).toBe(true)
+  })
+})
+
+describe('scopes', () => {
+  it('keeps Drive out of the health token, since Google Health rejects mixed tokens', () => {
+    const granted = 'openid https://www.googleapis.com/auth/googlehealth.sleep.readonly https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/googlehealth.activity_and_fitness.readonly'
+    const s = splitScopes(granted)
+    expect(s.health).toBe('https://www.googleapis.com/auth/googlehealth.activity_and_fitness.readonly https://www.googleapis.com/auth/googlehealth.sleep.readonly')
+    expect(s.drive).toBe('https://www.googleapis.com/auth/drive.file')
+    expect(splitScopes('https://www.googleapis.com/auth/googlehealth.sleep.readonly').drive).toBeNull()
   })
 })

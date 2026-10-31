@@ -27,6 +27,18 @@ export interface Env {
 }
 
 export const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.file'
+/** Google Health rejects tokens that also carry other APIs' scopes, so health calls get a health-only token. */
+export const HEALTH_SCOPES = [
+  'https://www.googleapis.com/auth/googlehealth.activity_and_fitness.readonly',
+  'https://www.googleapis.com/auth/googlehealth.health_metrics_and_measurements.readonly',
+  'https://www.googleapis.com/auth/googlehealth.sleep.readonly',
+]
+
+/** The granted scopes split into what the health token and the Drive token may carry. */
+export function splitScopes(granted: string): { health: string; drive: string | null } {
+  const has = new Set(granted.split(/\s+/).filter(Boolean))
+  return { health: HEALTH_SCOPES.filter((x) => has.has(x)).join(' '), drive: has.has(DRIVE_SCOPE) ? DRIVE_SCOPE : null }
+}
 
 // --- Database (PostgREST with the service key, which bypasses row-level security) ---------
 
@@ -98,11 +110,12 @@ export async function exchangeCode(env: Env, code: string): Promise<{ refreshTok
   return { refreshToken: j.refresh_token, accessToken: j.access_token, scopes: j.scope ?? '' }
 }
 
-async function accessTokenFor(env: Env, refreshToken: string): Promise<string> {
+/** A fresh access token, narrowed to `scope` (a subset of what was granted). */
+async function accessTokenFor(env: Env, refreshToken: string, scope: string): Promise<string> {
   const res = await fetch('https://oauth2.googleapis.com/token', {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({ refresh_token: refreshToken, client_id: env.googleClientId, client_secret: env.googleClientSecret, grant_type: 'refresh_token' }),
+    body: new URLSearchParams({ refresh_token: refreshToken, client_id: env.googleClientId, client_secret: env.googleClientSecret, grant_type: 'refresh_token', scope }),
   })
   const j = (await res.json()) as { access_token?: string; error?: string; error_description?: string }
   // Testing-mode Google apps expire background access after 7 days: that shows up as invalid_grant.
@@ -118,7 +131,15 @@ interface SyncStatus {
   time_zone: string
 }
 
-export async function syncUser(env: Env, userId: string, token: string, scopes: string, tz: string): Promise<string> {
+/** Health-only and (if granted) Drive-only access tokens from the stored refresh token. */
+async function tokensFor(env: Env, refreshToken: string, granted: string): Promise<{ health: string; drive: string | null }> {
+  const s = splitScopes(granted)
+  if (!s.health) throw new RelinkNeeded('Google health access is missing. Re-link and allow the health data.')
+  return { health: await accessTokenFor(env, refreshToken, s.health), drive: s.drive ? await accessTokenFor(env, refreshToken, s.drive) : null }
+}
+
+export async function syncUser(env: Env, userId: string, tokens: { health: string; drive: string | null }, tz: string): Promise<string> {
+  const token = tokens.health
   const d = db(env)
   const today = localDateIn(tz)
   const notes: string[] = []
@@ -174,7 +195,7 @@ export async function syncUser(env: Env, userId: string, token: string, scopes: 
   notes.push(`${readings.length} glucose readings`)
 
   // Weekly Drive backup, when Drive was allowed at linking.
-  if (scopes.includes(DRIVE_SCOPE) && backupDue(profile.lastBackupAt)) {
+  if (tokens.drive && backupDue(profile.lastBackupAt)) {
     const all = async <T,>(table: string) => d.select<T>(table, `user_id=eq.${userId}&deleted_at=is.null`)
     const bundle: ExportBundle = {
       exportedAt: new Date().toISOString(),
@@ -187,7 +208,7 @@ export async function syncUser(env: Env, userId: string, token: string, scopes: 
       activity: await all<ActivityDay>('daily_activity'),
       cgmDays: await all<CgmDay>('cgm_days'),
     }
-    const r = await backupToDrive(token, JSON.stringify(bundle), `keto-tracker-${today}.json`, profile.backupFolderId)
+    const r = await backupToDrive(tokens.drive, JSON.stringify(bundle), `keto-tracker-${today}.json`, profile.backupFolderId)
     const now = new Date().toISOString()
     await d.upsert('profiles', [{ user_id: userId, data: { ...profileRow?.data, lastBackupAt: now, backupFolderId: r.folderId, updatedAt: now }, updated_at: now }], 'user_id')
     notes.push(`backed up ${r.fileName}`)
@@ -213,8 +234,7 @@ export async function runAll(env: Env, minGapMs = 50 * 60_000): Promise<{ user: 
     const tz = st?.time_zone ?? 'America/Los_Angeles'
     const now = new Date().toISOString()
     try {
-      const access = await accessTokenFor(env, t.refresh_token)
-      const result = await syncUser(env, t.user_id, access, t.scopes, tz)
+      const result = await syncUser(env, t.user_id, await tokensFor(env, t.refresh_token, t.scopes), tz)
       await d.upsert('sync_status', [{ user_id: t.user_id, last_sync_at: now, last_result: result, last_error: null, needs_relink: false, updated_at: now }], 'user_id')
       out.push({ user: t.user_id, result })
     } catch (e) {
@@ -238,7 +258,7 @@ export async function link(env: Env, appJwt: string, code: string, tz: string): 
   await d.upsert('google_tokens', [{ user_id: userId, refresh_token: g.refreshToken, scopes: g.scopes, linked_at: now }], 'user_id')
   await d.upsert('sync_status', [{ user_id: userId, linked_at: now, time_zone: tz, needs_relink: false, last_error: null, updated_at: now }], 'user_id')
   try {
-    const result = await syncUser(env, userId, g.accessToken, g.scopes, tz)
+    const result = await syncUser(env, userId, await tokensFor(env, g.refreshToken, g.scopes), tz)
     await d.upsert('sync_status', [{ user_id: userId, last_sync_at: new Date().toISOString(), last_result: result, updated_at: new Date().toISOString() }], 'user_id')
     return result
   } catch (e) {
