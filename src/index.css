@@ -274,35 +274,75 @@ select {
 }
 
 /* Rings */
-.deficit-now {
-  margin-bottom: 14px;
-  padding-bottom: 12px;
-  border-bottom: 1px solid var(--border);
+.deficit-summary {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: center;
+  column-gap: 14px;
+  row-gap: 14px;
 }
 
-.deficit-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-end;
-  gap: 12px;
+.deficit-summary .wide {
+  grid-column: 2 / 4;
 }
 
-.deficit-num {
-  font-size: 2.2rem;
+.deficit-stat.end {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.deficit-big {
+  white-space: nowrap;
+  font-size: 1.85rem;
   font-weight: 800;
-  line-height: 1.1;
+  line-height: 1.05;
+  font-variant-numeric: tabular-nums;
+}
+
+.deficit-mid {
+  white-space: nowrap;
+  font-size: 1.5rem;
+  font-weight: 800;
+  line-height: 1.15;
   font-variant-numeric: tabular-nums;
 }
 
 .deficit-unit {
-  font-size: 1rem;
+  font-size: 0.95rem;
   font-weight: 600;
   color: var(--text-2);
 }
 
-.deficit-side {
-  text-align: right;
+/* Progress toward today's deficit goal as a colored ring. */
+.deficit-badge {
+  width: 84px;
+  height: 84px;
+  border-radius: 50%;
+  background: conic-gradient(from -90deg, var(--calories), var(--protein) calc(var(--pct) * 0.5), var(--carbs) var(--pct), var(--track) var(--pct));
+  display: grid;
+  place-items: center;
+}
+
+.deficit-badge > div {
+  width: 66px;
+  height: 66px;
+  border-radius: 50%;
+  background: var(--surface);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  line-height: 1.1;
   font-variant-numeric: tabular-nums;
+}
+
+.deficit-badge b {
+  font-size: 1.05rem;
+}
+
+.deficit-badge span {
+  font-size: 0.7rem;
+  color: var(--text-2);
 }
 
 .deficit-chart {

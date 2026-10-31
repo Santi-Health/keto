@@ -234,6 +234,7 @@ export function Today({ profile, targets, onOpenSettings, onToggleRefeed, onNavi
     () => (isToday ? [] : dailySeries({ days: viewDays, logs, readings, exercises, activity, cgmDays })),
     [isToday, viewDays, logs, readings, exercises, activity, cgmDays],
   )
+  const showDeficit = isToday && targets.bmr != null
   const carbsLeft = targets.netCarbsG * mult - totals.netCarbs
   const proteinLeft = targets.proteinG - totals.protein
   const fmtDay = (d: string, opts: Intl.DateTimeFormatOptions) => new Date(`${d}T12:00:00`).toLocaleDateString('en-US', opts)
@@ -306,23 +307,25 @@ export function Today({ profile, targets, onOpenSettings, onToggleRefeed, onNavi
             </button>
           )}
 
+          {showDeficit && (
+            <DeficitNow
+              calorieLimit={targets.calories}
+              day={today}
+              bmr={targets.bmr!}
+              logs={dayLogs}
+              exercises={sessionsToday}
+              activity={Object.values(activity).find((a) => a.day === today && !a.deleted_at) ?? null}
+              goal={targets.burn != null && targets.calories != null ? Math.max(0, targets.burn - targets.calories) : null}
+            />
+          )}
           <section className="card">
-            {isToday && targets.bmr != null && (
-              <DeficitNow
-                day={today}
-                bmr={targets.bmr}
-                logs={dayLogs}
-                exercises={sessionsToday}
-                activity={Object.values(activity).find((a) => a.day === today && !a.deleted_at) ?? null}
-                goal={targets.burn != null && targets.calories != null ? Math.max(0, targets.burn - targets.calories) : null}
-              />
-            )}
             <h2>Macros</h2>
-            <div className="rings">
+            <div className="rings" style={showDeficit ? { gridTemplateColumns: 'repeat(3, minmax(0, 1fr))' } : undefined}>
               <Ring label="Net carbs" value={totals.netCarbs} target={targets.netCarbsG * mult} unit="g" color="var(--carbs)" isLimit molecule="glucose" />
               <Ring label="Protein" value={totals.protein} target={targets.proteinG * mult} unit="g" color="var(--protein)" molecule="protein" />
               <Ring label="Fat" value={totals.fat} target={fatBudget} unit="g" color="var(--fat)" isLimit caption="Fat budget" molecule="fat" />
-              <Ring label="Calories" value={totals.calories} target={t(targets.calories)} unit="" color="var(--calories)" isLimit molecule="energy" />
+              {/* Today's calories live in the summary card above. */}
+              {!showDeficit && <Ring label="Calories" value={totals.calories} target={t(targets.calories)} unit="" color="var(--calories)" isLimit molecule="energy" />}
             </div>
             {!isToday && (
               <p className="small" style={{ marginBottom: 0 }}>

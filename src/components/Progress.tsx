@@ -43,7 +43,7 @@ export function Ring({ label, value, target, unit, color, isLimit, caption, mole
       <div className="ring-value">
         {target != null ? `${target}${unit}` : '—'}
       </div>
-      <div className="ring-label">{caption ?? (isLimit ? `${label} limit` : label)}</div>
+      <div className="ring-label" style={{ color }}>{caption ?? (isLimit ? `${label} limit` : label)}</div>
     </div>
   )
 }
