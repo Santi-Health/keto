@@ -715,6 +715,10 @@ input[type='range'] {
   background: var(--warn);
 }
 
+.dot.caution {
+  background: #e3b505;
+}
+
 .dot.info {
   background: var(--track);
 }

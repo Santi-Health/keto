@@ -24,7 +24,7 @@ function WatchRow({ item }: { item: WatchItem }) {
 /** Quiet when everything is fine; lists anything near or over its limit. */
 export function WatchListCard({ items, period = 'today' }: { items: WatchItem[]; period?: string }) {
   const [showAll, setShowAll] = useState(false)
-  const flagged = items.filter((i) => i.status === 'near' || i.status === 'over')
+  const flagged = items.filter((i) => i.status === 'near' || i.status === 'over' || i.status === 'caution')
   const shown = showAll ? items : flagged
   return (
     <section className="card">

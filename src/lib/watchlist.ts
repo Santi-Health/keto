@@ -262,7 +262,8 @@ export const WATCH_LIST: Record<WatchKey, WatchDef> = {
 
 export type WatchSettings = Partial<Record<WatchKey, { enabled?: boolean; limit?: number | null }>>
 
-export type WatchStatus = 'ok' | 'near' | 'over' | 'info'
+/** caution: no limit, but worth a yellow flag when present (sweeteners, ultra-processed). */
+export type WatchStatus = 'ok' | 'near' | 'over' | 'info' | 'caution'
 
 export interface WatchItem {
   key: WatchKey
@@ -295,7 +296,7 @@ export function computeWatchList(
       const limit = override !== undefined ? override : def.limit(ctx)
       let status: WatchStatus = 'info'
       if (limit != null && value != null) status = value > limit ? 'over' : value >= limit * 0.8 ? 'near' : 'ok'
-      else if (limit == null && value) status = key === 'heavyMetal' ? 'near' : 'info'
+      else if (limit == null && value) status = key === 'heavyMetal' ? 'near' : key === 'sweeteners' || key === 'ultraProcessed' ? 'caution' : 'info'
       return { key, label: def.label, unit: def.unit, period: def.period, value, limit, status, guidance: def.guidance }
     })
 }

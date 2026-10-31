@@ -64,4 +64,10 @@ describe('computeWatchList', () => {
     expect(items.find((i) => i.key === 'caffeine')!.status).toBe('over')
     expect(items.some((i) => i.key === 'alcohol')).toBe(false)
   })
+  it('flags sweeteners and ultra-processed foods yellow when eaten', () => {
+    const w = computeWatchList([{ sweetenerServings: 1, ultraProcessedServings: 2 }], [], { calorieTarget: 2000, weightKg: 68 })
+    expect(w.find((i) => i.key === 'sweeteners')!.status).toBe('caution')
+    expect(w.find((i) => i.key === 'ultraProcessed')!.status).toBe('caution')
+    expect(computeWatchList([{}], [], { calorieTarget: 2000, weightKg: 68 }).find((i) => i.key === 'sweeteners')!.status).toBe('info')
+  })
 })
