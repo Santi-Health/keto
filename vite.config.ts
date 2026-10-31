@@ -16,7 +16,7 @@ export default defineConfig(({ command }) => ({
         name: 'Keto Tracker',
         short_name: 'Keto Tracker',
         description: 'Track food, macros, electrolytes, glucose and ketones.',
-        theme_color: '#1f5c43',
+        theme_color: '#14524a',
         background_color: '#f6f5f1',
         display: 'standalone',
         orientation: 'any',
