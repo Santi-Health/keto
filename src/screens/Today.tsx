@@ -310,6 +310,7 @@ export function Today({ profile, targets, onOpenSettings, onToggleRefeed, onNavi
           {showDeficit && (
             <DeficitNow
               calorieLimit={targets.calories}
+              onOpenLog={(focus) => onNavigate(`log/${today}/${focus}`)}
               day={today}
               bmr={targets.bmr!}
               logs={dayLogs}

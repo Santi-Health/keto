@@ -14,6 +14,8 @@ interface Props {
   goal: number | null
   /** Today's calorie target, shown under what's been eaten. */
   calorieLimit: number | null
+  /** Opens the Log at a meal or workout. */
+  onOpenLog?: (focus: string) => void
 }
 
 const fmt = (n: number) => Math.abs(n).toLocaleString()
@@ -41,20 +43,30 @@ function smoothPath(pts: [number, number][]): string {
   return out
 }
 
-function Row({ label, sub, kcal }: { label: string; sub?: string; kcal: number }) {
-  return (
-    <div className="deficit-row">
+function Row({ label, sub, kcal, onOpen }: { label: string; sub?: string; kcal: number; onOpen?: () => void }) {
+  const body = (
+    <>
       <div>
         <div>{label}</div>
         {sub && <div className="muted small deficit-sub">{sub}</div>}
       </div>
-      <b>{kcal.toLocaleString()}</b>
-    </div>
+      <b>
+        {kcal.toLocaleString()}
+        {onOpen && <span className="deficit-go" aria-hidden="true"> ›</span>}
+      </b>
+    </>
+  )
+  return onOpen ? (
+    <button type="button" className="deficit-row tap" onClick={onOpen}>
+      {body}
+    </button>
+  ) : (
+    <div className="deficit-row">{body}</div>
   )
 }
 
 /** Burned minus eaten so far today, updated every minute, with how it built up hour by hour. */
-export function DeficitNow({ day, bmr, logs, exercises, activity, goal, calorieLimit }: Props) {
+export function DeficitNow({ day, bmr, logs, exercises, activity, goal, calorieLimit, onOpenLog }: Props) {
   const [now, setNow] = useState(() => new Date())
   useEffect(() => {
     const id = setInterval(() => setNow(new Date()), 60_000)
@@ -160,14 +172,19 @@ export function DeficitNow({ day, bmr, logs, exercises, activity, goal, calorieL
             <Row label="Resting (being alive)" kcal={d.parts.resting} />
             <Row label={d.burnSource === 'fitbit' ? 'Everyday movement (Fitbit)' : 'Everyday movement (estimate)'} kcal={d.parts.movement} />
             {d.parts.workouts.map((w) => (
-              <Row key={w.exercise.id} label={`${sessionLabel(w.exercise)} · ${w.exercise.duration_min} min`} kcal={w.kcal} />
+              <Row
+                key={w.exercise.id}
+                label={`${sessionLabel(w.exercise)} · ${w.exercise.duration_min} min`}
+                kcal={w.kcal}
+                onOpen={onOpenLog && (() => onOpenLog(`ex-${w.exercise.id}`))}
+              />
             ))}
           </div>
         )}
         {open === 'eaten' && (
           <div className="deficit-detail">
             {meals.length ? (
-              meals.map((m) => <Row key={m.meal} label={m.label} sub={m.foods} kcal={m.kcal} />)
+              meals.map((m) => <Row key={m.meal} label={m.label} sub={m.foods} kcal={m.kcal} onOpen={onOpenLog && (() => onOpenLog(m.meal))} />)
             ) : (
               <p className="muted small" style={{ margin: 0 }}>Nothing logged yet today.</p>
             )}

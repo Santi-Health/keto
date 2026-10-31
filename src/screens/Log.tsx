@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { MacroStrip } from '../components/FoodBits'
 import { FoodForm } from '../components/FoodForm'
 import { ExerciseSheet } from '../components/ExerciseSheet'
@@ -19,6 +19,8 @@ import type { WeightUnit } from '../lib/types'
 import { formatAmount } from '../lib/units'
 
 interface Props {
+  /** A meal ("lunch"), "exercise" or a workout ("ex-<id>") to scroll to. */
+  focus?: string | null
   weightKg: number
   /** For heart-rate calories on hand-logged workouts. */
   hr?: Omit<HrProfile, 'weightKg'>
@@ -84,7 +86,19 @@ function readingText(r: ReadingRow, unit: WeightUnit): string {
   }
 }
 
-export function Log({ weightKg, hr, weightUnit, netCarbLimit, proteinTarget, date, onDateChange, onAdd }: Props) {
+export function Log({ weightKg, hr, weightUnit, netCarbLimit, proteinTarget, date, focus, onDateChange, onAdd }: Props) {
+  // Opened from Today's breakdown: scroll to that meal or workout and flash it.
+  useEffect(() => {
+    if (!focus) return
+    const t = window.setTimeout(() => {
+      const el = document.getElementById(`log-${focus}`)
+      if (!el) return
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      el.classList.add('flash')
+      window.setTimeout(() => el.classList.remove('flash'), 1600)
+    }, 80)
+    return () => window.clearTimeout(t)
+  }, [focus, date])
   const { logsOn, foodById, exercisesOn, readingsOn } = useData()
   const [readingSheet, setReadingSheet] = useState<{ reading?: ReadingRow } | null>(null)
   const [savingMeal, setSavingMeal] = useState<{ meal: Meal; entries: LogEntry[] } | null>(null)
@@ -194,7 +208,7 @@ export function Log({ weightKg, hr, weightUnit, netCarbLimit, proteinTarget, dat
           </div>
         )}
         {sessions.length > 0 && (
-          <div>
+          <div id="log-exercise">
             <div className="section-label" style={{ display: 'flex', justifyContent: 'space-between' }}>
               <span>Exercise</span>
               <span>{sessions.reduce((sum, e) => sum + (e.calories ?? 0), 0)} active kcal</span>
@@ -202,7 +216,7 @@ export function Log({ weightKg, hr, weightUnit, netCarbLimit, proteinTarget, dat
             <div className="list">
               {sessions.map((e) => {
                 return (
-                  <button key={e.id} type="button" className="list-item" onClick={() => setExerciseSheet({ exercise: e })}>
+                  <button key={e.id} id={`log-ex-${e.id}`} type="button" className="list-item" onClick={() => setExerciseSheet({ exercise: e })}>
                     <span className="grow">
                       <span className="title" style={{ display: 'block' }}>
                         {sessionLabel(e)} · {e.duration_min} min
@@ -231,7 +245,7 @@ export function Log({ weightKg, hr, weightUnit, netCarbLimit, proteinTarget, dat
           if (!items.length) return null
           const sub = addNutrients(items.map((e) => e.nutrients))
           return (
-            <div key={m.value}>
+            <div key={m.value} id={`log-${m.value}`}>
               <div className="section-label" style={{ display: 'flex', justifyContent: 'space-between' }}>
                 <span>
                   {m.label}{' '}

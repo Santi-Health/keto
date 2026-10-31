@@ -34,10 +34,10 @@ const TABS: { id: Tab; label: string; icon: ReactNode }[] = [
   { id: 'settings', label: 'Settings', icon: icon('M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0M14 4v4M8 10v4M16 16v4') },
 ]
 
-/** Routes look like #log/2026-10-29 or #add/scan: a tab plus an optional detail. */
-const getRoute = (): { tab: Tab; param: string | null } => {
-  const [tab, param = null] = window.location.hash.slice(1).split('/') as [Tab, string?]
-  return TABS.some((t) => t.id === tab) || tab === 'report' ? { tab, param } : { tab: 'today', param: null }
+/** Routes look like #log/2026-10-29 or #add/scan: a tab plus an optional detail, and a part to jump to (#log/2026-10-29/lunch). */
+const getRoute = (): { tab: Tab; param: string | null; focus: string | null } => {
+  const [tab, param = null, focus = null] = window.location.hash.slice(1).split('/') as [Tab, string?, string?]
+  return TABS.some((t) => t.id === tab) || tab === 'report' ? { tab, param, focus } : { tab: 'today', param: null, focus: null }
 }
 
 const isDate = (s: string | null): s is string => !!s && /^\d{4}-\d{2}-\d{2}$/.test(s)
@@ -60,7 +60,7 @@ interface TrackerProps {
 
 function Tracker({ session, recovering = false, onPassphraseChanged = () => {} }: TrackerProps) {
   const { profile, update, sync } = useProfile(session)
-  const [{ tab, param }, setRoute] = useState(getRoute)
+  const [{ tab, param, focus }, setRoute] = useState(getRoute)
   const targets = useMemo(() => computeTargets(profile, new Date(), profile.fitbitBurnKcal ?? null), [profile])
 
   useEffect(() => {
@@ -122,6 +122,7 @@ function Tracker({ session, recovering = false, onPassphraseChanged = () => {} }
             netCarbLimit={targets.netCarbsG}
             proteinTarget={targets.proteinG}
             date={isDate(param) ? param : localDate()}
+            focus={focus}
             onDateChange={(d) => go(d === localDate() ? 'log' : `log/${d}`)}
             onAdd={(d) => go(d === localDate() ? 'add' : `add/${d}`)}
           />
