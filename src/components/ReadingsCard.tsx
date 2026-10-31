@@ -127,13 +127,11 @@ export function ReadingsCard({ weightUnit, waterTargetOz, onAdd }: Props) {
       )}
 
       <div style={{ marginTop: 12 }}>
-        <Bar label="Water" value={waterOz} target={waterTargetOz} unit="oz" color="var(--water, #3b82f6)" />
+        <Bar label="Water" value={waterOz / 8} target={Math.round((waterTargetOz / 8) * 10) / 10} unit="cups" color="var(--water)" />
         <div className="row" style={{ gap: 8 }}>
-          {[8, 16, 24].map((oz) => (
-            <button key={oz} type="button" className="btn secondary small-btn" onClick={() => addWater(oz)}>
-              +{oz} oz
-            </button>
-          ))}
+          <button type="button" className="btn secondary small-btn" onClick={() => addWater(8)}>
+            + 1 cup (8 oz)
+          </button>
           {water.length > 0 && (
             <button type="button" className="btn secondary small-btn" onClick={() => deleteReading(water[water.length - 1].id)}>
               Undo

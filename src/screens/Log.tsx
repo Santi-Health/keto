@@ -87,7 +87,7 @@ function readingText(r: ReadingRow, unit: WeightUnit): string {
     case "lab":
       return `${r.meta.test ?? "Lab"} ${r.value}${r.unit === "%" ? "%" : ` ${r.unit ?? ""}`}`;
     case "water":
-      return `Water ${r.value} oz`;
+      return `Water ${(r.value ?? 0) / 8} cups (${r.value} oz)`;
   }
 }
 
@@ -203,7 +203,7 @@ export function Log({
               style={{ display: "flex", justifyContent: "space-between" }}
             >
               <span>Readings</span>
-              {waterOz > 0 && <span>{waterOz} oz water</span>}
+              {waterOz > 0 && <span>{waterOz / 8} {waterOz === 8 ? 'cup' : 'cups'} water ({waterOz} oz)</span>}
             </div>
             <div className="list">
               {shownReadings.map((r) => (

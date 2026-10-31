@@ -190,7 +190,7 @@ export function Settings({ profile, update, targets, session, sync, recovering, 
               <NumberField label="Magnesium" value={profile.magnesiumMg} suffix="mg" step={10} onChange={(magnesiumMg) => update({ magnesiumMg })} />
               <NumberField label="Fiber" value={profile.fiberG} suffix="g" onChange={(fiberG) => update({ fiberG })} />
             </div>
-            <NumberField label="Water" value={profile.waterOz} suffix="oz / day" onChange={(waterOz) => update({ waterOz })} />
+            <NumberField label="Water" value={profile.waterOz / 8} step={0.5} suffix="cups (8 oz) / day" onChange={(cups) => update({ waterOz: cups * 8 })} />
             <p className="muted small" style={{ margin: 0 }}>
               Electrolyte defaults follow common keto guidance (sodium 3,000–5,000 mg, potassium 3,500–4,700 mg, magnesium
               300–500 mg). This is general guidance, not medical advice.
