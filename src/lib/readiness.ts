@@ -3,8 +3,9 @@ import { formatSleep } from './activity'
 
 /**
  * The app's own readiness score (0–100), built like Fitbit's from the same three signals, each compared
- * with your own last 30 days: overnight HRV (higher = better recovered), resting heart rate
- * (lower = better) and sleep (last night, plus the last 3 nights). Not Fitbit's number, which
+ * with your own last 30 days: overnight HRV (35%, higher = better recovered), resting heart rate
+ * (20%, lower = better) and sleep (45%: mostly last night, plus the last 3 nights). A night under
+ * 6 hours also caps the score, so good HRV can't hide a short night. Not Fitbit's number, which
  * Google Health doesn't share.
  */
 
@@ -13,10 +14,16 @@ export type ReadinessBand = 'high' | 'moderate' | 'low'
 export interface Readiness {
   score: number
   band: ReadinessBand
-  parts: { label: string; score: number; detail: string }[]
+  /** short: the headline value for the gauge view, e.g. "62.7 ms · +14%". */
+  parts: { label: string; score: number; detail: string; short: string }[]
   /** Parts that had no data, e.g. HRV before it's been imported. */
   missing: string[]
+  /** Set when a short night held the score down. */
+  cappedBySleep?: { cap: number; minutes: number }
 }
+
+/** Under 6 hours asleep the score can't go above this: 30 at 4 h, rising to 65 at 6 h. */
+export const shortSleepCap = (minutes: number) => (minutes >= 360 ? 100 : Math.round(30 + (Math.max(240, minutes) - 240) * (35 / 120)))
 
 const clamp = (x: number) => Math.max(0, Math.min(100, Math.round(x)))
 const mean = (xs: number[]) => xs.reduce((a, b) => a + b, 0) / xs.length
@@ -44,8 +51,8 @@ export function readinessFor(day: string, activity: Record<string, ActivityDay>)
     const base = mean(hrvs)
     const change = hrv / base - 1
     // Your normal scores 60; +20% scores 90, −20% scores 30.
-    parts.push({ label: 'HRV', score: clamp(60 + 150 * change), detail: `${Math.round(hrv)} ms, ${Math.abs(Math.round(change * 100))}% ${change >= 0 ? 'above' : 'below'} your normal (${Math.round(base)})` })
-    weights.push(0.4)
+    parts.push({ label: 'HRV', score: clamp(60 + 150 * change), short: `${Math.round(hrv)} ms · ${change >= 0 ? '+' : '−'}${Math.abs(Math.round(change * 100))}%`, detail: `${Math.round(hrv)} ms, ${Math.abs(Math.round(change * 100))}% ${change >= 0 ? 'above' : 'below'} your normal (${Math.round(base)})` })
+    weights.push(0.35)
   } else missing.push('HRV')
 
   const rhrs = history.map((d) => d.resting_hr).filter((x): x is number => x != null && x > 0)
@@ -54,22 +61,30 @@ export function readinessFor(day: string, activity: Record<string, ActivityDay>)
     const base = mean(rhrs)
     const diff = rhr - base
     // Your normal scores 60; each beat above it costs 10 points.
-    parts.push({ label: 'Resting HR', score: clamp(60 - 10 * diff), detail: `${rhr} bpm, ${Math.abs(Math.round(diff * 10) / 10)} ${diff >= 0 ? 'above' : 'below'} your normal (${Math.round(base)})` })
-    weights.push(0.3)
+    parts.push({ label: 'Resting HR', score: clamp(60 - 10 * diff), short: `${rhr} bpm · ${diff > 0 ? '+' : diff < 0 ? '−' : '±'}${Math.abs(Math.round(diff))}`, detail: `${rhr} bpm, ${Math.abs(Math.round(diff * 10) / 10)} ${diff >= 0 ? 'above' : 'below'} your normal (${Math.round(base)})` })
+    weights.push(0.2)
   } else missing.push('resting heart rate')
 
   const lastNight = today.sleep_minutes
   if (lastNight) {
     const recent = [lastNight, ...[1, 2].map((i) => activity[shift(day, -i)]?.sleep_minutes).filter((x): x is number => !!x)]
     const avg3 = mean(recent)
-    parts.push({ label: 'Sleep', score: clamp(0.6 * sleepPoints(lastNight) + 0.4 * sleepPoints(avg3)), detail: `${formatSleep(lastNight)} last night, ${formatSleep(avg3)} over ${recent.length} nights` })
-    weights.push(0.3)
+    parts.push({ label: 'Sleep', score: clamp(0.75 * sleepPoints(lastNight) + 0.25 * sleepPoints(avg3)), short: formatSleep(lastNight), detail: `${formatSleep(lastNight)} last night, ${formatSleep(avg3)} over ${recent.length} nights` })
+    weights.push(0.45)
   } else missing.push('sleep')
 
   if (!parts.length || parts.length === 1) return null
   const total = weights.reduce((a, b) => a + b, 0)
-  const score = clamp(parts.reduce((s, p, i) => s + p.score * weights[i], 0) / total)
-  return { score, band: score >= 70 ? 'high' : score >= 45 ? 'moderate' : 'low', parts, missing }
+  const blended = clamp(parts.reduce((s, p, i) => s + p.score * weights[i], 0) / total)
+  const cap = lastNight ? shortSleepCap(lastNight) : 100
+  const score = Math.min(blended, cap)
+  return {
+    score,
+    band: score >= 70 ? 'high' : score >= 45 ? 'moderate' : 'low',
+    parts,
+    missing,
+    cappedBySleep: cap < blended ? { cap, minutes: lastNight! } : undefined,
+  }
 }
 
 export const READINESS_TEXT: Record<ReadinessBand, string> = {

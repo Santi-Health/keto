@@ -1626,85 +1626,194 @@ input[type='time'] {
 }
 
 /* Readiness */
-.readiness {
+.ready {
+  --ready-a: #8fd3b5;
+  --ready-b: var(--accent);
+  margin-bottom: 12px;
+  padding: 14px;
+  border-radius: 16px;
+  background: linear-gradient(135deg, color-mix(in srgb, var(--ready-b) 14%, var(--surface-2)), var(--surface-2) 70%);
+  border: 1px solid color-mix(in srgb, var(--ready-b) 30%, var(--border));
+}
+
+.ready.moderate {
+  --ready-a: #f2d27a;
+  --ready-b: #d39b2a;
+}
+
+.ready.low {
+  --ready-a: #f0a58f;
+  --ready-b: var(--warn);
+}
+
+.ready-top {
   display: flex;
+  align-items: center;
   gap: 12px;
-  align-items: flex-start;
-  margin-bottom: 10px;
-  padding: 10px;
-  border-radius: 12px;
-  background: var(--surface-2);
-  border-left: 4px solid var(--border);
 }
 
-.readiness.high {
-  border-left-color: var(--accent);
-}
-
-.readiness.moderate {
-  border-left-color: var(--fat);
-}
-
-.readiness.low {
-  border-left-color: var(--warn);
-}
-
-.readiness-score {
-  display: grid;
-  justify-items: center;
+.ready-gauge {
   flex: none;
-  min-width: 64px;
+  width: 112px;
+  height: 112px;
 }
 
-.readiness-score b {
-  font-size: 1.9rem;
-  line-height: 1;
+.ready-gauge .stop-a {
+  stop-color: var(--ready-a);
+}
+
+.ready-gauge .stop-b {
+  stop-color: var(--ready-b);
+}
+
+.ready-track,
+.ready-arc {
+  fill: none;
+  stroke-width: 11;
+  stroke-linecap: round;
+}
+
+.ready-track {
+  stroke: color-mix(in srgb, var(--text-2) 18%, transparent);
+}
+
+.ready-arc {
+  transition: stroke-dasharray 0.6s ease;
+}
+
+.ready-num {
+  font-size: 34px;
+  font-weight: 800;
+  fill: var(--text);
   font-variant-numeric: tabular-nums;
 }
 
-.readiness-score span {
-  font-size: 0.65rem;
-  text-align: center;
-  color: var(--text-2);
+.ready-label {
+  font-size: 9.5px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  fill: var(--text-2);
 }
 
-.readiness-detail {
+.ready-head {
   display: grid;
   gap: 4px;
   min-width: 0;
 }
 
-.readiness-parts {
-  margin: 0;
-  padding-left: 16px;
-  font-size: 0.78rem;
+.ready-head b {
+  font-size: 1.1rem;
+  color: var(--ready-b);
 }
 
-.readiness-days {
+.ready-head span {
+  font-size: 0.85rem;
+  line-height: 1.35;
+}
+
+.ready-cap {
+  color: var(--text-2);
+}
+
+.ready-parts {
+  display: grid;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.ready-part {
+  display: grid;
+  grid-template-columns: 7.2em 1fr auto;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.82rem;
+}
+
+.ready-part-label {
+  white-space: nowrap;
+}
+
+.ready-part-label span {
+  display: inline-block;
+  width: 1.1em;
+  text-align: center;
+  color: var(--text-2);
+}
+
+.ready-bar {
+  height: 8px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--text-2) 18%, transparent);
+  overflow: hidden;
+}
+
+.ready-bar i {
+  display: block;
+  height: 100%;
+  border-radius: 4px;
+  background: var(--accent);
+}
+
+.ready-bar i.moderate {
+  background: #d39b2a;
+}
+
+.ready-bar i.low {
+  background: var(--warn);
+}
+
+.ready-part-value {
+  font-variant-numeric: tabular-nums;
+  color: var(--text-2);
+  white-space: nowrap;
+}
+
+.ready-week {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
-  gap: 3px;
+  gap: 6px;
+  height: 92px;
+  margin-top: 10px;
 }
 
-.readiness-days span {
-  padding: 3px 0;
-  font-size: 0.75rem;
-  font-weight: 700;
-  text-align: center;
-  border-radius: 6px;
-  border-bottom: 3px solid var(--border);
+.ready-day {
+  display: grid;
+  grid-template-rows: 1fr auto auto;
+  justify-items: center;
+  align-items: end;
+  font-size: 0.7rem;
 }
 
-.readiness-days .high {
-  border-bottom-color: var(--accent);
+.ready-day i {
+  width: 60%;
+  border-radius: 4px 4px 0 0;
+  background: color-mix(in srgb, var(--text-2) 30%, transparent);
 }
 
-.readiness-days .moderate {
-  border-bottom-color: var(--fat);
+.ready-day.high i {
+  background: var(--accent);
 }
 
-.readiness-days .low {
-  border-bottom-color: var(--warn);
+.ready-day.moderate i {
+  background: #d39b2a;
+}
+
+.ready-day.low i {
+  background: var(--warn);
+}
+
+.ready-day b {
+  font-variant-numeric: tabular-nums;
+}
+
+.ready-day span {
+  color: var(--text-2);
+}
+
+.ready-foot {
+  margin-top: 10px;
+  font-size: 0.68rem;
+  color: var(--text-2);
 }
 
 .week-mode {

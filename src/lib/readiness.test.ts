@@ -17,9 +17,9 @@ const month = (last: ActivityDay) => {
 }
 
 describe('readiness', () => {
-  it('scores a normal, well-slept day in the low 70s', () => {
+  it('scores a normal, well-slept day in the high 70s', () => {
     const r = readinessFor('2026-10-31', month(row('2026-10-31', 56, 40, 450)))!
-    expect(r.score).toBe(72)
+    expect(r.score).toBe(78)
   })
 
   it('is high with HRV up, resting HR down and good sleep', () => {
@@ -37,5 +37,19 @@ describe('readiness', () => {
     const r = readinessFor('2026-10-31', month(row('2026-10-31', 56, undefined, 450)))!
     expect(r.missing).toEqual(['HRV'])
     expect(readinessFor('2026-10-31', { '2026-10-31': row('2026-10-31', 56, undefined, 450) })).toBeNull()
+  })
+})
+
+describe('short sleep', () => {
+  it('caps the score after a short night even when HRV and resting HR look great', () => {
+    // Like Oct 31: HRV well above normal, resting HR a beat below, but only 5h 19m asleep.
+    const r = readinessFor('2026-10-31', month(row('2026-10-31', 55, 46, 319)))!
+    expect(r.cappedBySleep).toEqual({ cap: 53, minutes: 319 })
+    expect(r.score).toBe(53)
+    expect(r.band).toBe('moderate')
+  })
+
+  it('leaves a full night uncapped', () => {
+    expect(readinessFor('2026-10-31', month(row('2026-10-31', 55, 46, 420)))!.cappedBySleep).toBeUndefined()
   })
 })

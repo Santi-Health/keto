@@ -102,47 +102,99 @@ export function ActivityCard({ days, onImport, importing }: { days: string[]; on
   )
 }
 
+const BAND_TITLE = { high: 'Well recovered', moderate: 'Moderately recovered', low: 'Low recovery' } as const
+const bandOf = (score: number) => (score >= 70 ? 'high' : score >= 45 ? 'moderate' : 'low')
+/** The advice half of the readiness text ("Train as planned, …"), capitalized. */
+const advice = (band: 'high' | 'moderate' | 'low') => {
+  const a = READINESS_TEXT[band].split(': ')[1] ?? READINESS_TEXT[band]
+  return a.charAt(0).toUpperCase() + a.slice(1)
+}
+const PART_ICON: Record<string, string> = { HRV: '〰', 'Resting HR': '♥', Sleep: '☾' }
+
+/** A 270° gauge with the score in the middle, colored by how recovered you are. */
+function Gauge({ score, label }: { score: number; label: string }) {
+  const r = 46
+  const c = 2 * Math.PI * r
+  const arc = c * 0.75
+  const band = bandOf(score)
+  return (
+    <svg viewBox="0 0 120 120" className={`ready-gauge ${band}`} role="img" aria-label={`Readiness ${score} out of 100`}>
+      <defs>
+        <linearGradient id={`ready-grad-${band}`} x1="0" y1="1" x2="1" y2="0">
+          <stop offset="0%" className="stop-a" />
+          <stop offset="100%" className="stop-b" />
+        </linearGradient>
+      </defs>
+      <circle cx="60" cy="60" r={r} className="ready-track" strokeDasharray={`${arc} ${c}`} transform="rotate(135 60 60)" />
+      <circle
+        cx="60"
+        cy="60"
+        r={r}
+        className="ready-arc"
+        stroke={`url(#ready-grad-${band})`}
+        strokeDasharray={`${(arc * score) / 100} ${c}`}
+        transform="rotate(135 60 60)"
+      />
+      <text x="60" y="62" textAnchor="middle" className="ready-num">
+        {score}
+      </text>
+      <text x="60" y="80" textAnchor="middle" className="ready-label">
+        {label}
+      </text>
+    </svg>
+  )
+}
+
 /** The app's readiness score for the day (or the week's average), with what drove it. */
 function ReadinessBlock({ days, isWeek }: { days: string[]; isWeek: boolean }) {
   const { activity } = useData()
-  const scores = days.map((d) => readinessFor(d, activity)).filter((r): r is NonNullable<typeof r> => !!r)
-  if (!scores.length) return null
-  const r = scores[scores.length - 1]
-  const score = isWeek ? Math.round(scores.reduce((a, b) => a + b.score, 0) / scores.length) : r.score
-  const band = score >= 70 ? 'high' : score >= 45 ? 'moderate' : 'low'
+  const scores = days.map((d) => ({ day: d, r: readinessFor(d, activity) }))
+  const known = scores.filter((x): x is { day: string; r: NonNullable<typeof x.r> } => !!x.r)
+  if (!known.length) return null
+  const r = known[known.length - 1].r
+  const score = isWeek ? Math.round(known.reduce((a, b) => a + b.r.score, 0) / known.length) : r.score
+  const band = bandOf(score)
   return (
-    <div className={`readiness ${band}`}>
-      <div className="readiness-score">
-        <b>{score}</b>
-        <span>{isWeek ? `readiness avg (${scores.length} days)` : 'readiness'}</span>
-      </div>
-      <div className="readiness-detail">
-        {!isWeek && <div className="small">{READINESS_TEXT[band]}</div>}
-        {isWeek ? (
-          <div className="readiness-days">
-            {days.map((d) => {
-              const x = readinessFor(d, activity)
-              return (
-                <span key={d} className={x ? (x.score >= 70 ? 'high' : x.score >= 45 ? 'moderate' : 'low') : ''} title={d}>
-                  {x?.score ?? '–'}
-                </span>
-              )
-            })}
-          </div>
-        ) : (
-          <ul className="readiness-parts">
-            {r.parts.map((p) => (
-              <li key={p.label}>
-                <b>{p.label}</b> {p.score}: {p.detail}
-              </li>
-            ))}
-          </ul>
-        )}
-        <div className="muted small">
-          The app's own score from HRV, resting heart rate and sleep against your last 30 days (Fitbit's Readiness isn't shared with apps).
-          {!isWeek && r.missing.length ? ` No ${r.missing.join(' or ')} data yet.` : ''}
+    <div className={`ready ${band}`}>
+      <div className="ready-top">
+        <Gauge score={score} label={isWeek ? '7-day avg' : 'readiness'} />
+        <div className="ready-head">
+          <b>{BAND_TITLE[band]}</b>
+          {!isWeek && <span>{advice(band)}</span>}
+          {!isWeek && r.cappedBySleep && (
+            <span className="ready-cap">
+              Held at {r.cappedBySleep.cap} by a short night ({formatSleep(r.cappedBySleep.minutes)}).
+            </span>
+          )}
         </div>
       </div>
+      {isWeek ? (
+        <div className="ready-week">
+          {scores.map(({ day: d, r: x }) => (
+            <div key={d} className={`ready-day ${x ? bandOf(x.score) : ''}`}>
+              <i style={{ height: `${x ? Math.max(8, x.score) : 4}%` }} />
+              <b>{x?.score ?? '–'}</b>
+              <span>{new Date(`${d}T12:00:00`).toLocaleDateString('en-US', { weekday: 'narrow' })}</span>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="ready-parts">
+          {r.parts.map((p) => (
+            <div key={p.label} className="ready-part" title={p.detail}>
+              <span className="ready-part-label">
+                <span aria-hidden="true">{PART_ICON[p.label]}</span> {p.label}
+              </span>
+              <span className="ready-bar">
+                <i className={bandOf(p.score)} style={{ width: `${Math.max(4, p.score)}%` }} />
+              </span>
+              <span className="ready-part-value">{p.short}</span>
+            </div>
+          ))}
+          {r.missing.length > 0 && <div className="muted small">No {r.missing.join(' or ')} data yet.</div>}
+        </div>
+      )}
+      <div className="ready-foot">The app's own score vs. your last 30 days (Fitbit's Readiness isn't shared with apps).</div>
     </div>
   )
 }
