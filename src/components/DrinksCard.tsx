@@ -72,8 +72,18 @@ export function DrinksCard({ days, waterTargetOz }: Props) {
     setUndo({ kind: 'log', ids, label: label(d) })
   }
 
-  const findOrSave = (template: ReturnType<typeof drinkFood>): Food =>
-    foods.find((f) => f.meta.externalId === template.meta.externalId) ?? saveFood(template)
+  /**
+   * The saved food for a built-in drink, refreshed to the app's current values when they've changed
+   * (e.g. a corrected caffeine number). Past logs keep the values they were logged with.
+   */
+  const findOrSave = (template: ReturnType<typeof drinkFood>): Food => {
+    const found = foods.find((f) => f.meta.externalId === template.meta.externalId)
+    if (!found) return saveFood(template)
+    if (JSON.stringify(found.per_100g) === JSON.stringify(template.per_100g) && JSON.stringify(found.fields_estimated) === JSON.stringify(template.fields_estimated)) return found
+    const refreshed: Food = { ...found, per_100g: template.per_100g, fields_estimated: template.fields_estimated, confidence: template.confidence }
+    saveFood(refreshed)
+    return refreshed
+  }
 
   function logDrinkFood(d: Drink, at: Date) {
     const { amount, unit } = drinkPortion(d)
