@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { DEFAULT_YOGA_ROUTINE, daysSinceStrength, estimateExerciseKcal, pace, routineDue, trainingWarnings, type Exercise } from './exercise'
+import { DEFAULT_YOGA_ROUTINE, daysSinceStrength, estimateExerciseKcal, pace, routineDue, speed, trainingWarnings, type Exercise } from './exercise'
 
 const ex = (overrides: Partial<Exercise>): Exercise => ({
   id: 'e',
@@ -54,6 +54,13 @@ describe('detailed estimates', () => {
     // 3 mi in 30 min = 6 mph → MET ≈ 9.75; (9.75 − 1) × 68 × 0.5 ≈ 298
     expect(estimateExerciseKcal('cardio', 'moderate', 30, 68, { cardioType: 'running', distanceMi: 3 })).toBe(298)
     expect(pace(3, 28.5)).toBe('9:30 /mi')
+  })
+  it('uses cycling speed when the distance is known, effort otherwise', () => {
+    // 14 mi in 60 min = 14 mph → MET 10; (10 − 1) × 68 × 1 = 612
+    expect(estimateExerciseKcal('cardio', 'moderate', 60, 68, { cardioType: 'cycling', distanceMi: 14 })).toBe(612)
+    // Moderate without distance → 6.8; (6.8 − 1) × 68 × 0.5 ≈ 197
+    expect(estimateExerciseKcal('cardio', 'moderate', 30, 68, { cardioType: 'cycling' })).toBe(197)
+    expect(speed(14, 60)).toBe('14 mph')
   })
   it('uses StairMaster and yoga style values', () => {
     expect(estimateExerciseKcal('cardio', 'moderate', 30, 68, { cardioType: 'stairmaster' })).toBe(272)

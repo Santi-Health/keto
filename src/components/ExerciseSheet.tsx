@@ -6,6 +6,7 @@ import {
   YOGA_STYLES,
   estimateExerciseKcal,
   pace,
+  speed,
   type CardioType,
   type Exercise,
   type ExerciseKind,
@@ -83,7 +84,7 @@ export function ExerciseSheet({ weightKg, hr, exercise, date, onClose }: Props) 
   const mins = Number(minutes)
   const details = {
     cardioType: kind === 'cardio' ? cardioType : undefined,
-    distanceMi: kind === 'cardio' && cardioType === 'running' && distance !== '' ? Number(distance) : null,
+    distanceMi: kind === 'cardio' && (cardioType === 'running' || cardioType === 'cycling') && distance !== '' ? Number(distance) : null,
     floors: kind === 'cardio' && cardioType === 'stairmaster' && floors !== '' ? Number(floors) : null,
     level: kind === 'cardio' && cardioType === 'stairmaster' && level !== '' ? Number(level) : null,
     yogaStyle: kind === 'mobility' ? yogaStyle : undefined,
@@ -206,12 +207,12 @@ export function ExerciseSheet({ weightKg, hr, exercise, date, onClose }: Props) 
         onChange={setIntensity}
       />
 
-      {kind === 'cardio' && cardioType === 'running' && (
+      {kind === 'cardio' && (cardioType === 'running' || cardioType === 'cycling') && (
         <div className="field">
           <label htmlFor="ex-dist">Distance (optional, sharpens the estimate)</label>
           <div className="row">
             <input id="ex-dist" type="number" inputMode="decimal" step="0.01" value={distance} onChange={(e) => setDistance(e.target.value)} />
-            <span className="muted small" style={{ flex: 'none' }}>mi{Number(distance) > 0 && mins > 0 ? ` · ${pace(Number(distance), mins)}` : ''}</span>
+            <span className="muted small" style={{ flex: 'none' }}>mi{Number(distance) > 0 && mins > 0 ? ` · ${cardioType === 'cycling' ? speed(Number(distance), mins) : pace(Number(distance), mins)}` : ''}</span>
           </div>
         </div>
       )}

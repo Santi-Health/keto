@@ -17,6 +17,7 @@ describe('classifyExercise', () => {
   it('maps Fitbit types to yoga, running, StairMaster and strength', () => {
     expect(classifyExercise('YOGA')).toEqual({ kind: 'mobility' })
     expect(classifyExercise('RUNNING')).toEqual({ kind: 'cardio', cardioType: 'running' })
+    expect(classifyExercise('BIKING')).toEqual({ kind: 'cardio', cardioType: 'cycling' })
     expect(classifyExercise('STAIR_CLIMBING_MACHINE')).toEqual({ kind: 'cardio', cardioType: 'stairmaster' })
     expect(classifyExercise('WEIGHTLIFTING')).toEqual({ kind: 'strength' })
     expect(classifyExercise('EXERCISE', 'Stairmaster')).toEqual({ kind: 'cardio', cardioType: 'stairmaster' })

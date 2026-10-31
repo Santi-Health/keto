@@ -13,12 +13,13 @@ export const EXERCISE_KINDS: { value: ExerciseKind; label: string; emoji: string
   { value: 'other', label: 'Other', emoji: '✳️' },
 ]
 
-export type CardioType = 'stairmaster' | 'running'
+export type CardioType = 'stairmaster' | 'running' | 'cycling'
 export type YogaStyle = 'gentle' | 'flow' | 'power'
 
 export const CARDIO_TYPES: { value: CardioType; label: string; emoji: string }[] = [
   { value: 'stairmaster', label: 'StairMaster', emoji: '🪜' },
   { value: 'running', label: 'Running', emoji: '🏃' },
+  { value: 'cycling', label: 'Cycling', emoji: '🚴' },
 ]
 
 export const YOGA_STYLES: { value: YogaStyle; label: string; met: number }[] = [
@@ -33,6 +34,22 @@ const STAIRMASTER_MET: Record<Intensity, number> = { low: 6, moderate: 9, high: 
 /** Running MET from speed in mph (Compendium: 5 mph ≈ 8.3, 6 ≈ 9.8, 7 ≈ 11). */
 export const runningMet = (mph: number) => Math.max(6, 1.45 * mph + 1.05)
 
+/** Cycling METs by effort when the speed isn't known (Compendium: leisure, moderate, vigorous). */
+const CYCLING_MET: Record<Intensity, number> = { low: 4, moderate: 6.8, high: 10 }
+
+/** Road cycling MET from speed in mph (Compendium: <10 mph 4, 10–12 6.8, 12–14 8, 14–16 10, 16–20 12, 20+ 15.8). */
+export function cyclingMet(mph: number): number {
+  if (mph < 10) return 4
+  if (mph < 12) return 6.8
+  if (mph < 14) return 8
+  if (mph < 16) return 10
+  if (mph < 20) return 12
+  return 15.8
+}
+
+/** Miles per hour, e.g. "14 mph". */
+export const speed = (distanceMi: number, minutes: number) => `${Math.round((distanceMi / (minutes / 60)) * 10) / 10} mph`
+
 export interface ExerciseDetails {
   cardioType?: CardioType
   distanceMi?: number | null
@@ -46,6 +63,8 @@ export function sessionMet(kind: ExerciseKind, intensity: Intensity, minutes: nu
   if (kind === 'mobility' && d.yogaStyle) return YOGA_STYLES.find((y) => y.value === d.yogaStyle)!.met
   if (kind === 'cardio' && d.cardioType === 'stairmaster') return STAIRMASTER_MET[intensity]
   if (kind === 'cardio' && d.cardioType === 'running' && d.distanceMi && minutes > 0) return runningMet(d.distanceMi / (minutes / 60))
+  if (kind === 'cardio' && d.cardioType === 'cycling')
+    return d.distanceMi && minutes > 0 ? cyclingMet(d.distanceMi / (minutes / 60)) : CYCLING_MET[intensity]
   return METS[kind][intensity]
 }
 
@@ -207,11 +226,13 @@ export function routineDue(r: Routine, exercisesToday: Exercise[], now = new Dat
   return r.days.includes(now.getDay()) && !exercisesToday.some((e) => e.kind === r.kind)
 }
 
-/** "StairMaster", "Running 3 mi · 9:30 /mi", "Flow / vinyasa yoga", or the plain kind. */
+/** "StairMaster", "Running 3 mi · 9:30 /mi", "Cycling 12 mi · 14 mph", "Flow / vinyasa yoga", or the plain kind. */
 export function sessionLabel(e: Exercise): string {
   const k = EXERCISE_KINDS.find((x) => x.value === e.kind)!
   if (e.kind === 'cardio' && e.meta.cardioType === 'running')
     return `${k.emoji} Running${e.meta.distanceMi ? ` ${e.meta.distanceMi} mi · ${pace(e.meta.distanceMi, e.duration_min)}` : ''}`
+  if (e.kind === 'cardio' && e.meta.cardioType === 'cycling')
+    return `🚴 Cycling${e.meta.distanceMi ? ` ${e.meta.distanceMi} mi · ${speed(e.meta.distanceMi, e.duration_min)}` : ''}`
   if (e.kind === 'cardio' && e.meta.cardioType === 'stairmaster')
     return `🪜 StairMaster${e.meta.level ? ` L${e.meta.level}` : ''}${e.meta.floors ? ` · ${e.meta.floors} floors` : ''}`
   if (e.kind === 'mobility' && e.meta.yogaStyle) return `${k.emoji} ${YOGA_STYLES.find((y) => y.value === e.meta.yogaStyle)!.label} yoga`

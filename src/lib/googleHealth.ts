@@ -1,4 +1,4 @@
-import { heartRateKcal, type Exercise, type ExerciseKind, type Intensity } from './exercise'
+import { heartRateKcal, type CardioType, type Exercise, type ExerciseKind, type Intensity } from './exercise'
 
 /** OAuth client for the "Keto Tracker" Google Cloud project. Client IDs are public by design. */
 export const GOOGLE_CLIENT_ID =
@@ -458,7 +458,7 @@ export async function heartRateCalories(
 
 // --- Matching to the app's exercise types ----------------------------------------------
 
-export function classifyExercise(type: string, displayName = ''): { kind: ExerciseKind; cardioType?: 'running' | 'stairmaster' } {
+export function classifyExercise(type: string, displayName = ''): { kind: ExerciseKind; cardioType?: CardioType } {
   const t = `${type} ${displayName}`.toUpperCase()
   if (/STAIR|STEP ?MILL|STAIRMASTER/.test(t)) return { kind: 'cardio', cardioType: 'stairmaster' }
   if (/RUN|JOG|TREADMILL/.test(t)) return { kind: 'cardio', cardioType: 'running' }
@@ -466,7 +466,8 @@ export function classifyExercise(type: string, displayName = ''): { kind: Exerci
   if (/WEIGHT|STRENGTH|LIFT|RESISTANCE/.test(t)) return { kind: 'strength' }
   if (/WALK|HIKE/.test(t)) return { kind: 'walking' }
   if (/HIIT|INTERVAL|CIRCUIT/.test(t)) return { kind: 'hiit' }
-  if (/BIKE|CYCL|SPIN|ELLIPTICAL|ROW|SWIM|CARDIO/.test(t)) return { kind: 'cardio' }
+  if (/BIKE|BIKING|CYCL|SPIN/.test(t)) return { kind: 'cardio', cardioType: 'cycling' }
+  if (/ELLIPTICAL|ROW|SWIM|CARDIO/.test(t)) return { kind: 'cardio' }
   if (/TENNIS|SOCCER|BASKETBALL|SPORT|GOLF|PADEL|PICKLEBALL/.test(t)) return { kind: 'sport' }
   return { kind: 'other' }
 }
@@ -478,7 +479,7 @@ const seconds = (d?: string) => (d && /^[\d.]+s$/.test(d) ? Number(d.slice(0, -1
  * resting burn during the session, so that part is subtracted to keep active calories only.
  */
 /** Fitbit type → the type you corrected it to, learned from sessions you edited. */
-export type LearnedTypes = Record<string, { kind: ExerciseKind; cardioType?: 'running' | 'stairmaster' }>
+export type LearnedTypes = Record<string, { kind: ExerciseKind; cardioType?: CardioType }>
 
 export function learnTypes(exercises: Exercise[]): LearnedTypes {
   const map: LearnedTypes = {}
@@ -531,7 +532,7 @@ export function toAppExercise(
     meta: {
       caloriesEstimated: total == null,
       cardioType,
-      distanceMi: cardioType === 'running' || kind === 'walking' ? miles : undefined,
+      distanceMi: cardioType === 'running' || cardioType === 'cycling' || kind === 'walking' ? miles : undefined,
       yogaStyle: kind === 'mobility' ? 'flow' : undefined,
       fitbitTotalKcal: total ?? undefined,
       fitbitType: e.exerciseType,
