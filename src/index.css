@@ -945,3 +945,8 @@ input[type='time'] {
   color: var(--text);
   font-variant-numeric: tabular-nums;
 }
+
+.meal-picker button[aria-pressed='true'] {
+  background: var(--accent);
+  color: #fff;
+}

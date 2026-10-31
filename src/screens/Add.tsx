@@ -6,7 +6,7 @@ import { LogFoodSheet } from '../components/LogFoodSheet'
 import { RecipeBuilder } from '../components/RecipeBuilder'
 import { useData } from '../lib/data'
 import { lookupBarcode } from '../lib/foodApi'
-import type { Food, NewFood } from '../lib/foods'
+import { MEALS, mealForTime, suggestForMeal, type Food, type Meal, type NewFood } from '../lib/foods'
 import { useFoodSearch } from '../lib/useFoodSearch'
 
 type Overlay =
@@ -25,7 +25,10 @@ interface Props {
 }
 
 export function Add({ startScan, date, onLogged }: Props) {
-  const { foods } = useData()
+  const { foods, logs } = useData()
+  const [meal, setMeal] = useState<Meal>(() => mealForTime(new Date()))
+  const mealLabel = MEALS.find((m) => m.value === meal)!.label
+  const usual = suggestForMeal(foods, logs, meal)
   const [query, setQuery] = useState('')
   const { q, mine, results, searching, error } = useFoodSearch(query, 40)
   const recipes = foods.filter((f) => f.source === 'recipe').sort((a, b) => a.name.localeCompare(b.name))
@@ -73,6 +76,16 @@ export function Add({ startScan, date, onLogged }: Props) {
       </header>
 
       <div className="card">
+        <div className="field" style={{ marginBottom: 12 }}>
+          <span className="label">Logging to</span>
+          <div className="segmented meal-picker" role="group" aria-label="Meal">
+            {MEALS.map((m) => (
+              <button key={m.value} type="button" aria-pressed={meal === m.value} onClick={() => setMeal(m.value)}>
+                {m.label}
+              </button>
+            ))}
+          </div>
+        </div>
         <div className="search">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
             <circle cx="11" cy="11" r="7" />
@@ -99,6 +112,23 @@ export function Add({ startScan, date, onLogged }: Props) {
           </button>
         </div>
         {notice && <p className="notice small" style={{ marginBottom: 0 }}>{notice}</p>}
+
+        {!q && (
+          <>
+            <div className="section-label">Usual for {mealLabel.toLowerCase()}</div>
+            {usual.length ? (
+              <div className="food-grid">
+                {usual.map((f) => (
+                  <FoodRow key={f.id} food={f} onPick={() => setOverlay({ kind: 'log', food: f })} />
+                ))}
+              </div>
+            ) : (
+              <p className="muted small">
+                Nothing yet. Foods you log at {mealLabel.toLowerCase()} show up here, or tag a food with its usual meals when you log it.
+              </p>
+            )}
+          </>
+        )}
 
         {!q && recipes.length > 0 && (
           <>
@@ -144,6 +174,7 @@ export function Add({ startScan, date, onLogged }: Props) {
         <LogFoodSheet
           food={overlay.food}
           date={date}
+          meal={meal}
           onClose={close}
           onDone={logged}
           onEditFood={(food) =>

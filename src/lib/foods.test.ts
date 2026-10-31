@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildLogEntry, completeNutrients, type Food } from './foods'
+import { buildLogEntry, completeNutrients, suggestForMeal, type Food } from './foods'
 import { toGrams } from './units'
 
 const food = (overrides: Partial<Food> = {}): Food => ({
@@ -59,5 +59,25 @@ describe('buildLogEntry', () => {
     const bacon = buildLogEntry(food({ meta: { processedMeat: true, sweeteners: ['sucralose'] } }), 30, 'g', 'breakfast', new Date())
     expect(bacon.nutrients.processedMeatG).toBe(30)
     expect(bacon.nutrients.sweetenerServings).toBe(1)
+  })
+})
+
+describe('suggestForMeal', () => {
+  const now = Date.parse('2026-10-30T20:00:00Z')
+  const whites = food({ id: 'w', name: 'Egg whites', meta: { meals: ['breakfast'] } })
+  const nuts = food({ id: 'n', name: 'Almonds', meta: { meals: ['snack', 'dinner'] } })
+  const salmon = food({ id: 's', name: 'Smoked salmon' })
+  const bread = food({ id: 'b', name: 'Keto bread' })
+  const logs = [
+    { food_id: 's', meal: 'breakfast' as const, eaten_at: '2026-10-29T15:00:00Z' },
+    { food_id: 's', meal: 'breakfast' as const, eaten_at: '2026-10-28T15:00:00Z' },
+    { food_id: 'b', meal: 'lunch' as const, eaten_at: '2026-10-29T20:00:00Z' },
+  ]
+  it('puts tagged foods first, then what you usually log at that meal', () => {
+    expect(suggestForMeal([bread, salmon, nuts, whites], logs, 'breakfast', 8, now).map((f) => f.id)).toEqual(['w', 's'])
+  })
+  it('shows nuts for snacks and dinner, and leaves unrelated foods out', () => {
+    expect(suggestForMeal([bread, salmon, nuts, whites], logs, 'dinner', 8, now).map((f) => f.id)).toEqual(['n'])
+    expect(suggestForMeal([bread, salmon, nuts, whites], logs, 'lunch', 8, now).map((f) => f.id)).toEqual(['b'])
   })
 })

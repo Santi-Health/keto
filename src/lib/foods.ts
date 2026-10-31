@@ -34,6 +34,8 @@ export interface FoodMeta {
   lastUnit?: string
   /** Set on recipes: the ingredients and batch size the nutrition was calculated from. */
   recipe?: RecipeMeta
+  /** Meals this food is usually eaten at, as told by the user. */
+  meals?: Meal[]
 }
 
 /** Row shape of the `foods` table. */
@@ -140,4 +142,28 @@ export function rankFoods(foods: Food[], now = Date.now()): Food[] {
     return (f.favorite ? 1000 : 0) + f.use_count * 2 - Math.min(daysAgo, 60)
   }
   return [...foods].sort((a, b) => score(b) - score(a))
+}
+
+/**
+ * Foods to suggest for a meal: ones tagged for it, then ones most often logged at it,
+ * favoring recent use. Foods with no link to the meal are left out.
+ */
+export function suggestForMeal(foods: Food[], logs: Pick<LogEntry, 'food_id' | 'meal' | 'eaten_at'>[], meal: Meal, limit = 8, now = Date.now()): Food[] {
+  const counts = new Map<string, number>()
+  const lastAt = new Map<string, number>()
+  for (const l of logs) {
+    if (!l.food_id || l.meal !== meal) continue
+    counts.set(l.food_id, (counts.get(l.food_id) ?? 0) + 1)
+    lastAt.set(l.food_id, Math.max(lastAt.get(l.food_id) ?? 0, Date.parse(l.eaten_at)))
+  }
+  const scored = foods
+    .map((f) => {
+      const tagged = f.meta.meals?.includes(meal) ? 10 : 0
+      const n = counts.get(f.id) ?? 0
+      const days = lastAt.has(f.id) ? (now - lastAt.get(f.id)!) / 86_400_000 : null
+      const recency = days == null ? 0 : Math.max(0, 3 - days / 10)
+      return { f, score: tagged + n * 3 + recency + (f.favorite && (tagged || n) ? 1 : 0) }
+    })
+    .filter((x) => x.score > 0)
+  return scored.sort((a, b) => b.score - a.score).slice(0, limit).map((x) => x.f)
 }

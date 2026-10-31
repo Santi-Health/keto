@@ -12,6 +12,8 @@ interface Props {
   entry?: LogEntry
   /** Day to log on (YYYY-MM-DD); defaults to now. */
   date?: string
+  /** Meal chosen on the Add screen; defaults to one that fits the time. */
+  meal?: Meal
   onClose: () => void
   onEditFood?: (food: Food | NewFood) => void
   onDone?: () => void
@@ -30,7 +32,7 @@ function defaultTime(date?: string): Date {
   return d.toDateString() === now.toDateString() ? now : d
 }
 
-export function LogFoodSheet({ food, entry, date, onClose, onEditFood, onDone }: Props) {
+export function LogFoodSheet({ food, entry, date, meal: chosenMeal, onClose, onEditFood, onDone }: Props) {
   const { saveFood, logFood, updateLog, deleteLog, updateFood } = useData()
   const saved = 'id' in food ? food : null
   const units = unitsFor({ unitConversions: food.unit_conversions })
@@ -39,7 +41,8 @@ export function LogFoodSheet({ food, entry, date, onClose, onEditFood, onDone }:
   const [unit, setUnit] = useState(entry?.unit ?? saved?.meta.lastUnit ?? firstUnit)
   const start = entry ? new Date(entry.eaten_at) : defaultTime(date)
   const [time, setTime] = useState(toLocalInput(start))
-  const [meal, setMeal] = useState<Meal>(entry?.meal ?? mealForTime(start))
+  const [meal, setMeal] = useState<Meal>(entry?.meal ?? chosenMeal ?? mealForTime(start))
+  const [usualMeals, setUsualMeals] = useState<Meal[]>(food.meta.meals ?? [])
   const [favorite, setFavorite] = useState(saved?.favorite ?? false)
 
   const qty = Number(amount)
@@ -70,21 +73,27 @@ export function LogFoodSheet({ food, entry, date, onClose, onEditFood, onDone }:
       })
     } else {
       const f = saved ?? saveFood(food)
-      logFood(favorite !== f.favorite ? { ...f, favorite } : f, qty, unit, meal, eatenAt)
+      logFood({ ...f, favorite, meta: { ...f.meta, meals: usualMeals } }, qty, unit, meal, eatenAt)
     }
     onDone?.()
     onClose()
   }
 
+  function toggleUsual(m: Meal) {
+    const next = usualMeals.includes(m) ? usualMeals.filter((x) => x !== m) : [...usualMeals, m]
+    setUsualMeals(next)
+    if (saved) updateFood({ ...saved, favorite, meta: { ...saved.meta, meals: next } })
+  }
+
   function toggleFavorite() {
     setFavorite(!favorite)
-    if (saved) updateFood({ ...saved, favorite: !favorite })
+    if (saved) updateFood({ ...saved, favorite: !favorite, meta: { ...saved.meta, meals: usualMeals } })
   }
 
   const estimated = food.source === 'ai_estimate' || food.fields_estimated.length > 0
 
   return (
-    <Sheet title={food.name} subtitle={foodSubtitle(food)} onClose={onClose}>
+    <Sheet title={food.name} subtitle={`${entry ? 'Editing' : 'Logging to'} ${MEALS.find((m) => m.value === meal)!.label.toLowerCase()} · ${foodSubtitle(food)}`} onClose={onClose}>
       <FoodFlags food={food} portion={portion?.n} />
       {portion && <MacroStrip n={portion.n} estimated={estimated} />}
       {portion && (
@@ -127,6 +136,18 @@ export function LogFoodSheet({ food, entry, date, onClose, onEditFood, onDone }:
           <label htmlFor="when">When</label>
           <input id="when" type="datetime-local" value={time} onChange={(e) => setTime(e.target.value)} />
         </div>
+      </div>
+
+      <div className="field">
+        <span className="label">Usually eaten at</span>
+        <div className="chips">
+          {MEALS.map((m) => (
+            <button key={m.value} type="button" className={`chip-btn ${usualMeals.includes(m.value) ? 'on' : ''}`} aria-pressed={usualMeals.includes(m.value)} onClick={() => toggleUsual(m.value)}>
+              {m.label}
+            </button>
+          ))}
+        </div>
+        <div className="hint">Tagged foods are suggested first when you add food to that meal.</div>
       </div>
 
       <div className="row" style={{ flexWrap: 'wrap' }}>
