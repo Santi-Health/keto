@@ -78,6 +78,11 @@ export function ExerciseSheet({ weightKg, exercise, date, onClose }: Props) {
         ...exercise?.meta,
         ...details,
         fasted,
+        // Changing an imported session's type teaches future imports.
+        userEdited:
+          exercise?.meta.userEdited ||
+          (exercise?.source === 'fitbit' && (kind !== exercise.kind || details.cardioType !== exercise.meta.cardioType)) ||
+          undefined,
         lifts: kind === 'strength' ? lifts.filter((l) => l.name.trim()) : undefined,
         caloriesEstimated: kcalText === '',
       },
@@ -91,7 +96,15 @@ export function ExerciseSheet({ weightKg, exercise, date, onClose }: Props) {
   const num = (v: string) => (v === '' ? null : Number(v))
 
   return (
-    <Sheet title={exercise ? 'Edit exercise' : 'Log exercise'} onClose={onClose}>
+    <Sheet
+      title={exercise ? 'Edit exercise' : 'Log exercise'}
+      subtitle={
+        exercise?.source === 'fitbit'
+          ? `From Fitbit${exercise.meta.fitbitType ? ` (${exercise.meta.fitbitType.toLowerCase().replace(/_/g, ' ')})` : ''}. Change the type and future imports will learn it.`
+          : undefined
+      }
+      onClose={onClose}
+    >
       <div className="field">
         <span className="label">Type</span>
         <div className="chips">

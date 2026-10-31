@@ -111,6 +111,8 @@ export interface Exercise {
     fitbitType?: string
     steps?: number
     avgHr?: number
+    /** Set when you change an imported session's type; re-imports keep your version. */
+    userEdited?: boolean
   }
   updated_at: string
   deleted_at: string | null

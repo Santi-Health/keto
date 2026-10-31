@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { Exercise } from './exercise'
-import { classifyExercise, mergeImported, toAppExercise, type HealthExercise } from './googleHealth'
+import { classifyExercise, learnTypes, mergeImported, toAppExercise, type HealthExercise } from './googleHealth'
 
 const point = (type: string, start: string, minutes: number, kcal: number, extra: Partial<NonNullable<HealthExercise['exercise']>['metricsSummary']> = {}): HealthExercise => ({
   name: `users/1/dataTypes/exercise/dataPoints/${type}-${start}`,
@@ -71,5 +71,31 @@ describe('mergeImported', () => {
     const again = mergeImported([run], first.added)
     expect(again.added).toHaveLength(0)
     expect(again.updated).toHaveLength(1)
+  })
+})
+
+describe('your corrections', () => {
+  it('treats a slow "run" as walking', () => {
+    const e = toAppExercise(point('RUNNING', '2026-10-30T18:24:00Z', 11, 73, { distanceMillimiters: 869_000 }), 68, 1557)!
+    expect(e.kind).toBe('walking')
+    expect(e.note).toContain('walking pace')
+  })
+
+  it('learns that Fitbit "stationary bike" is your StairMaster', () => {
+    const bike = toAppExercise(point('STATIONARY_BIKE', '2026-10-30T21:25:00Z', 39, 364), 68, 1557)!
+    const corrected: Exercise = {
+      ...bike,
+      id: 'x',
+      kind: 'cardio',
+      updated_at: '2026-10-30T23:00:00Z',
+      deleted_at: null,
+      meta: { ...bike.meta, cardioType: 'stairmaster', userEdited: true },
+    }
+    const learned = learnTypes([corrected])
+    const next = toAppExercise(point('STATIONARY_BIKE', '2026-11-01T21:25:00Z', 40, 370), 68, 1557, learned)!
+    expect(next.meta.cardioType).toBe('stairmaster')
+    // Re-importing the corrected session keeps your type.
+    const again = mergeImported([{ ...bike, external_id: corrected.external_id }], [corrected])
+    expect(again.updated[0].meta.cardioType).toBe('stairmaster')
   })
 })

@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { daysSinceStrength, routineDue, routineSession, sessionLabel, trainingWarnings } from '../lib/exercise'
-import { getGoogleToken, listExercises, mergeImported, toAppExercise } from '../lib/googleHealth'
+import { getGoogleToken, learnTypes, listExercises, mergeImported, toAppExercise } from '../lib/googleHealth'
 import { useInstall } from '../lib/install'
 import { AminoCard } from '../components/AminoCard'
 import { ExerciseSheet } from '../components/ExerciseSheet'
@@ -44,7 +44,7 @@ export function Today({ profile, targets, onOpenSettings, onToggleRefeed, onNavi
       from.setDate(from.getDate() - 2)
       const points = await listExercises(token, localDate(from), day)
       const mapped = points
-        .map((p) => toAppExercise(p, profile.weightKg, targets.bmr))
+        .map((p) => toAppExercise(p, profile.weightKg, targets.bmr, learnTypes(exercises)))
         .filter((x): x is NonNullable<typeof x> => !!x)
       const fromIso = new Date(`${localDate(from)}T00:00:00`).toISOString()
       const recent = exercises.filter((e) => e.started_at >= fromIso)

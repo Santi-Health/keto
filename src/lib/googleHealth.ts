@@ -169,22 +169,48 @@ const seconds = (d?: string) => (d && /^[\d.]+s$/.test(d) ? Number(d.slice(0, -1
  * Turns a Google Health exercise into the app's shape. Fitbit's calories include the body's
  * resting burn during the session, so that part is subtracted to keep active calories only.
  */
-export function toAppExercise(p: HealthExercise, weightKg: number, restingKcalPerDay: number | null): Omit<Exercise, 'id' | 'updated_at' | 'deleted_at'> | null {
+/** Fitbit type → the type you corrected it to, learned from sessions you edited. */
+export type LearnedTypes = Record<string, { kind: ExerciseKind; cardioType?: 'running' | 'stairmaster' }>
+
+export function learnTypes(exercises: Exercise[]): LearnedTypes {
+  const map: LearnedTypes = {}
+  // Oldest first, so the most recent correction wins.
+  for (const e of [...exercises].sort((a, b) => a.updated_at.localeCompare(b.updated_at))) {
+    if (e.meta.userEdited && e.meta.fitbitType) map[e.meta.fitbitType] = { kind: e.kind, cardioType: e.meta.cardioType }
+  }
+  return map
+}
+
+/** Slower than this (minutes per mile) a Fitbit "run" is really walking. */
+export const WALKING_PACE_MIN_PER_MI = 15
+
+export function toAppExercise(
+  p: HealthExercise,
+  weightKg: number,
+  restingKcalPerDay: number | null,
+  learned: LearnedTypes = {},
+): Omit<Exercise, 'id' | 'updated_at' | 'deleted_at'> | null {
   const e = p.exercise
   const start = e?.interval?.startTime
   if (!e || !start) return null
   const end = e.interval?.endTime
   const active = seconds(e.activeDuration)
   const minutes = Math.max(1, Math.round((active ?? (end ? (Date.parse(end) - Date.parse(start)) / 1000 : 0)) / 60))
-  const { kind, cardioType } = classifyExercise(e.exerciseType ?? '', e.displayName)
+  const mm = e.metricsSummary?.distanceMillimiters ?? e.metricsSummary?.distanceMillimeters
+  const miles = mm ? Math.round((mm / 1_609_344) * 100) / 100 : null
+  let { kind, cardioType } = learned[e.exerciseType ?? ''] ?? classifyExercise(e.exerciseType ?? '', e.displayName)
+  let note: string | null = null
+  if (cardioType === 'running' && miles && minutes / miles > WALKING_PACE_MIN_PER_MI) {
+    kind = 'walking'
+    cardioType = undefined
+    note = `Fitbit called this a run, but ${Math.round(minutes / miles)} min/mi is walking pace`
+  }
   const total = e.metricsSummary?.caloriesKcal
   const resting = ((restingKcalPerDay ?? weightKg * 24) / 1440) * minutes
   const activeKcal = total != null ? Math.max(0, Math.round(total - resting)) : null
   // Intensity from energy cost: METs above rest.
   const met = activeKcal != null ? 1 + activeKcal / (weightKg * (minutes / 60)) : null
   const intensity: Intensity = met == null ? 'moderate' : met < 4 ? 'low' : met < 7.5 ? 'moderate' : 'high'
-  const mm = e.metricsSummary?.distanceMillimiters ?? e.metricsSummary?.distanceMillimeters
-  const miles = mm ? Math.round((mm / 1_609_344) * 100) / 100 : null
   return {
     started_at: new Date(start).toISOString(),
     kind,
@@ -193,11 +219,11 @@ export function toAppExercise(p: HealthExercise, weightKg: number, restingKcalPe
     calories: activeKcal,
     source: 'fitbit',
     external_id: p.name,
-    note: e.displayName && !/^(run|yoga|weights|stair)/i.test(e.displayName) ? e.displayName : null,
+    note,
     meta: {
       caloriesEstimated: total == null,
       cardioType,
-      distanceMi: cardioType === 'running' ? miles : undefined,
+      distanceMi: cardioType === 'running' || kind === 'walking' ? miles : undefined,
       yogaStyle: kind === 'mobility' ? 'flow' : undefined,
       fitbitTotalKcal: total ?? undefined,
       fitbitType: e.exerciseType,
@@ -229,7 +255,11 @@ export function mergeImported(
     const same = existing.find((e) => e.external_id === imp.external_id)
     if (same) {
       used.add(same.id)
-      result.updated.push({ ...same, ...imp, meta: { ...same.meta, ...imp.meta, fasted: same.meta.fasted, lifts: same.meta.lifts }, note: same.note ?? imp.note, updated_at: now })
+      // Your edits win: keep the type and details you set, refresh only Fitbit's numbers.
+      const keep = same.meta.userEdited
+        ? { kind: same.kind, intensity: same.intensity, meta: { ...imp.meta, ...same.meta, fitbitTotalKcal: imp.meta.fitbitTotalKcal } }
+        : { meta: { ...same.meta, ...imp.meta, fasted: same.meta.fasted, lifts: same.meta.lifts } }
+      result.updated.push({ ...same, ...imp, ...keep, note: same.note ?? imp.note, updated_at: now })
       continue
     }
     const manual = existing.find(
