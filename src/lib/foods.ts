@@ -1,6 +1,7 @@
 import { netCarbs, type SugarAlcoholType } from './nutrition'
 import { kcalFromMacros, scaleNutrients, type Nutrients } from './nutrients'
 import { toGrams, type UnitConversion } from './units'
+import type { RecipeMeta } from './recipes'
 import { MERCURY_PPM, type FishSpecies } from './watchlist'
 
 export type FoodSource = 'label_photo' | 'database' | 'ai_estimate' | 'manual' | 'recipe'
@@ -30,6 +31,8 @@ export interface FoodMeta {
   imageUrl?: string
   lastAmount?: number
   lastUnit?: string
+  /** Set on recipes: the ingredients and batch size the nutrition was calculated from. */
+  recipe?: RecipeMeta
 }
 
 /** Row shape of the `foods` table. */

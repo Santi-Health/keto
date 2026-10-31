@@ -140,7 +140,7 @@ export function LogFoodSheet({ food, entry, date, onClose, onEditFood, onDone }:
       <div className="row" style={{ marginTop: 8, flexWrap: 'wrap' }}>
         {onEditFood && (
           <button type="button" className="btn secondary" onClick={() => onEditFood(food)}>
-            Edit food details
+            {food.source === 'recipe' ? 'Edit recipe' : 'Edit food details'}
           </button>
         )}
         {entry && (

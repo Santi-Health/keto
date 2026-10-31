@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { MacroStrip } from '../components/FoodBits'
 import { FoodForm } from '../components/FoodForm'
 import { LogFoodSheet } from '../components/LogFoodSheet'
+import { RecipeBuilder } from '../components/RecipeBuilder'
 import { useData } from '../lib/data'
 import { MEALS, type Food, type LogEntry, type NewFood } from '../lib/foods'
 import { addNutrients, type NutrientKey, type Nutrients } from '../lib/nutrients'
@@ -153,7 +154,12 @@ export function Log({ date, onDateChange, onAdd }: Props) {
           }}
         />
       )}
-      {editingFood && <FoodForm food={editingFood} onClose={() => setEditingFood(null)} onSaved={() => setEditingFood(null)} />}
+      {editingFood &&
+        ('id' in editingFood && editingFood.source === 'recipe' ? (
+          <RecipeBuilder recipe={editingFood} onClose={() => setEditingFood(null)} onSaved={() => setEditingFood(null)} />
+        ) : (
+          <FoodForm food={editingFood} onClose={() => setEditingFood(null)} onSaved={() => setEditingFood(null)} />
+        ))}
     </>
   )
 }

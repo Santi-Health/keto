@@ -117,13 +117,14 @@ export function mapUsdaFood(f: UsdaFood): NewFood {
   return { ...withMeta, keto_notes: ketoNotes(withMeta) }
 }
 
-export async function searchUsda(query: string, signal?: AbortSignal): Promise<NewFood[]> {
+/** `ingredients` limits the search to plain foods (no branded products or mixed dishes). */
+export async function searchUsda(query: string, signal?: AbortSignal, opts: { ingredients?: boolean } = {}): Promise<NewFood[]> {
   const res = await fetch(`https://api.nal.usda.gov/fdc/v1/foods/search?api_key=${USDA_KEY}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       query,
-      dataType: ['Foundation', 'SR Legacy', 'Survey (FNDDS)', 'Branded'],
+      dataType: opts.ingredients ? ['Foundation', 'SR Legacy'] : ['Foundation', 'SR Legacy', 'Survey (FNDDS)', 'Branded'],
       pageSize: 25,
     }),
     signal,

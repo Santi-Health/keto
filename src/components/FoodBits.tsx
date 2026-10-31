@@ -63,5 +63,11 @@ export function FoodFlags({ food, portion }: { food: Food | NewFood; portion?: N
 
 export function foodSubtitle(food: Food | NewFood): string {
   const per = food.per_100g
+  const serving = food.unit_conversions.find((u) => u.unit === '1 serving')
+  if (food.source === 'recipe' && serving) {
+    const k = serving.grams / 100
+    const servings = food.meta.recipe?.servings
+    return `${fmt((per.kcal ?? 0) * k)} kcal · ${fmt((per.netCarbs ?? 0) * k, 1)}g net carbs · ${fmt((per.protein ?? 0) * k)}g protein per serving${servings ? ` · makes ${servings}` : ''}`
+  }
   return [food.brand, `${fmt(per.kcal)} kcal · ${fmt(per.netCarbs, 1)}g net carbs per 100 g`].filter(Boolean).join(' · ')
 }

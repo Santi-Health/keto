@@ -1,17 +1,19 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useState } from 'react'
 import { BarcodeScanner } from '../components/BarcodeScanner'
-import { FoodFlags, foodSubtitle } from '../components/FoodBits'
 import { FoodForm } from '../components/FoodForm'
+import { FoodRow } from '../components/FoodRow'
 import { LogFoodSheet } from '../components/LogFoodSheet'
+import { RecipeBuilder } from '../components/RecipeBuilder'
 import { useData } from '../lib/data'
-import { lookupBarcode, searchUsda } from '../lib/foodApi'
-import { rankFoods, type Food, type NewFood } from '../lib/foods'
-import { formatAmount } from '../lib/units'
+import { lookupBarcode } from '../lib/foodApi'
+import type { Food, NewFood } from '../lib/foods'
+import { useFoodSearch } from '../lib/useFoodSearch'
 
 type Overlay =
   | { kind: 'log'; food: Food | NewFood }
   | { kind: 'form'; food?: Food | NewFood; barcode?: string }
   | { kind: 'scan' }
+  | { kind: 'recipe'; recipe?: Food }
   | null
 
 interface Props {
@@ -25,51 +27,10 @@ interface Props {
 export function Add({ startScan, date, onLogged }: Props) {
   const { foods } = useData()
   const [query, setQuery] = useState('')
-  const [results, setResults] = useState<NewFood[]>([])
-  const [searching, setSearching] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const { q, mine, results, searching, error } = useFoodSearch(query, 40)
+  const recipes = foods.filter((f) => f.source === 'recipe').sort((a, b) => a.name.localeCompare(b.name))
   const [overlay, setOverlay] = useState<Overlay>(startScan ? { kind: 'scan' } : null)
   const [notice, setNotice] = useState<string | null>(null)
-  const abort = useRef<AbortController | null>(null)
-  const foodsRef = useRef(foods)
-  useEffect(() => {
-    foodsRef.current = foods
-  }, [foods])
-
-  const q = query.trim().toLowerCase()
-  const mine = useMemo(() => {
-    const ranked = rankFoods(foods)
-    if (!q) return ranked.slice(0, 40)
-    const words = q.split(/\s+/)
-    return ranked.filter((f) => words.every((w) => `${f.name} ${f.brand ?? ''}`.toLowerCase().includes(w))).slice(0, 10)
-  }, [foods, q])
-
-  // Database search waits until typing pauses, so each keystroke isn't a request.
-  useEffect(() => {
-    abort.current?.abort()
-    setError(null)
-    if (q.length < 3) {
-      setResults([])
-      setSearching(false)
-      return
-    }
-    setSearching(true)
-    const ctrl = new AbortController()
-    abort.current = ctrl
-    const t = window.setTimeout(() => {
-      searchUsda(q, ctrl.signal)
-        .then((r) => {
-          const known = new Set(foodsRef.current.map((f) => f.meta.externalId))
-          setResults(r.filter((f) => !known.has(f.meta.externalId)))
-        })
-        .catch((e) => !ctrl.signal.aborted && setError((e as Error).message))
-        .finally(() => !ctrl.signal.aborted && setSearching(false))
-    }, 450)
-    return () => {
-      window.clearTimeout(t)
-      ctrl.abort()
-    }
-  }, [q])
 
   const onDetected = useCallback(
     async (code: string) => {
@@ -126,20 +87,34 @@ export function Add({ startScan, date, onLogged }: Props) {
             autoFocus={!startScan}
           />
         </div>
-        <div className="quick" style={{ marginTop: 10, gridTemplateColumns: 'repeat(2, 1fr)' }}>
+        <div className="quick" style={{ marginTop: 10 }}>
           <button type="button" onClick={() => setOverlay({ kind: 'scan' })} style={{ color: 'var(--text)' }}>
             Scan barcode
           </button>
           <button type="button" onClick={() => setOverlay({ kind: 'form' })} style={{ color: 'var(--text)' }}>
             Enter from label
           </button>
+          <button type="button" onClick={() => setOverlay({ kind: 'recipe' })} style={{ color: 'var(--text)' }}>
+            New recipe
+          </button>
         </div>
         {notice && <p className="notice small" style={{ marginBottom: 0 }}>{notice}</p>}
+
+        {!q && recipes.length > 0 && (
+          <>
+            <div className="section-label">My recipes</div>
+            <div className="list">
+              {recipes.map((f) => (
+                <FoodRow key={f.id} food={f} onPick={() => setOverlay({ kind: 'log', food: f })} />
+              ))}
+            </div>
+          </>
+        )}
 
         <div className="section-label">{q ? 'My foods' : 'My foods: favorites and most used'}</div>
         {mine.length ? (
           <div className="list">
-            {mine.map((f) => (
+            {(q ? mine : mine.filter((f) => f.source !== 'recipe')).map((f) => (
               <FoodRow key={f.id} food={f} onPick={() => setOverlay({ kind: 'log', food: f })} />
             ))}
           </div>
@@ -166,7 +141,18 @@ export function Add({ startScan, date, onLogged }: Props) {
 
       {overlay?.kind === 'scan' && <BarcodeScanner onDetected={onDetected} onClose={close} />}
       {overlay?.kind === 'log' && (
-        <LogFoodSheet food={overlay.food} date={date} onClose={close} onDone={logged} onEditFood={(food) => setOverlay({ kind: 'form', food })} />
+        <LogFoodSheet
+          food={overlay.food}
+          date={date}
+          onClose={close}
+          onDone={logged}
+          onEditFood={(food) =>
+            setOverlay('id' in food && food.source === 'recipe' ? { kind: 'recipe', recipe: food } : { kind: 'form', food })
+          }
+        />
+      )}
+      {overlay?.kind === 'recipe' && (
+        <RecipeBuilder recipe={overlay.recipe} onClose={close} onSaved={(food) => setOverlay({ kind: 'log', food })} />
       )}
       {overlay?.kind === 'form' && (
         <FoodForm
@@ -180,29 +166,5 @@ export function Add({ startScan, date, onLogged }: Props) {
         />
       )}
     </>
-  )
-}
-
-function FoodRow({ food, onPick }: { food: Food | NewFood; onPick: () => void }) {
-  const saved = 'id' in food ? food : null
-  return (
-    <button type="button" className="list-item" onClick={onPick}>
-      {food.meta.imageUrl ? <img className="thumb" src={food.meta.imageUrl} alt="" loading="lazy" /> : null}
-      <span className="grow">
-        <span className="title" style={{ display: 'block' }}>
-          {saved?.favorite ? '★ ' : ''}
-          {food.name}
-        </span>
-        <span className="sub" style={{ display: 'block' }}>{foodSubtitle(food)}</span>
-        <span style={{ display: 'block', marginTop: 4 }}>
-          <FoodFlags food={food} />
-        </span>
-      </span>
-      {saved?.meta.lastAmount != null && (
-        <span className="right muted">
-          {formatAmount(saved.meta.lastAmount, saved.meta.lastUnit ?? 'g')}
-        </span>
-      )}
-    </button>
   )
 }
