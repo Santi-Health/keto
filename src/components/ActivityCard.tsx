@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { formatSleep, type ActivityDay } from '../lib/activity'
 import { useData } from '../lib/data'
 import { addNutrients } from '../lib/nutrients'
@@ -13,7 +13,7 @@ const shift = (date: string, days: number) => {
 const avg = (xs: number[]) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : null)
 
 /** Steps, sleep, resting heart rate, and the last 7 days of calories eaten vs. burned (from Fitbit). */
-export function ActivityCard({ days, onImport, importing }: { days: string[]; onImport: () => void; importing: boolean }) {
+export function ActivityCard({ days, onImport, importing, hideReadiness }: { days: string[]; onImport: () => void; importing: boolean; hideReadiness?: boolean }) {
   const { activity, logsOn } = useData()
   const today = localDate()
   const last = days[days.length - 1]
@@ -52,7 +52,7 @@ export function ActivityCard({ days, onImport, importing }: { days: string[]; on
   return (
     <section className="card">
       <h2>Activity &amp; sleep</h2>
-      <ReadinessBlock days={days} isWeek={isWeek} />
+      {!hideReadiness && <ReadinessBlock days={days} isWeek={isWeek} />}
       <div className="stat-grid two-col">
         <div>
           <b>{t?.steps != null ? t.steps.toLocaleString() : '—'}</b>
@@ -98,6 +98,54 @@ export function ActivityCard({ days, onImport, importing }: { days: string[]; on
         {avgGap != null &&
           ` · on ${balance.length} fully logged day${balance.length > 1 ? 's' : ''}, you ate ${Math.abs(Math.round(avgGap)).toLocaleString()} kcal ${avgGap >= 0 ? 'under' : 'over'} your burn on average`}
       </p>
+    </section>
+  )
+}
+
+const SEEN_KEY = 'keto:readinessSeen'
+const seenOn = () => {
+  try {
+    return localStorage.getItem(SEEN_KEY)
+  } catch {
+    return null
+  }
+}
+
+/** Whether today's readiness is still waiting to be seen at the top of Today (until you tap it away). */
+export function useMorningReadiness(): [boolean, () => void] {
+  const { activity } = useData()
+  const today = localDate()
+  const [seen, setSeen] = useState(seenOn)
+  const show = seen !== today && !!readinessFor(today, activity)
+  const dismiss = () => {
+    try {
+      localStorage.setItem(SEEN_KEY, today)
+    } catch {
+      /* private mode: it just goes away for this visit */
+    }
+    setSeen(today)
+  }
+  return [show, dismiss]
+}
+
+/** This morning's readiness and last night's sleep, first thing on Today. Tap to move it down to Activity & sleep. */
+export function MorningReadiness({ onDone }: { onDone: () => void }) {
+  const { activity } = useData()
+  const today = localDate()
+  const a = activity[today]
+  return (
+    <section className="card morning-ready">
+      <h2>Good morning</h2>
+      <ReadinessBlock days={[today]} isWeek={false} />
+      {a?.sleep_minutes ? (
+        <p className="muted small" style={{ margin: '8px 0 0' }}>
+          ☾ Slept <b>{formatSleep(a.sleep_minutes)}</b>
+          {a.meta?.deepMin != null && ` · ${a.meta.deepMin} min deep · ${a.meta.remMin ?? 0} min REM · awake ${a.meta.awakeMin ?? 0} min`}
+        </p>
+      ) : null}
+      <button type="button" className="btn secondary" style={{ marginTop: 10 }} onClick={onDone}>
+        Got it ✓ <span className="muted small">(moves down to Activity &amp; sleep)</span>
+      </button>
     </section>
   )
 }

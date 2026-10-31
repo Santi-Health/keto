@@ -5,7 +5,7 @@ import { DRIVE_SCOPE, cachedToken, fetchActivity, getGoogleToken, heartRateCalor
 import { useInstall } from '../lib/install'
 import { STATUS_TEXT, estimateKetosis, tomorrowMorning } from '../lib/ketosis'
 import { AminoCard } from '../components/AminoCard'
-import { ActivityCard } from '../components/ActivityCard'
+import { ActivityCard, MorningReadiness, useMorningReadiness } from '../components/ActivityCard'
 import { RelinkBanner } from '../components/BackgroundSyncCard'
 import { SuggestionsCard } from '../components/SuggestionsCard'
 import { VitaminsCard } from '../components/VitaminsCard'
@@ -208,6 +208,7 @@ export function Today({ profile, targets, onOpenSettings, onToggleRefeed, onNavi
   const sessionsToday = viewDays.flatMap((d) => exercisesOn(d))
   const sinceStrength = daysSinceStrength(exercises)
   const readiness = isToday ? readinessFor(today, activity) : null
+  const [morning, doneMorning] = useMorningReadiness()
   const trainWarnings = !isToday ? [] : [...(readiness?.band === 'low' ? [{ level: 'yellow' as const, text: `Readiness is ${readiness.score}: ${READINESS_TEXT.low}` }] : []), ...trainingWarnings({
     exercisesToday: sessionsToday,
     daysSinceStrength: sinceStrength,
@@ -271,6 +272,7 @@ export function Today({ profile, targets, onOpenSettings, onToggleRefeed, onNavi
       <div className="grid two">
         <div className="grid">
           {isToday && <RelinkBanner />}
+          {isToday && morning && <MorningReadiness onDone={doneMorning} />}
           {travelDays.map(({ day: d, t }) => {
             const pct = Math.round((t.hours / 24 - 1) * 100)
             return (
@@ -422,7 +424,7 @@ export function Today({ profile, targets, onOpenSettings, onToggleRefeed, onNavi
           </section>
           )}
 
-          <ActivityCard days={viewDays} onImport={() => void importFitbit()} importing={importing} />
+          <ActivityCard days={viewDays} onImport={() => void importFitbit()} importing={importing} hideReadiness={isToday && morning} />
 
           <DrinksCard days={viewDays} waterTargetOz={profile.waterOz} />
 
