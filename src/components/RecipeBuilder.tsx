@@ -1,6 +1,7 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useData } from '../lib/data'
 import { searchUsda } from '../lib/foodApi'
+import type { RestaurantDish } from '../lib/foodJson'
 import type { Food, NewFood } from '../lib/foods'
 import { bestIngredientMatch, computeRecipe, isOffTarget, parseIngredientLine, recipeToFood, resolveAmount, type RecipeIngredient } from '../lib/recipes'
 import { toGrams, unitsFor } from '../lib/units'
@@ -13,6 +14,8 @@ import { Sheet } from './Sheet'
 interface Props {
   /** An existing recipe to edit; omit to start a new one. */
   recipe?: Food
+  /** A restaurant dish estimated by Claude: its ingredients are matched right away and the result is marked estimated. */
+  dish?: RestaurantDish
   onClose: () => void
   onSaved: (food: Food) => void
 }
@@ -43,13 +46,13 @@ function snapshot(f: Food | NewFood): NewFood {
 let keySeq = 0
 const nextKey = () => `r${++keySeq}`
 
-export function RecipeBuilder({ recipe, onClose, onSaved }: Props) {
+export function RecipeBuilder({ recipe, dish, onClose, onSaved }: Props) {
   const { foods, saveFood } = useData()
   const existing = recipe?.meta.recipe
-  const [name, setName] = useState(recipe?.name ?? '')
-  const [servings, setServings] = useState(String(existing?.servings ?? 2))
+  const [name, setName] = useState(recipe?.name ?? (dish ? (dish.restaurant ? `${dish.name} (${dish.restaurant})` : dish.name) : ''))
+  const [servings, setServings] = useState(String(existing?.servings ?? (dish ? 1 : 2)))
   const [cooked, setCooked] = useState(existing?.cookedWeightG ? String(existing.cookedWeightG) : '')
-  const [paste, setPaste] = useState('')
+  const [paste, setPaste] = useState(dish ? dish.ingredients.join('\n') : '')
   const [rows, setRows] = useState<Row[]>(() =>
     (existing?.ingredients ?? []).map((i) => ({
       key: nextKey(),
@@ -74,6 +77,15 @@ export function RecipeBuilder({ recipe, onClose, onSaved }: Props) {
     const r = resolveAmount(f, { amount: p.amount, unit: p.unit, query: query || row?.query || f.name })
     update(key, { food: snapshot(f), foodId: 'id' in f ? f.id : null, amount: r.amount, unit: r.unit, guessed: r.guessed, status: 'ready', note: undefined })
   }
+
+  // A dish from Claude arrives with its ingredients filled in: match them right away.
+  const started = useRef(false)
+  useEffect(() => {
+    if (dish && !started.current) {
+      started.current = true
+      void findIngredients()
+    }
+  }, [])
 
   /** Parses the pasted lines and matches each to My Foods first, then USDA (generic foods first). */
   async function findIngredients() {
@@ -149,6 +161,12 @@ export function RecipeBuilder({ recipe, onClose, onSaved }: Props) {
       return { ...i, foodId: saved.id }
     })
     const food = recipeToFood(name, { servings: nServings, cookedWeightG: cookedG, ingredients: withIds }, recipe)
+    if (dish) {
+      // Restaurant portions are guesses: mark the dish estimated so its logs show "~".
+      food.confidence = dish.confidence
+      food.fields_estimated = ['restaurant portions']
+      food.keto_notes = [dish.hiddenCarbs.length ? `Possible hidden carbs: ${dish.hiddenCarbs.join('; ')}.` : '', dish.notes ?? ''].filter(Boolean).join(' ') || null
+    }
     onSaved(saveFood(food))
   }
 
@@ -156,7 +174,22 @@ export function RecipeBuilder({ recipe, onClose, onSaved }: Props) {
   const fishNames = [...new Set(ingredients.flatMap((i) => (i.food.meta.fishSpecies ? [MERCURY_PPM[i.food.meta.fishSpecies].label] : [])))]
 
   return (
-    <Sheet title={recipe ? 'Edit recipe' : 'New recipe'} subtitle="List the ingredients; the app does the math" onClose={onClose}>
+    <Sheet
+      title={recipe ? 'Edit recipe' : dish ? 'Restaurant dish' : 'New recipe'}
+      subtitle={dish ? `Claude's estimate (${dish.confidence} confidence): adjust portions, then save` : 'List the ingredients; the app does the math'}
+      onClose={onClose}
+    >
+      {dish && (dish.hiddenCarbs.length > 0 || dish.menuCalories != null) && (
+        <div className="notice small">
+          {dish.hiddenCarbs.length > 0 && <div>Watch for hidden carbs: {dish.hiddenCarbs.join('; ')}.</div>}
+          {dish.menuCalories != null && (
+            <div>
+              Menu says {dish.menuCalories} kcal
+              {totals ? `; these ingredients add up to ${Math.round(totals.perServing.kcal ?? 0) * nServings} kcal.` : '.'}
+            </div>
+          )}
+        </div>
+      )}
       <div className="field">
         <label htmlFor="rb-name">Recipe name</label>
         <input id="rb-name" type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Salmon with butter and asparagus" />

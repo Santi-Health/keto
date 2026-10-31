@@ -1258,3 +1258,35 @@ input[type='time'] {
 .pop-key {
   color: var(--text-2);
 }
+
+/* Claude chat import */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.steps {
+  display: grid;
+  gap: 10px;
+  margin: 8px 0 12px;
+  padding-left: 22px;
+  font-size: 0.92rem;
+}
+
+.steps a {
+  color: var(--accent);
+}
+
+.prompt-text {
+  max-height: 220px;
+  overflow: auto;
+  padding: 10px;
+  font-size: 0.72rem;
+  white-space: pre-wrap;
+  background: var(--surface-2);
+  border-radius: 8px;
+}

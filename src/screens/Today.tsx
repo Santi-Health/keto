@@ -229,7 +229,10 @@ export function Today({ profile, targets, onOpenSettings, onToggleRefeed, onNavi
               <button type="button" style={{ color: 'var(--text)' }} onClick={() => setReadingSheet({})}>
                 Reading
               </button>
-              {['Label photo', 'Saved meal'].map((label) => (
+              <button type="button" style={{ color: 'var(--text)' }} onClick={() => onNavigate('add/claude')}>
+                Label photo
+              </button>
+              {['Saved meal'].map((label) => (
                 <button key={label} type="button" disabled title="Coming in a later phase">
                   {label}
                 </button>

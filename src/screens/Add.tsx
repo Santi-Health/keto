@@ -1,11 +1,13 @@
 import { useCallback, useState } from 'react'
 import { BarcodeScanner } from '../components/BarcodeScanner'
+import { ClaudeChatSheet } from '../components/ClaudeChatSheet'
 import { FoodForm } from '../components/FoodForm'
 import { FoodRow } from '../components/FoodRow'
 import { LogFoodSheet } from '../components/LogFoodSheet'
 import { RecipeBuilder } from '../components/RecipeBuilder'
 import { useData } from '../lib/data'
 import { lookupBarcode } from '../lib/foodApi'
+import type { RestaurantDish } from '../lib/foodJson'
 import { MEALS, mealForTime, setUsual, suggestForMeal, type Food, type Meal, type NewFood } from '../lib/foods'
 import { useFoodSearch } from '../lib/useFoodSearch'
 
@@ -13,18 +15,21 @@ type Overlay =
   | { kind: 'log'; food: Food | NewFood }
   | { kind: 'form'; food?: Food | NewFood; barcode?: string }
   | { kind: 'scan' }
-  | { kind: 'recipe'; recipe?: Food }
+  | { kind: 'recipe'; recipe?: Food; dish?: RestaurantDish }
+  | { kind: 'claude'; mode?: 'label' | 'restaurant' }
   | null
 
 interface Props {
   /** Open the camera scanner right away (from the Today quick-add button). */
   startScan?: boolean
+  /** Open the Claude chat import right away (from the Today quick-add button). */
+  startClaude?: boolean
   /** Day to log on (YYYY-MM-DD), when adding to a past day from the Log screen. */
   date?: string
   onLogged: () => void
 }
 
-export function Add({ startScan, date, onLogged }: Props) {
+export function Add({ startScan, startClaude, date, onLogged }: Props) {
   const { foods, logs, updateFood } = useData()
   const [meal, setMeal] = useState<Meal>(() => mealForTime(new Date()))
   const mealLabel = MEALS.find((m) => m.value === meal)!.label
@@ -32,7 +37,7 @@ export function Add({ startScan, date, onLogged }: Props) {
   const [query, setQuery] = useState('')
   const { q, mine, results, searching, error } = useFoodSearch(query, 40)
   const recipes = foods.filter((f) => f.source === 'recipe').sort((a, b) => a.name.localeCompare(b.name))
-  const [overlay, setOverlay] = useState<Overlay>(startScan ? { kind: 'scan' } : null)
+  const [overlay, setOverlay] = useState<Overlay>(startScan ? { kind: 'scan' } : startClaude ? { kind: 'claude' } : null)
   const [notice, setNotice] = useState<string | null>(null)
 
   const onDetected = useCallback(
@@ -97,7 +102,7 @@ export function Add({ startScan, date, onLogged }: Props) {
             aria-label="Search foods"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            autoFocus={!startScan}
+            autoFocus={!startScan && !startClaude}
           />
         </div>
         <div className="quick" style={{ marginTop: 10 }}>
@@ -109,6 +114,12 @@ export function Add({ startScan, date, onLogged }: Props) {
           </button>
           <button type="button" onClick={() => setOverlay({ kind: 'recipe' })} style={{ color: 'var(--text)' }}>
             New recipe
+          </button>
+          <button type="button" onClick={() => setOverlay({ kind: 'claude', mode: 'label' })} style={{ color: 'var(--text)' }}>
+            Label photo (Claude)
+          </button>
+          <button type="button" onClick={() => setOverlay({ kind: 'claude', mode: 'restaurant' })} style={{ color: 'var(--text)' }}>
+            Restaurant (Claude)
           </button>
         </div>
         {notice && <p className="notice small" style={{ marginBottom: 0 }}>{notice}</p>}
@@ -189,7 +200,15 @@ export function Add({ startScan, date, onLogged }: Props) {
         />
       )}
       {overlay?.kind === 'recipe' && (
-        <RecipeBuilder recipe={overlay.recipe} onClose={close} onSaved={(food) => setOverlay({ kind: 'log', food })} />
+        <RecipeBuilder recipe={overlay.recipe} dish={overlay.dish} onClose={close} onSaved={(food) => setOverlay({ kind: 'log', food })} />
+      )}
+      {overlay?.kind === 'claude' && (
+        <ClaudeChatSheet
+          initialMode={overlay.mode}
+          onClose={close}
+          onFood={(food) => setOverlay({ kind: 'form', food })}
+          onDish={(dish) => setOverlay({ kind: 'recipe', dish })}
+        />
       )}
       {overlay?.kind === 'form' && (
         <FoodForm

@@ -140,6 +140,14 @@ export async function searchUsda(query: string, signal?: AbortSignal, opts: { in
       pageSize: 25,
     }),
     signal,
+  }).catch((e: Error) => {
+    if (e.name === 'AbortError') throw e
+    // A rate-limited reply has no CORS headers, so the browser reports it as a network failure.
+    throw new Error(
+      navigator.onLine
+        ? 'The USDA database is busy (hourly limit reached). Try again in a bit, or tap Choose to pick from My Foods.'
+        : "You're offline, so the USDA database can't be searched. Pick from My Foods instead.",
+    )
   })
   if (res.status === 429) throw new Error('The USDA database is busy (hourly limit reached). Try again later or add a free USDA key.')
   if (!res.ok) throw new Error(`USDA search failed (${res.status}).`)

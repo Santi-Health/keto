@@ -138,7 +138,26 @@ export function FoodForm({ food, barcode, onClose, onSaved }: Props) {
   const setValue = (k: string, v: string) => setValues((prev) => ({ ...prev, [k]: v }))
 
   return (
-    <Sheet title={food && 'id' in food ? 'Edit food' : 'New food'} subtitle="Type values from the nutrition label" onClose={onClose}>
+    <Sheet
+      title={food && 'id' in food ? 'Edit food' : food?.source === 'label_photo' || food?.source === 'ai_estimate' ? 'Review food' : 'New food'}
+      subtitle={
+        food && !('id' in food) && (food.source === 'label_photo' || food.source === 'ai_estimate')
+          ? 'From Claude: check the values against the label, then save'
+          : 'Type values from the nutrition label'
+      }
+      onClose={onClose}
+    >
+      {food && !('id' in food) && (food.keto_notes || food.fields_estimated.length > 0 || food.confidence === 'low') && (
+        <div className="notice small">
+          {food.keto_notes && <div>{food.keto_notes}</div>}
+          {food.fields_estimated.length > 0 && (
+            <div>
+              Estimated, not on the label: {food.fields_estimated.map((k) => FIELDS.find((f) => f.key === k)?.label.toLowerCase() ?? k).join(', ')}.
+            </div>
+          )}
+          {food.confidence === 'low' && <div>Low confidence: the label couldn't be read well.</div>}
+        </div>
+      )}
       <div className="field">
         <label htmlFor="ff-name">Name</label>
         <input id="ff-name" type="text" value={name} onChange={(e) => setName(e.target.value)} onBlur={onNameBlur} />

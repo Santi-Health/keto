@@ -119,6 +119,7 @@ function Tracker({ session, recovering = false, onPassphraseChanged = () => {} }
           <Add
             key={param ?? ''}
             startScan={param === 'scan'}
+            startClaude={param === 'claude'}
             date={isDate(param) ? param : undefined}
             onLogged={() => go(isDate(param) ? `log/${param}` : 'today')}
           />
