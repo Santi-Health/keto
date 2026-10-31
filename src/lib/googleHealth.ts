@@ -157,7 +157,13 @@ export async function listGlucose(token: string, from: Date, to: Date): Promise<
   const out: unknown[] = []
   let pageToken: string | undefined
   do {
-    const params = new URLSearchParams({ startTime: from.toISOString(), endTime: to.toISOString(), pageSize: '1000' })
+    // Sample-type data is filtered on physical (UTC) time, e.g. blood_glucose.sample_time.physical_time.
+    const utc = (d: Date) => d.toISOString().replace(/\.\d{3}Z$/, 'Z')
+    const field = 'blood_glucose.sample_time.physical_time'
+    const params = new URLSearchParams({
+      filter: `${field} >= "${utc(from)}" AND ${field} < "${utc(to)}"`,
+      pageSize: '1000',
+    })
     if (pageToken) params.set('pageToken', pageToken)
     const res = await fetch(`${API}/dataTypes/blood-glucose/dataPoints?${params}`, {
       headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
