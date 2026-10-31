@@ -13,6 +13,8 @@
   --calories: #2f7d5b;
   --warn: #b5482f;
   --warn-soft: #f8e3dc;
+  --caution: #8a6a00;
+  --caution-soft: #f6ecc2;
   --track: #e8e5dd;
   /* CPK-style atom colors for the molecule drawings */
   --atom-c: #6b7280;
@@ -53,6 +55,8 @@
     --calories: #5cc195;
     --warn: #ef8a6f;
     --warn-soft: #3d241d;
+    --caution: #e8c65a;
+    --caution-soft: #39321a;
     --track: #2e312c;
     --atom-c: #a3a9b3;
     --atom-o: #ff6b6b;
@@ -617,6 +621,12 @@ input[type='range'] {
 .chip.warn {
   background: var(--warn-soft);
   color: var(--warn);
+}
+
+/* Worth knowing, not a problem: sweeteners, ultra-processed. */
+.chip.caution {
+  background: var(--caution-soft);
+  color: var(--caution);
 }
 
 .macro-strip {

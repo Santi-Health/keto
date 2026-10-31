@@ -33,7 +33,7 @@ export function MacroStrip({ n, estimated }: { n: Nutrients; estimated?: boolean
 /** Watch-list and keto flags for a food, as small chips. */
 export function FoodFlags({ food, portion }: { food: Food | NewFood; portion?: Nutrients }) {
   const m = food.meta
-  const chips: { text: string; warn?: boolean }[] = []
+  const chips: { text: string; warn?: boolean; caution?: boolean }[] = []
   if (m.fishSpecies) {
     const mercury = portion?.mercuryUg
     chips.push({
@@ -42,8 +42,8 @@ export function FoodFlags({ food, portion }: { food: Food | NewFood; portion?: N
     })
   }
   if (m.partiallyHydrogenated) chips.push({ text: 'Trans fat (partially hydrogenated)', warn: true })
-  if (m.sweeteners?.length) chips.push({ text: `Sweeteners: ${m.sweeteners.join(', ')}` })
-  if (m.novaGroup === 4) chips.push({ text: 'Ultra-processed (NOVA 4)' })
+  if (m.sweeteners?.length) chips.push({ text: `Sweeteners: ${m.sweeteners.join(', ')}`, caution: true })
+  if (m.novaGroup === 4) chips.push({ text: 'Ultra-processed (NOVA 4)', caution: true })
   if (m.heavyMetalRisk) chips.push({ text: 'Lead/cadmium risk type', warn: true })
   if (food.carbs_exclude_fiber) chips.push({ text: 'EU/UK label carbs' })
   if (food.source === 'ai_estimate' || food.fields_estimated.length) chips.push({ text: 'Some values estimated' })
@@ -52,7 +52,7 @@ export function FoodFlags({ food, portion }: { food: Food | NewFood; portion?: N
   return (
     <div className="chips" style={{ marginBottom: 10 }}>
       {chips.map((c) => (
-        <span key={c.text} className={`chip ${c.warn ? 'warn' : ''}`}>
+        <span key={c.text} className={`chip ${c.warn ? 'warn' : c.caution ? 'caution' : ''}`}>
           {c.text}
         </span>
       ))}
