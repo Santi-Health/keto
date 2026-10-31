@@ -6,7 +6,7 @@ import type { LogEntry } from './foods'
  * Things measured by hand: finger-stick glucose, blood ketones (BHB), urine strips,
  * weight, occasional lab results and water. One synced table holds them all.
  */
-export type ReadingKind = 'glucose' | 'blood_ketone' | 'urine_ketone' | 'weight' | 'lab' | 'water'
+export type ReadingKind = 'glucose' | 'blood_ketone' | 'urine_ketone' | 'weight' | 'lab' | 'water' | 'body_scan'
 export type UrineLevel = 'negative' | 'trace' | 'small' | 'moderate' | 'large'
 export type ReadingContext = 'fasted' | 'pre_meal' | 'post_meal_1h' | 'post_meal_2h' | 'post_exercise' | 'bedtime' | 'other'
 
@@ -15,11 +15,34 @@ export interface ReadingMeta {
   bodyFatPct?: number | null
   /** Lab readings: test name, e.g. HbA1c. */
   test?: string
+  /** Where an imported reading came from, e.g. fitbit. */
+  source?: string
+  /** Body scan (DEXA) results; value holds total body fat %. */
+  scan?: BodyScan
   /** Water readings: which drink, e.g. sparkling_water. */
   drink?: string
   /** Ketosis estimate range at the time, kept for learning. */
   predictedLow?: number
   predictedHigh?: number
+}
+
+/** A DEXA body composition scan (e.g. BodySpec). Masses in kg; regional values are fat %. */
+export interface BodyScan {
+  provider?: string
+  totalMassKg?: number
+  bodyFatPct?: number
+  fatMassKg?: number
+  leanMassKg?: number
+  boneMassKg?: number
+  /** Visceral adipose tissue mass. */
+  vatMassKg?: number
+  vatVolumeIn3?: number
+  /** Appendicular lean mass index (arms + legs lean ÷ height²), kg/m². */
+  almi?: number
+  ffmi?: number
+  restingMetabolicRate?: number
+  agRatio?: number
+  regions?: Partial<Record<'arms' | 'legs' | 'trunk' | 'android' | 'gynoid', number>>
 }
 
 export interface ReadingRow {

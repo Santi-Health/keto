@@ -1,9 +1,11 @@
 import { useMemo, useState } from 'react'
 import { daysSinceStrength, routineDue, routineSession, sessionLabel, trainingWarnings } from '../lib/exercise'
-import { getGoogleToken, learnTypes, listExercises, mergeImported, toAppExercise } from '../lib/googleHealth'
+import { mergeActivity, weightReadings } from '../lib/activity'
+import { fetchActivity, getGoogleToken, learnTypes, listExercises, mergeImported, toAppExercise } from '../lib/googleHealth'
 import { useInstall } from '../lib/install'
 import { STATUS_TEXT, estimateKetosis, tomorrowMorning } from '../lib/ketosis'
 import { AminoCard } from '../components/AminoCard'
+import { ActivityCard } from '../components/ActivityCard'
 import { DrinksCard } from '../components/DrinksCard'
 import { ExerciseSheet } from '../components/ExerciseSheet'
 import { TrainingCard } from '../components/TrainingCard'
@@ -35,7 +37,7 @@ function useInstallOffer() {
 }
 
 export function Today({ profile, targets, onOpenSettings, onToggleRefeed, onNavigate }: Props) {
-  const { logsOn, logsWeekEnding, pending, syncError, exercises, exercisesOn, saveExercise, logs, readings } = useData()
+  const { logsOn, logsWeekEnding, pending, syncError, exercises, exercisesOn, saveExercise, logs, readings, activity, saveActivity, saveReading } = useData()
   const [logExercise, setLogExercise] = useState(false)
   const [readingSheet, setReadingSheet] = useState<{ kind?: ReadingKind } | null>(null)
   const [importing, setImporting] = useState(false)
@@ -58,10 +60,35 @@ export function Today({ profile, targets, onOpenSettings, onToggleRefeed, onNavi
       const { added, updated, matched } = mergeImported(mapped, recent)
       for (const e of [...added, ...updated, ...matched]) saveExercise(e)
       const names = [...added, ...matched].map((e) => `${sessionLabel(e)} ${e.duration_min} min`)
+
+      // Steps, calories burned, resting heart rate, sleep and weigh-ins: 30 days the first time, then the last week.
+      const actFrom = new Date()
+      actFrom.setDate(actFrom.getDate() - (Object.keys(activity).length ? 7 : 30))
+      // Workouts are already saved; a problem here is reported without losing them.
+      let actMessage: string
+      try {
+        const act = await fetchActivity(token, localDate(actFrom), day)
+        const changedDays = mergeActivity(act, activity)
+        for (const d of changedDays) saveActivity(d)
+        const weighIns = await weightReadings(act, readings)
+        for (const w of weighIns) saveReading(w)
+        actMessage = [
+          `Activity: ${changedDays.length} day${changedDays.length === 1 ? '' : 's'} updated${weighIns.length ? `, ${weighIns.length} weigh-in${weighIns.length > 1 ? 's' : ''}` : ''}.`,
+          act.skipped.length ? `Not allowed yet: ${act.skipped.join(', ')}. Tap Import again and allow them.` : '',
+        ].join(' ')
+      } catch (e) {
+        actMessage = `Couldn't read steps/sleep: ${(e as Error).message}`
+      }
+
       setImportMessage(
-        points.length === 0
-          ? 'No Fitbit workouts found in the last 3 days. If you just finished one, let the Fitbit app sync first.'
-          : `Imported ${added.length} new, matched ${matched.length} you logged, refreshed ${updated.length}.${names.length ? ` ${names.join(' · ')}` : ''}`,
+        [
+          points.length === 0
+            ? 'No Fitbit workouts in the last 3 days.'
+            : `Workouts: ${added.length} new, ${matched.length} matched, ${updated.length} refreshed.${names.length ? ` ${names.join(' · ')}` : ''}`,
+          actMessage,
+        ]
+          .filter(Boolean)
+          .join(' '),
       )
     } catch (e) {
       setImportMessage(`Couldn't import: ${(e as Error).message}`)
@@ -186,11 +213,11 @@ export function Today({ profile, targets, onOpenSettings, onToggleRefeed, onNavi
               {targets.isRefeed
                 ? `Refeed day: eat at maintenance (${targets.burn?.toLocaleString() ?? '?'} kcal), net carbs still under ${targets.netCarbsG} g.`
                 : targets.capped
-                  ? `Capped at your ${targets.calories?.toLocaleString()} kcal daily ceiling${targets.burn != null ? ` (estimated burn ${targets.burn.toLocaleString()} kcal).` : '.'}`
+                  ? `Capped at your ${targets.calories?.toLocaleString()} kcal daily ceiling${targets.burn != null ? ` (${targets.burnSource === 'fitbit' ? 'Fitbit 7-day burn' : 'estimated burn'} ${targets.burn.toLocaleString()} kcal).` : '.'}`
                   : targets.burnSource === 'fitbit'
-                    ? `Calories based on ${targets.burn?.toLocaleString()} kcal burned (Fitbit).`
+                    ? `Calories based on your Fitbit burn: ${targets.burn?.toLocaleString()} kcal a day (average of the last ${profile.fitbitBurnDays ?? 7} full days).`
                     : targets.burn != null
-                      ? `Calories based on an estimated ${targets.burn.toLocaleString()} kcal burn. Fitbit will replace this in phase 6.`
+                      ? `Calories based on an estimated ${targets.burn.toLocaleString()} kcal burn. Import from Fitbit to use your real burn.`
                       : 'Add your height in Settings to get a calorie target.'}
             </p>
             {targets.muscleWarning && (
@@ -237,6 +264,8 @@ export function Today({ profile, targets, onOpenSettings, onToggleRefeed, onNavi
               </button>
             </div>
           </section>
+
+          <ActivityCard onImport={() => void importFitbit()} importing={importing} />
 
           <DrinksCard waterTargetOz={profile.waterOz} />
 

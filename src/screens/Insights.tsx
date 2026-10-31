@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import { GlucoseChart } from '../components/GlucoseChart'
+import { BodyScanCard } from '../components/BodyScan'
 import { KetoModelCard } from '../components/KetoModelCard'
 import { useKetoModel } from '../lib/useKetoModel'
 import { mergeIntoDays, parseGlucosePoint, toReadings } from '../lib/cgm'
@@ -165,6 +166,8 @@ export function Insights({ netCarbLimit, proteinTarget, onApplyLimit }: Props) {
 
         <div className="grid">
           <KetoModelCard model={ketoModel} netCarbLimit={netCarbLimit} onApplyLimit={onApplyLimit} />
+
+          <BodyScanCard />
 
           <section className="card">
             <h2>How meals hit you</h2>

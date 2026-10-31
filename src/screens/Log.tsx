@@ -6,6 +6,7 @@ import { LogFoodSheet } from '../components/LogFoodSheet'
 import { ReadingSheet } from '../components/ReadingSheet'
 import { RecipeBuilder } from '../components/RecipeBuilder'
 import { SaveMealSheet } from '../components/SavedMealSheets'
+import { BodyScanSheet } from '../components/BodyScan'
 import { useData } from '../lib/data'
 import { sessionLabel, type Exercise } from '../lib/exercise'
 import { MEALS, type Food, type LogEntry, type Meal, type NewFood } from '../lib/foods'
@@ -74,6 +75,8 @@ function readingText(r: ReadingRow, unit: WeightUnit): string {
       return `${r.meta.test ?? 'Lab'} ${r.value}${r.unit === '%' ? '%' : ` ${r.unit ?? ''}`}`
     case 'water':
       return `Water ${(r.value ?? 0) / 8} cups (${r.value} oz)`
+    case 'body_scan':
+      return `Body scan: ${r.value}% body fat`
   }
 }
 
@@ -294,7 +297,8 @@ export function Log({ weightKg, weightUnit, netCarbLimit, proteinTarget, date, o
         />
       )}
       {savingMeal && <SaveMealSheet entries={savingMeal.entries} meal={savingMeal.meal} onClose={() => setSavingMeal(null)} />}
-      {readingSheet && (
+      {readingSheet?.reading?.kind === 'body_scan' && <BodyScanSheet reading={readingSheet.reading} onClose={() => setReadingSheet(null)} />}
+      {readingSheet && readingSheet.reading?.kind !== 'body_scan' && (
         <ReadingSheet
           weightUnit={weightUnit}
           netCarbLimit={netCarbLimit}

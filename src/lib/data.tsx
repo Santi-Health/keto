@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useMemo, type ReactNode } from 
 import type { Session } from '@supabase/supabase-js'
 import type { CgmDay } from './cgm'
 import type { Exercise } from './exercise'
+import type { ActivityDay } from './activity'
 import type { ReadingRow } from './readings'
 import type { SavedMeal } from './savedMeals'
 import { buildLogEntry, type Food, type LogEntry, type Meal, type NewFood } from './foods'
@@ -35,6 +36,8 @@ interface Data {
   saveReading: (r: ReadingRow) => void
   deleteReading: (id: string) => void
   readingsOn: (date: string) => ReadingRow[]
+  activity: Record<string, ActivityDay>
+  saveActivity: (d: ActivityDay) => void
   savedMeals: SavedMeal[]
   saveMeal: (m: SavedMeal) => void
   deleteMeal: (id: string) => void
@@ -49,6 +52,7 @@ export function DataProvider({ session, children }: { session: Session | null; c
   const cgmTable = useSyncedTable<CgmDay>('cgm_days', session)
   const readingTable = useSyncedTable<ReadingRow>('readings', session)
   const mealTable = useSyncedTable<SavedMeal>('saved_meals', session)
+  const activityTable = useSyncedTable<ActivityDay>('daily_activity', session)
 
   const saveFood = useCallback(
     (food: NewFood | Food): Food => {
@@ -139,8 +143,8 @@ export function DataProvider({ session, children }: { session: Session | null; c
       foodById: foodsTable.byId,
       logs: logsTable.rows,
       // Without a database (local development) nothing is waiting to sync.
-      pending: supabase ? foodsTable.pending + logsTable.pending + exerciseTable.pending + cgmTable.pending + readingTable.pending + mealTable.pending : 0,
-      syncError: foodsTable.error ?? logsTable.error ?? exerciseTable.error ?? cgmTable.error ?? readingTable.error ?? mealTable.error,
+      pending: supabase ? foodsTable.pending + logsTable.pending + exerciseTable.pending + cgmTable.pending + readingTable.pending + mealTable.pending + activityTable.pending : 0,
+      syncError: foodsTable.error ?? logsTable.error ?? exerciseTable.error ?? cgmTable.error ?? readingTable.error ?? mealTable.error ?? activityTable.error,
       saveFood,
       updateFood: foodsTable.upsert,
       deleteFood: foodsTable.remove,
@@ -159,11 +163,13 @@ export function DataProvider({ session, children }: { session: Session | null; c
       saveReading: readingTable.upsert,
       deleteReading: readingTable.remove,
       readingsOn,
+      activity: activityTable.byId,
+      saveActivity: activityTable.upsert,
       savedMeals: mealTable.rows,
       saveMeal: mealTable.upsert,
       deleteMeal: mealTable.remove,
     }),
-    [foodsTable, logsTable, exerciseTable, cgmTable, readingTable, mealTable, saveFood, logFood, logsOn, logsWeekEnding, exercisesOn, readingsOn],
+    [foodsTable, logsTable, exerciseTable, cgmTable, readingTable, mealTable, activityTable, saveFood, logFood, logsOn, logsWeekEnding, exercisesOn, readingsOn],
   )
 
   return <DataContext.Provider value={value}>{children}</DataContext.Provider>

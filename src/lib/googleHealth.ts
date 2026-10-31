@@ -8,6 +8,7 @@ export const GOOGLE_CLIENT_ID =
 const SCOPE = [
   'https://www.googleapis.com/auth/googlehealth.activity_and_fitness.readonly',
   'https://www.googleapis.com/auth/googlehealth.health_metrics_and_measurements.readonly',
+  'https://www.googleapis.com/auth/googlehealth.sleep.readonly',
 ].join(' ')
 const API = 'https://health.googleapis.com/v4/users/me'
 
@@ -184,6 +185,162 @@ export async function listGlucose(token: string, from: Date, to: Date): Promise<
     out.push(...(data.dataPoints ?? []))
     pageToken = data.nextPageToken
   } while (pageToken)
+  return out
+}
+
+// --- Daily activity: steps, calories burned, resting heart rate, sleep, weight -------------
+
+/** Thrown for a 403: the saved sign-in doesn't cover this data type yet. */
+export class NeedsConsentError extends Error {}
+
+async function healthFetch(token: string, url: string, init?: RequestInit): Promise<unknown> {
+  const res = await fetch(url, { ...init, headers: { Authorization: `Bearer ${token}`, Accept: 'application/json', 'Content-Type': 'application/json' } })
+  if (res.status === 401) {
+    forgetGoogleToken()
+    throw new Error('Google sign-in expired. Tap Import again.')
+  }
+  if (res.status === 403) {
+    forgetGoogleToken()
+    throw new NeedsConsentError('Google needs your OK for this data. Tap Import again and allow it.')
+  }
+  if (!res.ok) {
+    const body = await res.text().catch(() => '')
+    throw new Error(`Google Health returned ${res.status}. ${body.slice(0, 300)}`)
+  }
+  return res.json()
+}
+
+/** Lists data points of one type with a filter, following pages. */
+async function listPoints(token: string, dataType: string, filter: string): Promise<Record<string, unknown>[]> {
+  const out: Record<string, unknown>[] = []
+  let pageToken: string | undefined
+  do {
+    const params = new URLSearchParams({ filter, pageSize: '100' })
+    if (pageToken) params.set('pageToken', pageToken)
+    const data = (await healthFetch(token, `${API}/dataTypes/${dataType}/dataPoints?${params}`)) as {
+      dataPoints?: Record<string, unknown>[]
+      nextPageToken?: string
+    }
+    out.push(...(data.dataPoints ?? []))
+    pageToken = data.nextPageToken
+  } while (pageToken)
+  return out
+}
+
+const civilDate = (date: string) => {
+  const [year, month, day] = date.split('-').map(Number)
+  return { date: { year, month, day }, time: { hours: 0, minutes: 0, seconds: 0 } }
+}
+const fromCivil = (c: unknown): string | null => {
+  const d = (c as { date?: { year?: number; month?: number; day?: number } } | undefined)?.date ?? (c as { year?: number; month?: number; day?: number })
+  if (!d?.year || !d.month || !d.day) return null
+  return `${d.year}-${String(d.month).padStart(2, '0')}-${String(d.day).padStart(2, '0')}`
+}
+const addDays = (date: string, n: number) => civil(date, n).slice(0, 10)
+
+/** One value per day from dailyRollUp (steps, total-calories); at most 14 days per call. */
+export async function dailyRollup(token: string, dataType: string, fromDate: string, toDate: string): Promise<{ day: string; value: Record<string, unknown> }[]> {
+  const out: { day: string; value: Record<string, unknown> }[] = []
+  for (let start = fromDate; start <= toDate; start = addDays(start, 14)) {
+    const end = addDays(start, 14) > addDays(toDate, 1) ? addDays(toDate, 1) : addDays(start, 14)
+    const data = (await healthFetch(token, `${API}/dataTypes/${dataType}/dataPoints:dailyRollUp`, {
+      method: 'POST',
+      body: JSON.stringify({ range: { start: civilDate(start), end: civilDate(end) }, windowSizeDays: 1 }),
+    })) as { rollupDataPoints?: Record<string, unknown>[] }
+    for (const p of data.rollupDataPoints ?? []) {
+      const day = fromCivil(p.civilStartTime)
+      const value = Object.entries(p).find(([k]) => k !== 'civilStartTime' && k !== 'civilEndTime')?.[1] as Record<string, unknown> | undefined
+      if (day && value) out.push({ day, value })
+    }
+  }
+  return out
+}
+
+export interface SleepNight {
+  /** Local date the sleep ended (the morning). */
+  day: string
+  start: string
+  end: string
+  asleepMin: number
+  inBedMin: number
+  stages: Partial<Record<'DEEP' | 'REM' | 'LIGHT' | 'AWAKE', number>>
+}
+
+export function parseSleep(p: Record<string, unknown>): SleepNight | null {
+  const s = p.sleep as
+    | {
+        interval?: { startTime?: string; endTime?: string; civilEndTime?: unknown }
+        summary?: { minutesAsleep?: string | number; minutesInSleepPeriod?: string | number; stagesSummary?: { type?: string; minutes?: string | number }[] }
+      }
+    | undefined
+  const start = s?.interval?.startTime
+  const end = s?.interval?.endTime
+  if (!start || !end) return null
+  const inBed = Number(s?.summary?.minutesInSleepPeriod) || Math.round((Date.parse(end) - Date.parse(start)) / 60_000)
+  const stages: SleepNight['stages'] = {}
+  for (const st of s?.summary?.stagesSummary ?? []) {
+    const t = st.type?.toUpperCase()
+    if (t === 'DEEP' || t === 'REM' || t === 'LIGHT' || t === 'AWAKE') stages[t] = Number(st.minutes) || 0
+  }
+  const day = fromCivil(s?.interval?.civilEndTime) ?? localDay(new Date(end))
+  return { day, start, end, asleepMin: Number(s?.summary?.minutesAsleep) || inBed - (stages.AWAKE ?? 0), inBedMin: inBed, stages }
+}
+
+const localDay = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+
+export interface ActivityImport {
+  steps: Record<string, number>
+  caloriesOut: Record<string, number>
+  restingHr: Record<string, number>
+  sleep: SleepNight[]
+  weights: { id: string; at: string; kg: number }[]
+  bodyFat: { at: string; pct: number }[]
+  /** Parts that couldn't be read, e.g. sleep before the user allows it. */
+  skipped: string[]
+}
+
+/** Pulls daily activity for a date range. Each part fails on its own so one missing permission doesn't block the rest. */
+export async function fetchActivity(token: string, fromDate: string, toDate: string): Promise<ActivityImport> {
+  const out: ActivityImport = { steps: {}, caloriesOut: {}, restingHr: {}, sleep: [], weights: [], bodyFat: [], skipped: [] }
+  const civilRange = (field: string) => `${field} >= "${civil(fromDate)}" AND ${field} < "${civil(toDate, 1)}"`
+  const part = async (label: string, run: () => Promise<void>) => {
+    try {
+      await run()
+    } catch (e) {
+      if (e instanceof NeedsConsentError) out.skipped.push(label)
+      else throw e
+    }
+  }
+  await part('steps', async () => {
+    for (const r of await dailyRollup(token, 'steps', fromDate, toDate)) out.steps[r.day] = Number(r.value.countSum) || 0
+  })
+  await part('calories burned', async () => {
+    for (const r of await dailyRollup(token, 'total-calories', fromDate, toDate)) out.caloriesOut[r.day] = Math.round(Number(r.value.kcalSum) || 0)
+  })
+  await part('resting heart rate', async () => {
+    for (const p of await listPoints(token, 'daily-resting-heart-rate', `daily_resting_heart_rate.date >= "${fromDate}" AND daily_resting_heart_rate.date < "${addDays(toDate, 1)}"`)) {
+      const v = p.dailyRestingHeartRate as { date?: unknown; beatsPerMinute?: string | number } | undefined
+      const day = fromCivil(v?.date)
+      const bpm = Number(v?.beatsPerMinute)
+      if (day && bpm > 0) out.restingHr[day] = bpm
+    }
+  })
+  await part('sleep', async () => {
+    for (const p of await listPoints(token, 'sleep', civilRange('sleep.interval.civil_end_time'))) {
+      const n = parseSleep(p)
+      if (n) out.sleep.push(n)
+    }
+  })
+  await part('weight', async () => {
+    for (const p of await listPoints(token, 'weight', civilRange('weight.sample_time.civil_time'))) {
+      const w = p.weight as { sampleTime?: { physicalTime?: string }; weightGrams?: number } | undefined
+      if (w?.sampleTime?.physicalTime && w.weightGrams) out.weights.push({ id: String(p.name ?? w.sampleTime.physicalTime), at: w.sampleTime.physicalTime, kg: w.weightGrams / 1000 })
+    }
+    for (const p of await listPoints(token, 'body-fat', civilRange('body_fat.sample_time.civil_time'))) {
+      const b = p.bodyFat as { sampleTime?: { physicalTime?: string }; percentage?: number } | undefined
+      if (b?.sampleTime?.physicalTime && b.percentage) out.bodyFat.push({ at: b.sampleTime.physicalTime, pct: b.percentage })
+    }
+  })
   return out
 }
 

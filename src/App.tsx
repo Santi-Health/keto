@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import { DataProvider, useData } from './lib/data'
+import { averageBurn } from './lib/activity'
 import { latest } from './lib/readings'
 import type { Profile } from './lib/types'
 import { useProfile, useSession } from './lib/profileStore'
@@ -56,7 +57,7 @@ interface TrackerProps {
 function Tracker({ session, recovering = false, onPassphraseChanged = () => {} }: TrackerProps) {
   const { profile, update, sync } = useProfile(session)
   const [{ tab, param }, setRoute] = useState(getRoute)
-  const targets = useMemo(() => computeTargets(profile), [profile])
+  const targets = useMemo(() => computeTargets(profile, new Date(), profile.fitbitBurnKcal ?? null), [profile])
 
   useEffect(() => {
     const onHash = () => setRoute(getRoute())
@@ -82,6 +83,7 @@ function Tracker({ session, recovering = false, onPassphraseChanged = () => {} }
   return (
     <DataProvider session={session}>
     <WeightFromReadings weightKg={profile.weightKg} lastId={profile.weightReadingId ?? null} update={update} />
+    <BurnFromActivity kcal={profile.fitbitBurnKcal ?? null} update={update} />
     <div className="app">
       <main className="main">
         {tab === 'today' && (
@@ -154,5 +156,15 @@ function WeightFromReadings({ weightKg, lastId, update }: { weightKg: number; la
     if (!w?.value || key === lastId) return
     update({ weightKg: Math.round(w.value * 100) / 100, weightReadingId: key })
   }, [key, lastId, w?.value, weightKg, update])
+  return null
+}
+
+/** Keeps the profile's Fitbit burn in step with the last 7 full days of imported activity. */
+function BurnFromActivity({ kcal, update }: { kcal: number | null; update: (p: Partial<Profile>) => void }) {
+  const { activity } = useData()
+  const burn = averageBurn(Object.values(activity).filter((d) => !d.deleted_at), localDate())
+  useEffect(() => {
+    if (burn && burn.kcal !== kcal) update({ fitbitBurnKcal: burn.kcal, fitbitBurnDays: burn.days })
+  }, [burn?.kcal, burn?.days, kcal, update])
   return null
 }

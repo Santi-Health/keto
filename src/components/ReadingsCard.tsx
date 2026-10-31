@@ -40,6 +40,7 @@ export function ReadingsCard({ weightUnit, onAdd }: Props) {
   const glucose = latest(readings, 'glucose')
   const urine = latest(readings, 'urine_ketone')
   const weight = latest(readings, 'weight')
+  const scan = latest(readings, 'body_scan')
   const ketoneDay = ketone ? localDate(new Date(ketone.taken_at)) : null
   const cgm = useMemo(() => (ketoneDay && cgmDays[ketoneDay] ? toReadings([cgmDays[ketoneDay]]) : []), [cgmDays, ketoneDay])
   const gki = ketone ? gkiFor(ketone, readings, cgm) : null
@@ -97,6 +98,13 @@ export function ReadingsCard({ weightUnit, onAdd }: Props) {
       {urine && (
         <p className="muted small" style={{ margin: '4px 0 0' }}>
           Urine strip: {URINE_LEVELS.find((u) => u.value === urine.urine_level)?.label.toLowerCase()} ({when(urine.taken_at)})
+        </p>
+      )}
+      {scan?.meta.scan && (
+        <p className="muted small" style={{ margin: '4px 0 0' }}>
+          Last body scan: {scan.value}% body fat
+          {scan.meta.scan.leanMassKg ? ` · ${(scan.meta.scan.leanMassKg / KG_PER_LB).toFixed(1)} lb lean` : ''} (
+          {new Date(scan.taken_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}). Progress is on Insights.
         </p>
       )}
       {labs.length > 0 && (

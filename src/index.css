@@ -1337,3 +1337,77 @@ input[type='time'] {
   min-height: 36px;
   padding: 4px 8px;
 }
+
+/* Eaten vs. burned */
+.burn-chart {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 6px;
+  height: 96px;
+}
+
+.burn-day {
+  display: grid;
+  grid-template-rows: 1fr auto;
+  gap: 2px;
+  min-width: 0;
+}
+
+.burn-bars {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 2px;
+}
+
+.burn-bars span {
+  width: 40%;
+  max-width: 14px;
+  border-radius: 3px 3px 0 0;
+}
+
+.burn-out {
+  background: var(--text-2);
+  opacity: 0.45;
+}
+
+.burn-in {
+  background: var(--calories);
+}
+
+.burn-label {
+  font-size: 0.65rem;
+  text-align: center;
+  color: var(--text-2);
+}
+
+/* Body scans */
+.scan-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.scan-table th {
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-align: right;
+  color: var(--text-2);
+}
+
+.scan-table td {
+  padding: 5px 0;
+  text-align: right;
+  border-bottom: 1px solid var(--border);
+}
+
+.scan-table td:first-child,
+.scan-table th:first-child {
+  text-align: left;
+}
+
+.keto-chart .axis-zero {
+  stroke: var(--text-2);
+  stroke-width: 1;
+}
