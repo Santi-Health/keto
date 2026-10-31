@@ -4,6 +4,7 @@ import { DRINKS, MILKS, drinkFood, drinkPortion, milkFood, type Drink, type Drin
 import { portionNutrients, type Food } from '../lib/foods'
 import { mealForTime } from '../lib/foods'
 import { localDate } from '../lib/targets'
+import { deviceTz } from '../lib/time'
 import { Segmented } from './Fields'
 import { Bar } from './Progress'
 import { Sheet } from './Sheet'
@@ -53,7 +54,7 @@ export function DrinksCard({ days, waterTargetOz }: Props) {
         note: null,
         predicted_value: null,
         unit: 'oz',
-        meta: d.key === 'water' ? {} : { drink: d.key },
+        meta: d.key === 'water' ? { tz: deviceTz() } : { drink: d.key, tz: deviceTz() },
         updated_at: now.toISOString(),
         deleted_at: null,
       })

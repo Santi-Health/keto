@@ -1,5 +1,6 @@
 import type { ActivityImport } from './googleHealth'
 import type { ReadingRow } from './readings'
+import { dayIn, deviceTz } from './time'
 
 /** One row per local day of Fitbit totals (synced table daily_activity, id = YYYY-MM-DD). */
 export interface ActivityDay {
@@ -86,9 +87,9 @@ export async function stableUuid(key: string): Promise<string> {
 }
 
 /** Fitbit weigh-ins as weight readings, with body fat from the same day attached. */
-export async function weightReadings(imp: ActivityImport, existing: ReadingRow[]): Promise<ReadingRow[]> {
+export async function weightReadings(imp: ActivityImport, existing: ReadingRow[], tz = deviceTz()): Promise<ReadingRow[]> {
   const out: ReadingRow[] = []
-  const dayOf = (iso: string) => new Date(iso).toDateString()
+  const dayOf = (iso: string) => dayIn(tz, Date.parse(iso))
   for (const w of imp.weights) {
     const id = await stableUuid(`fitbit-weight:${w.id}`)
     const fat = imp.bodyFat.find((b) => dayOf(b.at) === dayOf(w.at))
@@ -105,7 +106,7 @@ export async function weightReadings(imp: ActivityImport, existing: ReadingRow[]
       note: null,
       predicted_value: null,
       unit: 'kg',
-      meta: { ...prev?.meta, bodyFatPct: fat?.pct ?? null, source: 'fitbit' },
+      meta: { ...prev?.meta, bodyFatPct: fat?.pct ?? null, source: 'fitbit', tz: prev?.meta.tz ?? tz },
       updated_at: new Date().toISOString(),
       deleted_at: null,
     })

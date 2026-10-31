@@ -1,6 +1,6 @@
-import { localDate } from './targets'
+import { dayIn, deviceTz, midnightIn } from './time'
 
-/** [minute of the local day, mg/dL] */
+/** [minutes since the day's local midnight (real elapsed time, so 0–1499 on a 25-hour day), mg/dL] */
 export type CgmPoint = [number, number]
 
 /** Row shape of the `cgm_days` table. */
@@ -9,7 +9,8 @@ export interface CgmDay {
   day: string
   points: CgmPoint[]
   source: string
-  meta: Record<string, unknown>
+  /** startMs: the local midnight as a UTC instant; tz: the zone the day was filed in. Absent on older rows. */
+  meta: { startMs?: number; tz?: string } & Record<string, unknown>
   updated_at: string
   deleted_at: string | null
 }
@@ -20,23 +21,35 @@ export interface Reading {
   v: number
 }
 
-const minuteOfDay = (d: Date) => d.getHours() * 60 + d.getMinutes()
+/** When a stored day starts. Older rows (no startMs) used wall-clock minutes from the phone's midnight. */
+const dayStart = (d: CgmDay) => (typeof d.meta?.startMs === 'number' ? d.meta.startMs : new Date(`${d.day}T00:00:00`).getTime())
 
-/** Groups timestamped readings into local days and merges them with what's stored (by minute). */
-export function mergeIntoDays(readings: Reading[], existing: Record<string, CgmDay>, now = new Date().toISOString()): CgmDay[] {
+/**
+ * Files timestamped readings under their local day in `tz` and merges them with what's stored.
+ * Minutes are counted from that day's real midnight, so the repeated 1 AM hour when clocks fall back
+ * doesn't overwrite itself, and the missing hour in spring doesn't shift the rest of the day.
+ * Older rows are converted on the way through.
+ */
+export function mergeIntoDays(readings: Reading[], existing: Record<string, CgmDay>, tz = deviceTz(), now = new Date().toISOString()): CgmDay[] {
   const byDay = new Map<string, Map<number, number>>()
-  for (const r of readings) {
-    const d = new Date(r.t)
-    const day = localDate(d)
-    if (!byDay.has(day)) byDay.set(day, new Map((existing[day]?.points ?? []).map(([m, v]) => [m, v])))
-    byDay.get(day)!.set(minuteOfDay(d), Math.round(r.v))
+  const starts = new Map<string, number>()
+  const add = (r: Reading) => {
+    const day = dayIn(tz, r.t)
+    if (!starts.has(day)) starts.set(day, midnightIn(tz, day))
+    if (!byDay.has(day)) {
+      byDay.set(day, new Map())
+      // Bring in what's already stored for the day, re-filed the same way.
+      if (existing[day]) for (const old of toReadings([existing[day]])) byDay.get(day)!.set(Math.round((old.t - starts.get(day)!) / 60_000), old.v)
+    }
+    byDay.get(day)!.set(Math.round((r.t - starts.get(day)!) / 60_000), Math.round(r.v))
   }
+  for (const r of readings) add(r)
   return [...byDay.entries()].map(([day, pts]) => ({
     id: day,
     day,
     points: [...pts.entries()].sort((a, b) => a[0] - b[0]) as CgmPoint[],
     source: 'google_health',
-    meta: existing[day]?.meta ?? {},
+    meta: { ...existing[day]?.meta, startMs: starts.get(day)!, tz },
     updated_at: now,
     deleted_at: null,
   }))
@@ -46,7 +59,7 @@ export function mergeIntoDays(readings: Reading[], existing: Record<string, CgmD
 export function toReadings(days: CgmDay[]): Reading[] {
   const out: Reading[] = []
   for (const d of days) {
-    const base = new Date(`${d.day}T00:00:00`).getTime()
+    const base = dayStart(d)
     for (const [m, v] of d.points) out.push({ t: base + m * 60_000, v })
   }
   return out.sort((a, b) => a.t - b.t)

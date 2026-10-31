@@ -1,3 +1,4 @@
+import { deviceTz } from './time'
 export type ExerciseKind = 'strength' | 'cardio' | 'hiit' | 'walking' | 'sport' | 'mobility' | 'other'
 export type Intensity = 'low' | 'moderate' | 'high'
 
@@ -132,6 +133,8 @@ export interface Exercise {
     fitbitType?: string
     steps?: number
     avgHr?: number
+    /** The time zone it was logged in. */
+    tz?: string
     /** "heart-rate" when calories came from Fitbit heart rate during a hand-logged session. */
     caloriesSource?: 'heart-rate'
     /** Heart-rate samples behind avgHr, to show how much data there was. */
@@ -230,7 +233,7 @@ export function routineSession(r: Routine, weightKg: number, day = new Date()): 
     source: 'manual',
     external_id: null,
     note: null,
-    meta: { yogaStyle: r.yogaStyle, caloriesEstimated: true },
+    meta: { yogaStyle: r.yogaStyle, caloriesEstimated: true, tz: deviceTz() },
     updated_at: new Date().toISOString(),
     deleted_at: null,
   }

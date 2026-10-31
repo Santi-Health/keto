@@ -58,7 +58,10 @@ Deno.serve(async (req: Request) => {
       if (!code) return json({ error: 'Missing code' }, 400)
       return json({ ok: true, result: await link(env(), appJwt, code, tz || 'America/Los_Angeles') })
     }
-    if (path.endsWith('/sync-me')) return json({ ok: true, ...(await syncMe(env(), appJwt)) })
+    if (path.endsWith('/sync-me')) {
+      const { tz } = (await req.json().catch(() => ({}))) as { tz?: string }
+      return json({ ok: true, ...(await syncMe(env(), appJwt, tz)) })
+    }
     if (path.endsWith('/unlink')) {
       await unlink(env(), appJwt)
       return json({ ok: true })

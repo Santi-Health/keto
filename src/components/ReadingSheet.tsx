@@ -20,6 +20,7 @@ import {
   type UrineLevel,
 } from '../lib/readings'
 import { localDate } from '../lib/targets'
+import { deviceTz } from '../lib/time'
 import type { WeightUnit } from '../lib/types'
 import { Sheet } from './Sheet'
 
@@ -84,6 +85,7 @@ export function ReadingSheet({ weightUnit, netCarbLimit, proteinTarget, reading,
         ...(reading?.kind === kind ? reading.meta : {}),
         ...(kind === 'weight' ? { bodyFatPct: bodyFat !== '' ? Number(bodyFat) : null } : {}),
         ...(kind === 'lab' ? { test: test.trim() } : {}),
+        tz: reading?.meta.tz ?? deviceTz(),
       },
       updated_at: new Date().toISOString(),
       deleted_at: null,

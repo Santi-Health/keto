@@ -15,7 +15,8 @@ import type { Food, LogEntry } from '../lib/foods'
 import { fetchActivity, heartRateCalories, learnTypes, listExercises, listGlucose, mergeImported, toAppExercise } from '../lib/googleHealth'
 import type { ReadingRow } from '../lib/readings'
 import type { SavedMeal } from '../lib/savedMeals'
-import { computeTargets, localDate } from '../lib/targets'
+import { computeTargets } from '../lib/targets'
+import { dayIn, midnightIn } from '../lib/time'
 import { DEFAULT_PROFILE, type Profile } from '../lib/types'
 
 export interface Env {
@@ -80,19 +81,10 @@ const forUser = (userId: string, rows: object[]) =>
 
 // --- Time zones ---------------------------------------------------------------------------
 
-/** Milliseconds to add to a UTC instant to get the wall-clock time in `tz` (DST-aware). */
-export function tzOffsetMs(tz: string, t: number): number {
-  const parts = Object.fromEntries(
-    new Intl.DateTimeFormat('en-US', { timeZone: tz, hourCycle: 'h23', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' })
-      .formatToParts(new Date(t))
-      .map((p) => [p.type, p.value]),
-  )
-  const asUtc = Date.UTC(+parts.year, +parts.month - 1, +parts.day, +parts.hour, +parts.minute, +parts.second)
-  return asUtc - Math.floor(t / 1000) * 1000
-}
+export { tzOffsetMs } from '../lib/time'
 
 /** The user's local date, computed on a UTC server. */
-export const localDateIn = (tz: string, t = Date.now()) => localDate(new Date(t + tzOffsetMs(tz, t)))
+export const localDateIn = (tz: string, t = Date.now()) => dayIn(tz, t)
 
 // --- Google ---------------------------------------------------------------------------------
 
@@ -157,7 +149,10 @@ export async function syncUser(env: Env, userId: string, tokens: { health: strin
   const lastWorkout = exercises.filter((e) => e.source === 'fitbit').map((e) => e.started_at.slice(0, 10)).sort().pop() ?? null
   const exFrom = since(catchUpDays(lastWorkout, today, { min: 3, first: 14 }) - 1)
   const points = await listExercises(token, exFrom, today)
-  const mapped = points.map((p) => toAppExercise(p, profile.weightKg, targets.bmr, learnTypes(exercises))).filter((x): x is NonNullable<typeof x> => !!x)
+  const mapped = points
+    .map((p) => toAppExercise(p, profile.weightKg, targets.bmr, learnTypes(exercises)))
+    .filter((x): x is NonNullable<typeof x> => !!x)
+    .map((x) => ({ ...x, meta: { ...x.meta, tz } }))
   const recent = exercises.filter((e) => e.started_at >= `${exFrom}T00:00:00`)
   const { added, updated, matched } = mergeImported(mapped, recent)
   const touched = new Set([...added, ...updated, ...matched].map((e) => e.id))
@@ -177,7 +172,7 @@ export async function syncUser(env: Env, userId: string, tokens: { health: strin
   const days = mergeActivity(act, activity)
   await d.upsert('daily_activity', forUser(userId, days), 'user_id,id')
   const weights = await d.select<ReadingRow>('readings', `user_id=eq.${userId}&kind=eq.weight`)
-  const weighIns = await weightReadings(act, weights)
+  const weighIns = await weightReadings(act, weights, tz)
   await d.upsert('readings', forUser(userId, weighIns), 'id')
   notes.push(`${days.length} activity days`)
   if (act.skipped.length) notes.push(`not allowed: ${act.skipped.join(', ')}`)
@@ -186,11 +181,11 @@ export async function syncUser(env: Env, userId: string, tokens: { health: strin
   const cgmRows = await d.select<CgmDay>('cgm_days', `user_id=eq.${userId}&deleted_at=is.null&day=gte.${since(120)}`)
   const cgm = Object.fromEntries(cgmRows.map((c) => [c.id, c]))
   const lastCgm = cgmRows.map((c) => c.day).sort().pop() ?? null
-  const from = new Date(`${since(catchUpDays(lastCgm, today, { min: 3, first: 14 }) - 1)}T00:00:00Z`)
-  const raw = await listGlucose(token, new Date(from.getTime() - tzOffsetMs(tz, from.getTime())), new Date())
-  // Shift each reading to local wall-clock time so the (UTC) server buckets it into the right day and minute.
-  const readings = raw.map(parseGlucosePoint).filter((r): r is NonNullable<typeof r> => !!r).map((r) => ({ ...r, t: r.t + tzOffsetMs(tz, r.t) }))
-  const cgmDays = mergeIntoDays(readings, cgm)
+  const from = midnightIn(tz, since(catchUpDays(lastCgm, today, { min: 3, first: 14 }) - 1))
+  const raw = await listGlucose(token, new Date(from), new Date())
+  const readings = raw.map(parseGlucosePoint).filter((r): r is NonNullable<typeof r> => !!r)
+  // Filed under the user's local days (the server's own clock is UTC).
+  const cgmDays = mergeIntoDays(readings, cgm, tz)
   await d.upsert('cgm_days', forUser(userId, cgmDays), 'user_id,id')
   notes.push(`${readings.length} glucose readings`)
 
@@ -271,7 +266,7 @@ export async function link(env: Env, appJwt: string, code: string, tz: string): 
  * Syncs only the signed-in user, right now (the app calls this when it opens). Skips when a sync ran in the
  * last `minGapMs`, so opening the app repeatedly doesn't hit Google each time.
  */
-export async function syncMe(env: Env, appJwt: string, minGapMs = 10 * 60_000): Promise<{ ran: boolean; result: string }> {
+export async function syncMe(env: Env, appJwt: string, tz?: string, minGapMs = 10 * 60_000): Promise<{ ran: boolean; result: string }> {
   const who = await fetch(`${env.supabaseUrl}/auth/v1/user`, { headers: { apikey: env.anonKey, Authorization: `Bearer ${appJwt}` } })
   if (!who.ok) throw new Error('Not signed in to the app.')
   const userId = ((await who.json()) as { id: string }).id
@@ -279,6 +274,11 @@ export async function syncMe(env: Env, appJwt: string, minGapMs = 10 * 60_000): 
   const token = (await d.select<{ refresh_token: string; scopes: string }>('google_tokens', `user_id=eq.${userId}&select=refresh_token,scopes`))[0]
   if (!token) return { ran: false, result: 'not linked' }
   const st = (await d.select<SyncStatus & { last_sync_at: string | null }>('sync_status', `user_id=eq.${userId}&select=user_id,time_zone,last_sync_at`))[0]
+  // Follow the phone: traveling moves the zone the server files new data under.
+  if (tz && st && tz !== st.time_zone) {
+    await d.upsert('sync_status', [{ user_id: userId, time_zone: tz, updated_at: new Date().toISOString() }], 'user_id')
+    st.time_zone = tz
+  }
   if (st?.last_sync_at && Date.now() - Date.parse(st.last_sync_at) < minGapMs) return { ran: false, result: 'synced recently' }
   const now = new Date().toISOString()
   try {

@@ -6,6 +6,7 @@ import { summarize } from './glucoseInsights'
 import { addNutrients } from './nutrients'
 import { gkiFor, type ReadingRow } from './readings'
 import { localDate } from './targets'
+import { entryDay } from './time'
 
 /** One row per local day, for trend charts, averages and the doctor summary. */
 export interface DayPoint {
@@ -64,15 +65,15 @@ export function dailySeries(opts: {
   cgmDays: Record<string, CgmDay>
 }): DayPoint[] {
   const { days, logs, readings, exercises, activity, cgmDays } = opts
-  const dayOf = (iso: string) => localDate(new Date(iso))
+  const dayOf = (iso: string, tz?: string) => entryDay(iso, tz)
   const by = <T,>(xs: T[], get: (x: T) => string) => {
     const m = new Map<string, T[]>()
     for (const x of xs) m.set(get(x), [...(m.get(get(x)) ?? []), x])
     return m
   }
-  const logsBy = by(logs, (l) => dayOf(l.eaten_at))
-  const readingsBy = by(readings, (r) => dayOf(r.taken_at))
-  const exBy = by(exercises, (e) => dayOf(e.started_at))
+  const logsBy = by(logs, (l) => dayOf(l.eaten_at, l.meta?.tz))
+  const readingsBy = by(readings, (r) => dayOf(r.taken_at, r.meta?.tz))
+  const exBy = by(exercises, (e) => dayOf(e.started_at, e.meta?.tz))
 
   return days.map((day) => {
     const n = addNutrients((logsBy.get(day) ?? []).map((l) => l.nutrients))
@@ -152,7 +153,7 @@ export function summarizeRange(points: DayPoint[], readings: ReadingRow[], netCa
   const weights = points.filter((p) => p.weightKg != null)
   const from = points[0]?.day
   const to = points[points.length - 1]?.day
-  const ketoneReadings = readings.filter((r) => r.kind === 'blood_ketone' && r.value != null && localDate(new Date(r.taken_at)) >= from && localDate(new Date(r.taken_at)) <= to)
+  const ketoneReadings = readings.filter((r) => r.kind === 'blood_ketone' && r.value != null && entryDay(r.taken_at, r.meta?.tz) >= from && entryDay(r.taken_at, r.meta?.tz) <= to)
   return {
     days: points.length,
     loggedDays: logged.length,

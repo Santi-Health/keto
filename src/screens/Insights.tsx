@@ -15,6 +15,7 @@ import { sessionLabel } from '../lib/exercise'
 import { getGoogleToken, listGlucose } from '../lib/googleHealth'
 import { exerciseEffects, foodImpacts, mealResponses, oddThings, summarize, type ResponseLevel } from '../lib/glucoseInsights'
 import { localDate } from '../lib/targets'
+import { entryDay } from '../lib/time'
 
 const shift = (date: string, days: number) => {
   const d = new Date(`${date}T12:00:00`)
@@ -58,8 +59,8 @@ export function Insights({ targets, weightUnit, onApplyLimit, onOpenReport }: Pr
     const days = Object.values(cgmDays).filter((d) => !d.deleted_at && d.day >= shift(today, -13))
     const all = toReadings(days)
     const from = shift(today, -13)
-    const recentLogs = logs.filter((l) => localDate(new Date(l.eaten_at)) >= from)
-    const recentSessions = exercises.filter((e) => localDate(new Date(e.started_at)) >= from)
+    const recentLogs = logs.filter((l) => entryDay(l.eaten_at, l.meta?.tz) >= from)
+    const recentSessions = exercises.filter((e) => entryDay(e.started_at, e.meta?.tz) >= from)
     return foodImpacts(mealResponses(recentLogs, all, recentSessions))
   }, [cgmDays, logs, exercises, today])
 

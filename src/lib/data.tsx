@@ -8,6 +8,7 @@ import type { SavedMeal } from './savedMeals'
 import { buildLogEntry, type Food, type LogEntry, type Meal, type NewFood } from './foods'
 import { supabase } from './supabase'
 import { localDate } from './targets'
+import { entryDay } from './time'
 import { useSyncedTable } from './syncTable'
 
 interface Data {
@@ -103,7 +104,7 @@ export function DataProvider({ session, children }: { session: Session | null; c
 
   const logsOn = useCallback(
     (date: string) =>
-      logsTable.rows.filter((l) => localDate(new Date(l.eaten_at)) === date).sort((a, b) => a.eaten_at.localeCompare(b.eaten_at)),
+      logsTable.rows.filter((l) => entryDay(l.eaten_at, l.meta?.tz) === date).sort((a, b) => a.eaten_at.localeCompare(b.eaten_at)),
     [logsTable.rows],
   )
 
@@ -114,7 +115,7 @@ export function DataProvider({ session, children }: { session: Session | null; c
       start.setDate(start.getDate() - 6)
       const from = localDate(start)
       return logsTable.rows.filter((l) => {
-        const d = localDate(new Date(l.eaten_at))
+        const d = entryDay(l.eaten_at, l.meta?.tz)
         return d >= from && d <= date
       })
     },
@@ -124,7 +125,7 @@ export function DataProvider({ session, children }: { session: Session | null; c
   const exercisesOn = useCallback(
     (date: string) =>
       exerciseTable.rows
-        .filter((e) => localDate(new Date(e.started_at)) === date)
+        .filter((e) => entryDay(e.started_at, e.meta?.tz) === date)
         .sort((a, b) => a.started_at.localeCompare(b.started_at)),
     [exerciseTable.rows],
   )
@@ -132,7 +133,7 @@ export function DataProvider({ session, children }: { session: Session | null; c
   const readingsOn = useCallback(
     (date: string) =>
       readingTable.rows
-        .filter((r) => localDate(new Date(r.taken_at)) === date)
+        .filter((r) => entryDay(r.taken_at, r.meta?.tz) === date)
         .sort((a, b) => a.taken_at.localeCompare(b.taken_at)),
     [readingTable.rows],
   )

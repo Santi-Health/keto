@@ -8,6 +8,7 @@ import { AminoCard } from '../components/AminoCard'
 import { ActivityCard } from '../components/ActivityCard'
 import { RelinkBanner } from '../components/BackgroundSyncCard'
 import { useOpenSyncState } from '../lib/backgroundSync'
+import { deviceTz } from '../lib/time'
 import { DrinksCard } from '../components/DrinksCard'
 import { ExerciseSheet } from '../components/ExerciseSheet'
 import { TrainingCard } from '../components/TrainingCard'
@@ -79,6 +80,7 @@ export function Today({ profile, targets, onOpenSettings, onToggleRefeed, onNavi
       const mapped = points
         .map((p) => toAppExercise(p, profile.weightKg, targets.bmr, learnTypes(exercises)))
         .filter((x): x is NonNullable<typeof x> => !!x)
+        .map((x) => ({ ...x, meta: { ...x.meta, tz: deviceTz() } }))
       const fromIso = new Date(`${localDate(from)}T00:00:00`).toISOString()
       const recent = exercises.filter((e) => e.started_at >= fromIso)
       const { added, updated, matched } = mergeImported(mapped, recent)

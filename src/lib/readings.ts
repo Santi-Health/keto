@@ -15,6 +15,8 @@ export interface ReadingMeta {
   bodyFatPct?: number | null
   /** Lab readings: test name, e.g. HbA1c. */
   test?: string
+  /** The time zone it was logged in. */
+  tz?: string
   /** Where an imported reading came from, e.g. fitbit. */
   source?: string
   /** Body scan (DEXA) results; value holds total body fat %. */

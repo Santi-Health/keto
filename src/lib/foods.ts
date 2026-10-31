@@ -1,4 +1,5 @@
 import { netCarbs, type SugarAlcoholType } from './nutrition'
+import { deviceTz } from './time'
 import { estimateAminos } from './aminoAcids'
 import { kcalFromMacros, scaleNutrients, type Nutrients } from './nutrients'
 import { toGrams, type UnitConversion } from './units'
@@ -73,7 +74,8 @@ export interface LogEntry {
   unit: string
   grams: number
   nutrients: Nutrients
-  meta: { approximate?: boolean; estimated?: boolean }
+  /** tz: the time zone it was logged in (the day it counts on, wherever it's viewed later). */
+  meta: { approximate?: boolean; estimated?: boolean; tz?: string }
   updated_at: string
   deleted_at: string | null
 }
@@ -124,7 +126,7 @@ export function buildLogEntry(
     unit,
     grams,
     nutrients: portionNutrients(food, grams),
-    meta: { approximate, estimated: food.fields_estimated.length > 0 || food.source === 'ai_estimate' },
+    meta: { approximate, estimated: food.fields_estimated.length > 0 || food.source === 'ai_estimate', tz: deviceTz() },
   }
 }
 

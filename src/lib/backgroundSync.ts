@@ -130,7 +130,7 @@ export function useSyncOnOpen(enabled: boolean) {
         const res = await fetch(fnUrl('sync-me'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}`, apikey: import.meta.env.VITE_SUPABASE_ANON_KEY as string },
-          body: '{}',
+          body: JSON.stringify({ tz: Intl.DateTimeFormat().resolvedOptions().timeZone }),
         })
         const j = (await res.json().catch(() => ({}))) as { ran?: boolean; result?: string; error?: string }
         if (j.ran) window.dispatchEvent(new Event(REFRESH_EVENT))

@@ -14,6 +14,7 @@ import { MEALS, type Food, type LogEntry, type Meal, type NewFood } from '../lib
 import { addNutrients, type NutrientKey, type Nutrients } from '../lib/nutrients'
 import { CONTEXTS, KG_PER_LB, URINE_LEVELS, type ReadingRow } from '../lib/readings'
 import { localDate } from '../lib/targets'
+import { entryTime } from '../lib/time'
 import type { WeightUnit } from '../lib/types'
 import { formatAmount } from '../lib/units'
 
@@ -175,10 +176,7 @@ export function Log({ weightKg, hr, weightUnit, netCarbLimit, proteinTarget, dat
                       {readingText(r, weightUnit)}
                     </span>
                     <span className="sub" style={{ display: 'block' }}>
-                      {new Date(r.taken_at).toLocaleTimeString('en-US', {
-                        hour: 'numeric',
-                        minute: '2-digit',
-                      })}
+                      {entryTime(r.taken_at, r.meta?.tz)}
                       {r.kind === 'blood_ketone' || r.kind === 'glucose' || r.kind === 'urine_ketone'
                         ? ` · ${CONTEXTS.find((c) => c.value === r.context)?.label.toLowerCase()}`
                         : ''}
@@ -210,10 +208,7 @@ export function Log({ weightKg, hr, weightUnit, netCarbLimit, proteinTarget, dat
                         {sessionLabel(e)} · {e.duration_min} min
                       </span>
                       <span className="sub" style={{ display: 'block' }}>
-                        {new Date(e.started_at).toLocaleTimeString('en-US', {
-                          hour: 'numeric',
-                          minute: '2-digit',
-                        })}{' '}
+                        {entryTime(e.started_at, e.meta?.tz)}{' '}
                         · {e.intensity === 'low' ? 'easy' : e.intensity === 'high' ? 'hard' : 'moderate'}
                         {e.meta.fasted ? ' · fasted' : ''}
                         {e.meta.caloriesSource === 'heart-rate' && e.meta.avgHr ? ` · ♥ ${e.meta.avgHr} bpm avg` : ''}
@@ -267,10 +262,7 @@ export function Log({ weightKg, hr, weightUnit, netCarbLimit, proteinTarget, dat
                       </span>
                       <span className="sub" style={{ display: 'block' }}>
                         {formatAmount(e.amount, e.unit)} ·{' '}
-                        {new Date(e.eaten_at).toLocaleTimeString('en-US', {
-                          hour: 'numeric',
-                          minute: '2-digit',
-                        })}
+                        {entryTime(e.eaten_at, e.meta?.tz)}
                         {e.meta.approximate ? ' · approx.' : ''}
                       </span>
                     </span>

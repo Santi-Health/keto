@@ -15,6 +15,7 @@ import {
 } from '../lib/exercise'
 import { getGoogleToken, heartRateCalories, type HrProfile } from '../lib/googleHealth'
 import { Segmented } from './Fields'
+import { deviceTz } from '../lib/time'
 import { Sheet } from './Sheet'
 
 interface Props {
@@ -105,6 +106,7 @@ export function ExerciseSheet({ weightKg, hr, exercise, date, onClose }: Props) 
       meta: {
         ...exercise?.meta,
         ...details,
+        tz: exercise?.meta.tz ?? deviceTz(),
         fasted,
         // Changing an imported session's type teaches future imports.
         userEdited:

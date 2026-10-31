@@ -3,6 +3,7 @@ import { toReadings } from '../lib/cgm'
 import { useData } from '../lib/data'
 import { KG_PER_LB, URINE_LEVELS, gkiBand, gkiFor, hoursSinceFood, ketoneBand, latest, weightTrend, type ReadingKind } from '../lib/readings'
 import { localDate } from '../lib/targets'
+import { entryDay } from '../lib/time'
 import type { WeightUnit } from '../lib/types'
 
 interface Props {
@@ -41,7 +42,7 @@ export function ReadingsCard({ weightUnit, onAdd }: Props) {
   const urine = latest(readings, 'urine_ketone')
   const weight = latest(readings, 'weight')
   const scan = latest(readings, 'body_scan')
-  const ketoneDay = ketone ? localDate(new Date(ketone.taken_at)) : null
+  const ketoneDay = ketone ? entryDay(ketone.taken_at, ketone.meta.tz) : null
   const cgm = useMemo(() => (ketoneDay && cgmDays[ketoneDay] ? toReadings([cgmDays[ketoneDay]]) : []), [cgmDays, ketoneDay])
   const gki = ketone ? gkiFor(ketone, readings, cgm) : null
   const trend = weightTrend(readings)

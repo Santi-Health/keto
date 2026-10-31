@@ -1,6 +1,7 @@
 import type { Reading } from '../lib/cgm'
 import type { Exercise } from '../lib/exercise'
 import type { LogEntry } from '../lib/foods'
+import { deviceTz, midnightIn, nextDay, wallTimeToUtc } from '../lib/time'
 import { RANGE, eatingEvents } from '../lib/glucoseInsights'
 
 interface Props {
@@ -18,8 +19,11 @@ const Y_MAX = 220
 
 /** One day of glucose with the 70–140 band, meals (▲) and workouts (shaded). */
 export function GlucoseChart({ day, readings, logs, exercises }: Props) {
-  const start = new Date(`${day}T00:00:00`).getTime()
-  const x = (t: number) => PAD.l + ((t - start) / 86_400_000) * (W - PAD.l - PAD.r)
+  // The day's real length: 23 or 25 hours when clocks change.
+  const tz = deviceTz()
+  const start = midnightIn(tz, day)
+  const span = midnightIn(tz, nextDay(day)) - start
+  const x = (t: number) => PAD.l + ((t - start) / span) * (W - PAD.l - PAD.r)
   const y = (v: number) => PAD.t + (1 - (Math.min(Math.max(v, Y_MIN), Y_MAX) - Y_MIN) / (Y_MAX - Y_MIN)) * (H - PAD.t - PAD.b)
   // Break the line where readings are missing for more than 20 minutes.
   const segments: Reading[][] = []
@@ -41,7 +45,7 @@ export function GlucoseChart({ day, readings, logs, exercises }: Props) {
         </g>
       ))}
       {[0, 6, 12, 18, 24].map((h) => (
-        <text key={h} x={x(start + h * 3_600_000)} y={H - 6} textAnchor="middle" fontSize="8" fill="var(--text-2)">
+        <text key={h} x={x(h === 24 ? start + span : wallTimeToUtc(tz, day, h * 60))} y={H - 6} textAnchor="middle" fontSize="8" fill="var(--text-2)">
           {h === 0 || h === 24 ? '12a' : h === 12 ? '12p' : h < 12 ? `${h}a` : `${h - 12}p`}
         </text>
       ))}
