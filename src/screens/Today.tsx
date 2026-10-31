@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { daysSinceStrength, routineDue, routineSession, sessionLabel, trainingWarnings } from '../lib/exercise'
 import { getGoogleToken, learnTypes, listExercises, mergeImported, toAppExercise } from '../lib/googleHealth'
 import { useInstall } from '../lib/install'
+import { STATUS_TEXT, estimateKetosis, tomorrowMorning } from '../lib/ketosis'
 import { AminoCard } from '../components/AminoCard'
 import { ExerciseSheet } from '../components/ExerciseSheet'
 import { TrainingCard } from '../components/TrainingCard'
@@ -29,7 +30,7 @@ function useInstallOffer() {
 }
 
 export function Today({ profile, targets, onOpenSettings, onToggleRefeed, onNavigate }: Props) {
-  const { logsOn, logsWeekEnding, pending, syncError, exercises, exercisesOn, saveExercise } = useData()
+  const { logsOn, logsWeekEnding, pending, syncError, exercises, exercisesOn, saveExercise, logs } = useData()
   const [logExercise, setLogExercise] = useState(false)
   const [importing, setImporting] = useState(false)
   const [importMessage, setImportMessage] = useState<string | null>(null)
@@ -96,6 +97,8 @@ export function Today({ profile, targets, onOpenSettings, onToggleRefeed, onNavi
     effectiveDeficit: targets.effectiveDeficit,
     isRefeed: targets.isRefeed,
   })
+  const keto = estimateKetosis({ at: Date.now(), logs, exercises, netCarbLimit: targets.netCarbsG, proteinTarget: targets.proteinG })
+  const ketoTomorrow = estimateKetosis({ at: tomorrowMorning(), logs, exercises, netCarbLimit: targets.netCarbsG, proteinTarget: targets.proteinG })
   const carbsLeft = targets.netCarbsG - totals.netCarbs
   const proteinLeft = targets.proteinG - totals.protein
   const date = new Date().toLocaleDateString('en-US', {
@@ -245,11 +248,25 @@ export function Today({ profile, targets, onOpenSettings, onToggleRefeed, onNavi
                 <div className="muted small">β-hydroxybutyrate: the ketone your blood meter reads</div>
               </div>
             </div>
-            <p className="muted small" style={{ margin: 0 }}>
-              {totals.netCarbs <= targets.netCarbsG
-                ? `Today's net carbs (${totals.netCarbs.toFixed(1)} g) are within your ${targets.netCarbsG} g limit.`
-                : `Today's net carbs (${totals.netCarbs.toFixed(1)} g) are over your ${targets.netCarbsG} g limit.`}{' '}
-              Predicted blood ketones arrive with the ketosis engine (phase 7).
+            <div className={`keto-status ${keto.status}`}>
+              <b>{STATUS_TEXT[keto.status]}</b>
+              <span>
+                Estimated blood ketones {keto.low}–{keto.high} mmol/L
+              </span>
+            </div>
+            <ul className="keto-reasons">
+              {keto.reasons.map((r) => (
+                <li key={r}>{r}</li>
+              ))}
+            </ul>
+            <p className="small" style={{ margin: '8px 0 0' }}>
+              <b>Tomorrow 7 AM</b> if you don't eat more tonight: {STATUS_TEXT[ketoTomorrow.status].toLowerCase()} ({ketoTomorrow.low}–
+              {ketoTomorrow.high} mmol/L).
+              {keto.status === 'out' && ketoTomorrow.status === 'out' && ' Back under 25 g a day, it usually takes 1–3 days to return to ketosis.'}
+            </p>
+            <p className="muted small" style={{ marginBottom: 0 }}>
+              Estimate from general research (carbs, fasting, exercise, protein). Ketosis means about 0.5+ mmol/L. It will personalize once you
+              enter blood ketone readings.
             </p>
           </section>
         </div>

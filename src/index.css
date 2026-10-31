@@ -1053,3 +1053,50 @@ input[type='time'] {
   white-space: nowrap;
   padding: 10px 14px;
 }
+
+/* Ketosis estimate */
+.keto-status {
+  display: grid;
+  gap: 2px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--surface-2);
+  border-left: 4px solid var(--ketone);
+}
+
+.keto-status b {
+  font-size: 1.05rem;
+}
+
+.keto-status span {
+  font-size: 0.85rem;
+  color: var(--text-2);
+}
+
+.keto-status.out {
+  border-left-color: var(--warn);
+}
+
+.keto-status.out b {
+  color: var(--warn);
+}
+
+.keto-status.light {
+  border-left-color: var(--carbs);
+}
+
+.keto-status.in b,
+.keto-status.deep b {
+  color: var(--ketone);
+}
+
+.keto-reasons {
+  margin: 8px 0 0;
+  padding-left: 18px;
+  font-size: 0.85rem;
+  color: var(--text-2);
+}
+
+.keto-reasons li + li {
+  margin-top: 3px;
+}
