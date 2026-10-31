@@ -5,15 +5,14 @@ import { VitePWA } from 'vite-plugin-pwa'
 
 // GitHub Pages serves the app from /<repo-name>/. Override with VITE_BASE if the repo is named differently.
 export default defineConfig(({ command }) => ({
-  base: command === 'build' ? (process.env.VITE_BASE ?? '/keto-tracker/') : '/',
+  base: command === 'build' ? (process.env.VITE_BASE ?? '/keto/') : '/',
   plugins: [
     react(),
     VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.svg', 'apple-touch-icon.png'],
       manifest: {
-        // Changed from '/keto-tracker/' after a broken install left Chrome thinking the old id was installed.
-        id: '/keto-tracker/?app=keto-tracker-v2',
+        id: '/keto/',
         name: 'Keto Tracker',
         short_name: 'Keto Tracker',
         description: 'Track food, macros, electrolytes, glucose and ketones.',
