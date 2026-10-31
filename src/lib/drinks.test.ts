@@ -63,6 +63,6 @@ describe('button order and Kazar', () => {
     expect(drinkPortion(k)).toEqual({ amount: 1, unit: 'pod' })
     expect(asksForMilk(k)).toBe(true)
     const n = portionNutrients({ ...drinkFood(k), id: 'k', favorite: false, use_count: 0, last_used_at: null, updated_at: '', deleted_at: null }, 40)
-    expect(n.caffeineMg).toBeCloseTo(100, 0)
+    expect(n.caffeineMg).toBeCloseTo(120, 0)
   })
 })

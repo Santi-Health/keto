@@ -131,9 +131,9 @@ const ALL: Drink[] = [
     oz: 1.4,
     hydration: false,
     color: '#3b2a4a',
-    // Nespresso doesn't publish per-pod caffeine; Kazaar is a robusta-heavy intensity-12 blend, so ~100 mg is an estimate.
-    perServing: { kcal: 2, protein: 0.1, fat: 0, carbs: 0.3, netCarbs: 0.3, sodiumMg: 3, potassiumMg: 45, magnesiumMg: 30, caffeineMg: 100 },
-    estimated: ['caffeineMg', 'potassiumMg', 'magnesiumMg'],
+    // Nespresso doesn't publish per-pod caffeine; Kazaar is a robusta-heavy intensity-12 blend. Set at the high
+    // end of the 80–120 mg range on purpose (the user's choice), and treated as a fixed value.
+    perServing: { kcal: 2, protein: 0.1, fat: 0, carbs: 0.3, netCarbs: 0.3, sodiumMg: 3, potassiumMg: 45, magnesiumMg: 30, caffeineMg: 120 },
   },
 ]
 
