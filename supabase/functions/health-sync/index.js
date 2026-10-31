@@ -334,7 +334,7 @@ const DEFAULT_YOGA_ROUTINE = {
 	minutes: 50,
 	yogaStyle: "flow"
 };
-import.meta.env.VITE_GOOGLE_CLIENT_ID;
+({}).VITE_GOOGLE_CLIENT_ID;
 [
 	"https://www.googleapis.com/auth/googlehealth.activity_and_fitness.readonly",
 	"https://www.googleapis.com/auth/googlehealth.health_metrics_and_measurements.readonly",
