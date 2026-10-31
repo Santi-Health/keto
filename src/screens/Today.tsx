@@ -8,7 +8,7 @@ import { AminoCard } from '../components/AminoCard'
 import { ActivityCard } from '../components/ActivityCard'
 import { RelinkBanner } from '../components/BackgroundSyncCard'
 import { useOpenSyncState } from '../lib/backgroundSync'
-import { deviceTz } from '../lib/time'
+import { deviceTz, travelDay, zoneLabel } from '../lib/time'
 import { DrinksCard } from '../components/DrinksCard'
 import { ExerciseSheet } from '../components/ExerciseSheet'
 import { TrainingCard } from '../components/TrainingCard'
@@ -161,6 +161,10 @@ export function Today({ profile, targets, onOpenSettings, onToggleRefeed, onNavi
   // The week is the 7 full days before today, so a half-eaten today doesn't drag the averages down.
   const viewDays = useMemo(() => (view === 'today' ? [today] : view === 'yesterday' ? [yesterday] : lastDays(7, yesterday)), [view, today, yesterday])
   const day = viewDays[viewDays.length - 1]
+  const travelDays = useMemo(
+    () => viewDays.map((d) => ({ day: d, t: travelDay(d, profile.zoneLog) })).filter((x): x is { day: string; t: NonNullable<ReturnType<typeof travelDay>> } => !!x.t),
+    [viewDays, profile.zoneLog],
+  )
   const dayLogs = viewDays.flatMap((d) => logsOn(d))
   const loggedDays = Math.max(1, viewDays.filter((d) => logsOn(d).length > 0).length)
   const weekLogs = logsWeekEnding(day)
@@ -265,6 +269,17 @@ export function Today({ profile, targets, onOpenSettings, onToggleRefeed, onNavi
       <div className="grid two">
         <div className="grid">
           {isToday && <RelinkBanner />}
+          {travelDays.map(({ day: d, t }) => {
+            const pct = Math.round((t.hours / 24 - 1) * 100)
+            return (
+              <div key={d} className="notice small travel-note" role="status">
+                ✈︎ <b>Travel day</b>: {isWeek ? `${fmtDay(d, { weekday: 'short', month: 'short', day: 'numeric' })} was` : isToday ? 'today is' : 'yesterday was'}{' '}
+                <b>{t.hours} hours</b> long ({zoneLabel(t.from)} → {zoneLabel(t.to)}). Targets stay daily, so totals
+                {Math.abs(pct) >= 3 ? ` may run about ${Math.abs(pct)}% ${pct > 0 ? 'high' : 'low'}` : ' are about normal'}; your body runs on hours awake, not the
+                calendar.
+              </div>
+            )
+          })}
           {isToday && hasData && backupDue(profile.lastBackupAt) && (
             <div className="notice small" role="status">
               {profile.lastBackupAt

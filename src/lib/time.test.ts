@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { mergeIntoDays, toReadings, type CgmDay } from './cgm'
-import { dayHours, dayIn, entryDay, midnightIn, wallTimeToUtc } from './time'
+import { dayHours, dayIn, entryDay, midnightIn, recordZone, travelDay, wallTimeToUtc } from './time'
 
 const LA = 'America/Los_Angeles'
 const NY = 'America/New_York'
@@ -52,5 +52,33 @@ describe('travel', () => {
     expect(entryDay(dinner, LA)).toBe('2026-10-30')
     expect(entryDay(dinner, NY)).toBe('2026-10-31')
     expect(dayIn(NY, Date.parse(dinner))).toBe('2026-10-31')
+  })
+})
+
+describe('travel days', () => {
+  it('records a new zone only when it changes', () => {
+    const log = recordZone(undefined, LA, new Date('2026-10-20T12:00:00Z'))!
+    expect(recordZone(log, LA)).toBeNull()
+    expect(recordZone(log, NY, new Date('2026-10-31T15:00:00Z'))).toHaveLength(2)
+  })
+
+  it('measures a flight day: LA → New York is 21 hours, New York → LA is 27', () => {
+    const east = [
+      { tz: LA, since: '2026-10-01T00:00:00Z' },
+      { tz: NY, since: '2026-10-31T21:00:00Z' }, // landed in New York in the afternoon
+    ]
+    expect(travelDay('2026-10-31', east)).toEqual({ hours: 21, from: LA, to: NY })
+    expect(travelDay('2026-10-30', east)).toBeNull()
+    expect(travelDay('2026-11-01', east)).toBeNull()
+
+    const west = [
+      { tz: NY, since: '2026-10-01T00:00:00Z' },
+      { tz: LA, since: '2026-10-31T22:00:00Z' },
+    ]
+    expect(travelDay('2026-10-31', west)?.hours).toBe(27)
+  })
+
+  it('treats a plain daylight-saving change as an ordinary day', () => {
+    expect(travelDay('2026-11-01', [{ tz: LA, since: '2026-10-01T00:00:00Z' }])).toBeNull()
   })
 })

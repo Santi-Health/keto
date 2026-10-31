@@ -82,3 +82,57 @@ export function entryTime(iso: string, tz?: string | null): string {
   const text = new Date(t).toLocaleTimeString('en-US', { timeZone: zone, hour: 'numeric', minute: '2-digit' })
   return zone !== deviceTz() && tzOffsetMs(zone, t) !== tzOffsetMs(deviceTz(), t) ? `${text} ${zoneLabel(zone, t)}` : text
 }
+
+// --- Travel ------------------------------------------------------------------------------------
+
+/** Where the phone has been: a new entry each time the app opens in a different time zone. */
+export interface ZoneStop {
+  tz: string
+  /** When the app first saw this zone (ISO). */
+  since: string
+}
+
+/** Adds the current zone when it differs from the last one seen; keeps the last 60 stops. */
+export function recordZone(log: ZoneStop[] | undefined, tz = deviceTz(), now = new Date()): ZoneStop[] | null {
+  const last = log?.[log.length - 1]
+  if (last?.tz === tz) return null
+  return [...(log ?? []), { tz, since: now.toISOString() }].slice(-60)
+}
+
+/** The zone the phone was in at instant `t` (the first known zone for anything earlier). */
+export function zoneAt(log: ZoneStop[] | undefined, t: number, fallback = deviceTz()): string {
+  if (!log?.length) return fallback
+  let z = log[0].tz
+  for (const s of log) if (Date.parse(s.since) <= t) z = s.tz
+  return z
+}
+
+export interface TravelDay {
+  /** Real length of the calendar day as lived: midnight where it started to midnight where it ended. */
+  hours: number
+  from: string
+  to: string
+}
+
+/**
+ * A calendar day that changed time zones (a flight), with its real length, e.g. 21 hours LA → New York
+ * or 27 hours New York → LA. Null for ordinary days, including plain daylight-saving changes.
+ */
+export function travelDay(day: string, log: ZoneStop[] | undefined): TravelDay | null {
+  if (!log || log.length < 2) return null
+  const roughStart = midnightIn(deviceTz(), day)
+  const from = zoneAt(log, roughStart - 12 * 3_600_000)
+  const start = midnightIn(from, day)
+  const roughEnd = midnightIn(from, nextDay(day))
+  const changes = log.filter((s) => {
+    const t = Date.parse(s.since)
+    return t > start && t < roughEnd + 12 * 3_600_000
+  })
+  if (!changes.length) return null
+  const to = changes[changes.length - 1].tz
+  if (to === from) return null
+  const end = midnightIn(to, nextDay(day))
+  // Only once the day is over (or underway) in the new zone does its length change.
+  if (Date.parse(changes[0].since) >= end) return null
+  return { hours: Math.round(((end - start) / 3_600_000) * 10) / 10, from, to }
+}

@@ -3,6 +3,7 @@ import type { Session } from '@supabase/supabase-js'
 import { DataProvider, useData } from './lib/data'
 import { averageBurn } from './lib/activity'
 import { useSyncOnOpen } from './lib/backgroundSync'
+import { recordZone } from './lib/time'
 import { latest } from './lib/readings'
 import type { Profile } from './lib/types'
 import { useProfile, useSession } from './lib/profileStore'
@@ -87,6 +88,7 @@ function Tracker({ session, recovering = false, onPassphraseChanged = () => {} }
     <WeightFromReadings weightKg={profile.weightKg} lastId={profile.weightReadingId ?? null} update={update} />
     <BurnFromActivity kcal={profile.fitbitBurnKcal ?? null} update={update} />
     <SyncOnOpen enabled={!!session} />
+    <ZoneTracker log={profile.zoneLog} update={update} />
     <div className="app">
       <main className="main">
         {tab === 'today' && (
@@ -187,5 +189,19 @@ function BurnFromActivity({ kcal, update }: { kcal: number | null; update: (p: P
 /** Asks the server for a fresh Fitbit / Google Health sync when the app opens (if background sync is linked). */
 function SyncOnOpen({ enabled }: { enabled: boolean }) {
   useSyncOnOpen(enabled)
+  return null
+}
+
+/** Notes the phone's time zone when the app opens or comes back, so travel days can be recognized. */
+function ZoneTracker({ log, update }: { log: Profile['zoneLog']; update: (p: Partial<Profile>) => void }) {
+  useEffect(() => {
+    const check = () => {
+      const next = recordZone(log)
+      if (next) update({ zoneLog: next })
+    }
+    check()
+    document.addEventListener('visibilitychange', check)
+    return () => document.removeEventListener('visibilitychange', check)
+  }, [log, update])
   return null
 }

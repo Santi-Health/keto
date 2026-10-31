@@ -41,6 +41,8 @@ export interface Profile {
   /** Last weekly backup to Google Drive, and the folder it lives in. */
   lastBackupAt?: string | null
   backupFolderId?: string | null
+  /** Time zones the phone has been in (travel), newest last. */
+  zoneLog?: { tz: string; since: string }[]
   /** Name printed on the doctor summary. */
   reportName?: string
   /** Average daily burn from Fitbit (last 7 full days), used instead of the estimate. */
