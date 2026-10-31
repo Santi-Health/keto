@@ -14,6 +14,17 @@
   --warn: #b5482f;
   --warn-soft: #f8e3dc;
   --track: #e8e5dd;
+  /* CPK-style atom colors for the molecule drawings */
+  --atom-c: #6b7280;
+  --atom-o: #e5484d;
+  --atom-n: #3a6fd8;
+  --atom-p: #f08a24;
+  --atom-na: #9b5de5;
+  --atom-k: #7b3fc4;
+  --atom-mg: #3f9a4a;
+  --bond: #9aa0a6;
+  --fiber: #9a7b4f;
+  --ketone: #8b5cf6;
   --radius: 14px;
   --nav-h: 64px;
 
@@ -42,6 +53,16 @@
     --warn: #ef8a6f;
     --warn-soft: #3d241d;
     --track: #2e312c;
+    --atom-c: #a3a9b3;
+    --atom-o: #ff6b6b;
+    --atom-n: #7aa2f2;
+    --atom-p: #ffa347;
+    --atom-na: #b98cf5;
+    --atom-k: #a07ce8;
+    --atom-mg: #6cc46f;
+    --bond: #6b7078;
+    --fiber: #c4a274;
+    --ketone: #a78bfa;
     color-scheme: dark;
   }
 }
@@ -62,6 +83,16 @@
   --warn: #ef8a6f;
   --warn-soft: #3d241d;
   --track: #2e312c;
+  --atom-c: #a3a9b3;
+  --atom-o: #ff6b6b;
+  --atom-n: #7aa2f2;
+  --atom-p: #ffa347;
+  --atom-na: #b98cf5;
+  --atom-k: #a07ce8;
+  --atom-mg: #6cc46f;
+  --bond: #6b7078;
+  --fiber: #c4a274;
+  --ketone: #a78bfa;
   color-scheme: dark;
 }
 
@@ -238,7 +269,7 @@ select {
 /* Rings */
 .rings {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 8px;
 }
 
@@ -729,4 +760,38 @@ input[type='search'] {
 input[type='datetime-local'],
 input[type='date'] {
   min-width: 0;
+}
+
+/* Molecule drawings */
+.molecule {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  line-height: 1;
+}
+
+.molecule svg {
+  display: block;
+  overflow: visible;
+}
+
+.molecule .formula {
+  font-size: 0.66rem;
+  white-space: nowrap;
+  color: var(--text-2);
+  margin-top: 2px;
+  font-variant-numeric: tabular-nums;
+}
+
+.bar-head .bar-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ketosis-head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 8px;
 }

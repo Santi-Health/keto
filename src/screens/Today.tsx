@@ -1,6 +1,7 @@
 import { useMemo } from 'react'
 import { useInstall } from '../lib/install'
 import { InstallCard } from '../components/InstallCard'
+import { Molecule } from '../components/Molecules'
 import { Bar, Ring } from '../components/Progress'
 import { WatchListCard } from '../components/WatchListCard'
 import { useData } from '../lib/data'
@@ -83,10 +84,10 @@ export function Today({ profile, targets, onOpenSettings, onToggleRefeed, onNavi
           <section className="card">
             <h2>Macros</h2>
             <div className="rings">
-              <Ring label="Net carbs" value={totals.netCarbs} target={targets.netCarbsG} unit="g" color="var(--carbs)" isLimit />
-              <Ring label="Protein" value={totals.protein} target={targets.proteinG} unit="g" color="var(--protein)" />
-              <Ring label="Fat" value={totals.fat} target={fatBudget} unit="g" color="var(--fat)" isLimit caption="Fat budget" />
-              <Ring label="Calories" value={totals.calories} target={targets.calories} unit="" color="var(--calories)" isLimit />
+              <Ring label="Net carbs" value={totals.netCarbs} target={targets.netCarbsG} unit="g" color="var(--carbs)" isLimit molecule="glucose" />
+              <Ring label="Protein" value={totals.protein} target={targets.proteinG} unit="g" color="var(--protein)" molecule="protein" />
+              <Ring label="Fat" value={totals.fat} target={fatBudget} unit="g" color="var(--fat)" isLimit caption="Fat budget" molecule="fat" />
+              <Ring label="Calories" value={totals.calories} target={targets.calories} unit="" color="var(--calories)" isLimit molecule="energy" />
             </div>
             {dayLogs.length > 0 && (
               <p className="small" style={{ marginBottom: 0 }}>
@@ -145,10 +146,10 @@ export function Today({ profile, targets, onOpenSettings, onToggleRefeed, onNavi
 
           <section className="card">
             <h2>Electrolytes &amp; fiber</h2>
-            <Bar label="Sodium" value={totals.sodium} target={targets.sodiumMg} unit="mg" />
-            <Bar label="Potassium" value={totals.potassium} target={targets.potassiumMg} unit="mg" />
-            <Bar label="Magnesium" value={totals.magnesium} target={targets.magnesiumMg} unit="mg" />
-            <Bar label="Fiber" value={totals.fiber} target={targets.fiberG} unit="g" />
+            <Bar label="Sodium" value={totals.sodium} target={targets.sodiumMg} unit="mg" molecule="sodium" color="var(--atom-na)" />
+            <Bar label="Potassium" value={totals.potassium} target={targets.potassiumMg} unit="mg" molecule="potassium" color="var(--atom-k)" />
+            <Bar label="Magnesium" value={totals.magnesium} target={targets.magnesiumMg} unit="mg" molecule="magnesium" color="var(--atom-mg)" />
+            <Bar label="Fiber" value={totals.fiber} target={targets.fiberG} unit="g" molecule="fiber" color="var(--fiber)" />
           </section>
         </div>
 
@@ -175,7 +176,13 @@ export function Today({ profile, targets, onOpenSettings, onToggleRefeed, onNavi
           <WatchListCard items={watch} />
 
           <section className="card">
-            <h2>Ketosis</h2>
+            <div className="ketosis-head">
+              <Molecule molecule="ketone" size={88} showFormula />
+              <div>
+                <h2 style={{ color: 'var(--ketone)' }}>Ketosis</h2>
+                <div className="muted small">β-hydroxybutyrate: the ketone your blood meter reads</div>
+              </div>
+            </div>
             <p className="muted small" style={{ margin: 0 }}>
               {totals.netCarbs <= targets.netCarbsG
                 ? `Today's net carbs (${totals.netCarbs.toFixed(1)} g) are within your ${targets.netCarbsG} g limit.`
