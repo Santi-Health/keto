@@ -6,7 +6,7 @@ import { LogFoodSheet } from '../components/LogFoodSheet'
 import { RecipeBuilder } from '../components/RecipeBuilder'
 import { useData } from '../lib/data'
 import { lookupBarcode } from '../lib/foodApi'
-import { MEALS, mealForTime, suggestForMeal, type Food, type Meal, type NewFood } from '../lib/foods'
+import { MEALS, mealForTime, setUsual, suggestForMeal, type Food, type Meal, type NewFood } from '../lib/foods'
 import { useFoodSearch } from '../lib/useFoodSearch'
 
 type Overlay =
@@ -25,7 +25,7 @@ interface Props {
 }
 
 export function Add({ startScan, date, onLogged }: Props) {
-  const { foods, logs } = useData()
+  const { foods, logs, updateFood } = useData()
   const [meal, setMeal] = useState<Meal>(() => mealForTime(new Date()))
   const mealLabel = MEALS.find((m) => m.value === meal)!.label
   const usual = suggestForMeal(foods, logs, meal)
@@ -119,7 +119,13 @@ export function Add({ startScan, date, onLogged }: Props) {
             {usual.length ? (
               <div className="food-grid">
                 {usual.map((f) => (
-                  <FoodRow key={f.id} food={f} onPick={() => setOverlay({ kind: 'log', food: f })} />
+                  <FoodRow
+                    key={f.id}
+                    food={f}
+                    onPick={() => setOverlay({ kind: 'log', food: f })}
+                    onDismiss={() => updateFood({ ...f, meta: setUsual(f.meta, meal, false) })}
+                    dismissLabel={`Not usual for ${mealLabel.toLowerCase()}`}
+                  />
                 ))}
               </div>
             ) : (

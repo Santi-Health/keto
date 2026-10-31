@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useData } from '../lib/data'
-import { MEALS, mealForTime, portionNutrients, type Food, type LogEntry, type Meal, type NewFood } from '../lib/foods'
+import { MEALS, mealForTime, portionNutrients, setUsual, usualMealsFor, type Food, type FoodMeta, type LogEntry, type Meal, type NewFood } from '../lib/foods'
 import { toGrams, unitsFor } from '../lib/units'
 import { FoodFlags, MacroStrip, foodSubtitle } from './FoodBits'
 import { Sheet } from './Sheet'
@@ -33,7 +33,7 @@ function defaultTime(date?: string): Date {
 }
 
 export function LogFoodSheet({ food, entry, date, meal: chosenMeal, onClose, onEditFood, onDone }: Props) {
-  const { saveFood, logFood, updateLog, deleteLog, updateFood } = useData()
+  const { saveFood, logFood, updateLog, deleteLog, updateFood, logs } = useData()
   const saved = 'id' in food ? food : null
   const units = unitsFor({ unitConversions: food.unit_conversions })
   const firstUnit = food.unit_conversions[0]?.unit ?? 'g'
@@ -42,7 +42,9 @@ export function LogFoodSheet({ food, entry, date, meal: chosenMeal, onClose, onE
   const start = entry ? new Date(entry.eaten_at) : defaultTime(date)
   const [time, setTime] = useState(toLocalInput(start))
   const [meal, setMeal] = useState<Meal>(entry?.meal ?? chosenMeal ?? mealForTime(start))
-  const [usualMeals, setUsualMeals] = useState<Meal[]>(food.meta.meals ?? [])
+  // What the app currently treats as usual (tags + history); changes are saved as overrides.
+  const [usualMeta, setUsualMeta] = useState<FoodMeta>(food.meta)
+  const usualMeals = usualMealsFor({ id: saved?.id ?? '', meta: usualMeta }, logs)
   const [favorite, setFavorite] = useState(saved?.favorite ?? false)
 
   const qty = Number(amount)
@@ -73,21 +75,21 @@ export function LogFoodSheet({ food, entry, date, meal: chosenMeal, onClose, onE
       })
     } else {
       const f = saved ?? saveFood(food)
-      logFood({ ...f, favorite, meta: { ...f.meta, meals: usualMeals } }, qty, unit, meal, eatenAt)
+      logFood({ ...f, favorite, meta: { ...f.meta, meals: usualMeta.meals, notMeals: usualMeta.notMeals } }, qty, unit, meal, eatenAt)
     }
     onDone?.()
     onClose()
   }
 
   function toggleUsual(m: Meal) {
-    const next = usualMeals.includes(m) ? usualMeals.filter((x) => x !== m) : [...usualMeals, m]
-    setUsualMeals(next)
-    if (saved) updateFood({ ...saved, favorite, meta: { ...saved.meta, meals: next } })
+    const next = setUsual(usualMeta, m, !usualMeals.includes(m))
+    setUsualMeta(next)
+    if (saved) updateFood({ ...saved, favorite, meta: { ...saved.meta, meals: next.meals, notMeals: next.notMeals } })
   }
 
   function toggleFavorite() {
     setFavorite(!favorite)
-    if (saved) updateFood({ ...saved, favorite: !favorite, meta: { ...saved.meta, meals: usualMeals } })
+    if (saved) updateFood({ ...saved, favorite: !favorite, meta: { ...saved.meta, meals: usualMeta.meals, notMeals: usualMeta.notMeals } })
   }
 
   const estimated = food.source === 'ai_estimate' || food.fields_estimated.length > 0
@@ -147,7 +149,7 @@ export function LogFoodSheet({ food, entry, date, meal: chosenMeal, onClose, onE
             </button>
           ))}
         </div>
-        <div className="hint">Tagged foods are suggested first when you add food to that meal.</div>
+        <div className="hint">Highlighted meals show this food under "Usual for…". Tap to add or remove; it overrides what the app learned.</div>
       </div>
 
       <div className="row" style={{ flexWrap: 'wrap' }}>

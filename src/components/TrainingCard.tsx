@@ -8,9 +8,12 @@ interface Props {
   /** Shown when today is a routine day and it isn't logged yet. */
   routine: Routine | null
   onLogRoutine: () => void
+  onImportFitbit: () => void
+  importing: boolean
+  importMessage: string | null
 }
 
-export function TrainingCard({ today, daysSinceStrength, warnings, onLog, routine, onLogRoutine }: Props) {
+export function TrainingCard({ today, daysSinceStrength, warnings, onLog, routine, onLogRoutine, onImportFitbit, importing, importMessage }: Props) {
   const active = today.reduce((s, e) => s + (e.calories ?? 0), 0)
   const minutes = today.reduce((s, e) => s + e.duration_min, 0)
   return (
@@ -31,6 +34,7 @@ export function TrainingCard({ today, daysSinceStrength, warnings, onLog, routin
             {today.map((e) => (
               <span key={e.id} className="chip">
                 {sessionLabel(e)} · {e.duration_min} min{isHardSession(e) ? ' · hard' : ''}
+                {e.source === 'fitbit' ? ' · ⌚' : ''}
                 {e.meta.fasted ? ' · fasted' : ''}
               </span>
             ))}
@@ -54,10 +58,14 @@ export function TrainingCard({ today, daysSinceStrength, warnings, onLog, routin
             🧘 Log usual yoga ({routine.minutes} min, {formatTime(routine.start)})
           </button>
         )}
+        <button type="button" className="btn secondary" onClick={onImportFitbit} disabled={importing}>
+          {importing ? 'Importing…' : '⌚ Import from Fitbit'}
+        </button>
         <button type="button" className="btn secondary" onClick={onLog}>
           + Log exercise
         </button>
       </div>
+      {importMessage && <p className="small" role="status" style={{ marginBottom: 0 }}>{importMessage}</p>}
     </section>
   )
 }

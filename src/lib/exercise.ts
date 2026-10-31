@@ -106,6 +106,11 @@ export interface Exercise {
     fasted?: boolean
     lifts?: Lift[]
     caloriesEstimated?: boolean
+    // From Fitbit / Google Health imports.
+    fitbitTotalKcal?: number
+    fitbitType?: string
+    steps?: number
+    avgHr?: number
   }
   updated_at: string
   deleted_at: string | null

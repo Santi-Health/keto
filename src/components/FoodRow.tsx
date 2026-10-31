@@ -16,12 +16,12 @@ const n0 = (v: number | undefined) => (v == null ? '—' : Math.round(v).toLocal
 const n1 = (v: number | undefined) => (v == null ? '—' : v < 10 ? (Math.round(v * 10) / 10).toString() : Math.round(v).toString())
 
 /** A small card with label-style numbers for one serving, for quick comparison. */
-export function FoodRow({ food, onPick }: { food: Food | NewFood; onPick: () => void }) {
+export function FoodRow({ food, onPick, onDismiss, dismissLabel }: { food: Food | NewFood; onPick: () => void; onDismiss?: () => void; dismissLabel?: string }) {
   const saved = 'id' in food ? food : null
   const serving = labelServing(food)
   const n = scaleNutrients(food.per_100g, serving.grams)
   const est = food.source === 'ai_estimate' || food.fields_estimated.length > 0 ? '~' : ''
-  return (
+  const card = (
     <button type="button" className="food-card" onClick={onPick}>
       <span className="food-card-name">
         {saved?.favorite && <span className="star">★</span>}
@@ -61,5 +61,14 @@ export function FoodRow({ food, onPick }: { food: Food | NewFood; onPick: () => 
         </span>
       </span>
     </button>
+  )
+  if (!onDismiss) return card
+  return (
+    <div className="food-card-wrap">
+      {card}
+      <button type="button" className="food-card-dismiss" aria-label={dismissLabel} title={dismissLabel} onClick={onDismiss}>
+        ×
+      </button>
+    </div>
   )
 }

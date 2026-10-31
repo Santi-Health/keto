@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildLogEntry, completeNutrients, suggestForMeal, type Food } from './foods'
+import { buildLogEntry, completeNutrients, setUsual, suggestForMeal, usualMealsFor, type Food } from './foods'
 import { toGrams } from './units'
 
 const food = (overrides: Partial<Food> = {}): Food => ({
@@ -79,5 +79,12 @@ describe('suggestForMeal', () => {
   it('shows nuts for snacks and dinner, and leaves unrelated foods out', () => {
     expect(suggestForMeal([bread, salmon, nuts, whites], logs, 'dinner', 8, now).map((f) => f.id)).toEqual(['n'])
     expect(suggestForMeal([bread, salmon, nuts, whites], logs, 'lunch', 8, now).map((f) => f.id)).toEqual(['b'])
+  })
+
+  it('drops a food from a meal once you say it is not usual there, even with history', () => {
+    const s2 = { ...salmon, meta: setUsual(salmon.meta, 'breakfast', false) }
+    expect(suggestForMeal([s2, whites], logs, 'breakfast', 8, now).map((f) => f.id)).toEqual(['w'])
+    expect(usualMealsFor(s2, logs)).toEqual([])
+    expect(usualMealsFor({ ...bread, meta: setUsual(bread.meta, 'dinner', true) }, logs)).toEqual(['lunch', 'dinner'])
   })
 })

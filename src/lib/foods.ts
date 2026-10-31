@@ -36,6 +36,8 @@ export interface FoodMeta {
   recipe?: RecipeMeta
   /** Meals this food is usually eaten at, as told by the user. */
   meals?: Meal[]
+  /** Meals the user said this food is NOT usual for; overrides what history suggests. */
+  notMeals?: Meal[]
 }
 
 /** Row shape of the `foods` table. */
@@ -157,6 +159,7 @@ export function suggestForMeal(foods: Food[], logs: Pick<LogEntry, 'food_id' | '
     lastAt.set(l.food_id, Math.max(lastAt.get(l.food_id) ?? 0, Date.parse(l.eaten_at)))
   }
   const scored = foods
+    .filter((f) => !f.meta.notMeals?.includes(meal))
     .map((f) => {
       const tagged = f.meta.meals?.includes(meal) ? 10 : 0
       const n = counts.get(f.id) ?? 0
@@ -166,4 +169,26 @@ export function suggestForMeal(foods: Food[], logs: Pick<LogEntry, 'food_id' | '
     })
     .filter((x) => x.score > 0)
   return scored.sort((a, b) => b.score - a.score).slice(0, limit).map((x) => x.f)
+}
+
+/** Meals a food currently counts as usual for: tagged, or logged there before, minus ones ruled out. */
+export function usualMealsFor(food: Pick<Food, 'id' | 'meta'>, logs: Pick<LogEntry, 'food_id' | 'meal'>[]): Meal[] {
+  const fromHistory = new Set(logs.filter((l) => l.food_id === food.id).map((l) => l.meal))
+  return MEALS.map((m) => m.value).filter(
+    (m) => !food.meta.notMeals?.includes(m) && (food.meta.meals?.includes(m) || fromHistory.has(m)),
+  )
+}
+
+/** Meta after the user says a food is (or isn't) usual for a meal. */
+export function setUsual(meta: FoodMeta, meal: Meal, usual: boolean): FoodMeta {
+  const meals = new Set(meta.meals ?? [])
+  const notMeals = new Set(meta.notMeals ?? [])
+  if (usual) {
+    meals.add(meal)
+    notMeals.delete(meal)
+  } else {
+    meals.delete(meal)
+    notMeals.add(meal)
+  }
+  return { ...meta, meals: [...meals], notMeals: [...notMeals] }
 }

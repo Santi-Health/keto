@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
-import { daysSinceStrength, routineDue, routineSession, trainingWarnings } from '../lib/exercise'
+import { daysSinceStrength, routineDue, routineSession, sessionLabel, trainingWarnings } from '../lib/exercise'
+import { getGoogleToken, listExercises, mergeImported, toAppExercise } from '../lib/googleHealth'
 import { useInstall } from '../lib/install'
 import { AminoCard } from '../components/AminoCard'
 import { ExerciseSheet } from '../components/ExerciseSheet'
@@ -30,6 +31,37 @@ function useInstallOffer() {
 export function Today({ profile, targets, onOpenSettings, onToggleRefeed, onNavigate }: Props) {
   const { logsOn, logsWeekEnding, pending, syncError, exercises, exercisesOn, saveExercise } = useData()
   const [logExercise, setLogExercise] = useState(false)
+  const [importing, setImporting] = useState(false)
+  const [importMessage, setImportMessage] = useState<string | null>(null)
+
+  /** Pulls the last 3 days of Fitbit workouts and merges them with what's logged. */
+  async function importFitbit() {
+    setImporting(true)
+    setImportMessage(null)
+    try {
+      const token = await getGoogleToken()
+      const from = new Date()
+      from.setDate(from.getDate() - 2)
+      const points = await listExercises(token, localDate(from), day)
+      const mapped = points
+        .map((p) => toAppExercise(p, profile.weightKg, targets.bmr))
+        .filter((x): x is NonNullable<typeof x> => !!x)
+      const fromIso = new Date(`${localDate(from)}T00:00:00`).toISOString()
+      const recent = exercises.filter((e) => e.started_at >= fromIso)
+      const { added, updated, matched } = mergeImported(mapped, recent)
+      for (const e of [...added, ...updated, ...matched]) saveExercise(e)
+      const names = [...added, ...matched].map((e) => `${sessionLabel(e)} ${e.duration_min} min`)
+      setImportMessage(
+        points.length === 0
+          ? 'No Fitbit workouts found in the last 3 days. If you just finished one, let the Fitbit app sync first.'
+          : `Imported ${added.length} new, matched ${matched.length} you logged, refreshed ${updated.length}.${names.length ? ` ${names.join(' · ')}` : ''}`,
+      )
+    } catch (e) {
+      setImportMessage(`Couldn't import: ${(e as Error).message}`)
+    } finally {
+      setImporting(false)
+    }
+  }
   const day = localDate()
   const dayLogs = logsOn(day)
   const weekLogs = logsWeekEnding(day)
@@ -196,6 +228,9 @@ export function Today({ profile, targets, onOpenSettings, onToggleRefeed, onNavi
             onLog={() => setLogExercise(true)}
             routine={profile.yogaRoutine && routineDue(profile.yogaRoutine, sessionsToday) ? profile.yogaRoutine : null}
             onLogRoutine={() => profile.yogaRoutine && saveExercise(routineSession(profile.yogaRoutine, profile.weightKg))}
+            onImportFitbit={() => void importFitbit()}
+            importing={importing}
+            importMessage={importMessage}
           />
 
           <AminoCard logs={dayLogs} weightKg={profile.weightKg} goal={profile.muscleGoal} />

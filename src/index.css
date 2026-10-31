@@ -950,3 +950,26 @@ input[type='time'] {
   background: var(--accent);
   color: #fff;
 }
+
+.food-card-wrap {
+  position: relative;
+}
+
+.food-card-wrap .food-card {
+  padding-right: 40px;
+}
+
+.food-card-dismiss {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 30px;
+  height: 30px;
+  border: 0;
+  border-radius: 99px;
+  background: var(--surface-2);
+  color: var(--text-2);
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+}
