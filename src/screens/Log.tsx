@@ -97,7 +97,7 @@ export function Log({ weightKg, date, onDateChange, onAdd }: Props) {
       <div className="card">
         <div className="page-header" style={{ marginBottom: 0 }}>
           <h2>{label}</h2>
-          <div className="row" style={{ flex: 'none' }}>
+          <div className="header-actions">
             <button type="button" className="btn secondary" onClick={() => setExerciseSheet({})}>
               + Exercise
             </button>

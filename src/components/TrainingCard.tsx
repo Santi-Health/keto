@@ -66,7 +66,7 @@ export function TrainingCard({ today, daysSinceStrength, warnings, onLog, routin
         </p>
       ))}
       <p className="muted small">Exercise is saved for the ketosis model: hard and fasted sessions tend to raise ketones, and it will learn how much for you.</p>
-      <div className="row" style={{ flexWrap: 'wrap' }}>
+      <div className="header-actions" style={{ flexWrap: 'wrap' }}>
         {routine && (
           <button type="button" className="btn" onClick={onLogRoutine}>
             🧘 Log usual yoga ({routine.minutes} min, {formatTime(routine.start)})

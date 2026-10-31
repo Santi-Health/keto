@@ -1041,3 +1041,15 @@ input[type='time'] {
 .insight-row:last-child {
   border-bottom: 0;
 }
+
+/* Side-by-side header buttons: same height, never wrapping */
+.header-actions {
+  display: flex;
+  gap: 8px;
+  flex: none;
+}
+
+.header-actions .btn {
+  white-space: nowrap;
+  padding: 10px 14px;
+}
