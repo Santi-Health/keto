@@ -22,6 +22,7 @@ import type { Profile } from '../lib/types'
 import { computeWatchList } from '../lib/watchlist'
 import { KG_PER_LB, ketoneBand, latest, type ReadingKind } from '../lib/readings'
 import { useKetoModel } from '../lib/useKetoModel'
+import { READINESS_TEXT, readinessFor } from '../lib/readiness'
 import { dailySeries, lastDays } from '../lib/trends'
 import { formatSleep } from '../lib/activity'
 
@@ -90,7 +91,9 @@ export function Today({ profile, targets, onOpenSettings, onToggleRefeed, onNavi
 
       // Steps, calories burned, resting heart rate, sleep and weigh-ins: 30 days the first time, then the last week.
       const actFrom = new Date()
-      actFrom.setDate(actFrom.getDate() - (Object.keys(activity).length ? 7 : 30))
+      // A month the first time (and once more to backfill HRV for readiness), then the last week.
+      const hasHistory = Object.values(activity).some((d) => d.meta.hrvMs != null)
+      actFrom.setDate(actFrom.getDate() - (hasHistory ? 7 : 30))
       // Workouts are already saved; a problem here is reported without losing them.
       let actMessage: string
       try {
@@ -166,12 +169,13 @@ export function Today({ profile, targets, onOpenSettings, onToggleRefeed, onNavi
   const fatBudget = liveFatBudget(targets, { protein: totals.protein, netCarbs: totals.netCarbs })
   const sessionsToday = viewDays.flatMap((d) => exercisesOn(d))
   const sinceStrength = daysSinceStrength(exercises)
-  const trainWarnings = !isToday ? [] : trainingWarnings({
+  const readiness = isToday ? readinessFor(today, activity) : null
+  const trainWarnings = !isToday ? [] : [...(readiness?.band === 'low' ? [{ level: 'yellow' as const, text: `Readiness is ${readiness.score}: ${READINESS_TEXT.low}` }] : []), ...trainingWarnings({
     exercisesToday: sessionsToday,
     daysSinceStrength: sinceStrength,
     effectiveDeficit: targets.effectiveDeficit,
     isRefeed: targets.isRefeed,
-  })
+  })]
   const ketoModel = useKetoModel(targets.netCarbsG, targets.proteinG)
   const ketoOpts = { logs, exercises, netCarbLimit: targets.netCarbsG, proteinTarget: targets.proteinG, model: ketoModel.adjuster }
   // Past days are judged at the end of the day (11:59 PM).

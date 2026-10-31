@@ -292,6 +292,8 @@ export interface ActivityImport {
   steps: Record<string, number>
   caloriesOut: Record<string, number>
   restingHr: Record<string, number>
+  /** Overnight HRV (RMSSD, ms) by the morning it was measured. */
+  hrv: Record<string, number>
   sleep: SleepNight[]
   weights: { id: string; at: string; kg: number }[]
   bodyFat: { at: string; pct: number }[]
@@ -301,7 +303,7 @@ export interface ActivityImport {
 
 /** Pulls daily activity for a date range. Each part fails on its own so one missing permission doesn't block the rest. */
 export async function fetchActivity(token: string, fromDate: string, toDate: string): Promise<ActivityImport> {
-  const out: ActivityImport = { steps: {}, caloriesOut: {}, restingHr: {}, sleep: [], weights: [], bodyFat: [], skipped: [] }
+  const out: ActivityImport = { steps: {}, caloriesOut: {}, restingHr: {}, hrv: {}, sleep: [], weights: [], bodyFat: [], skipped: [] }
   const civilRange = (field: string) => `${field} >= "${civil(fromDate)}" AND ${field} < "${civil(toDate, 1)}"`
   const part = async (label: string, run: () => Promise<void>) => {
     try {
@@ -323,6 +325,14 @@ export async function fetchActivity(token: string, fromDate: string, toDate: str
       const day = fromCivil(v?.date)
       const bpm = Number(v?.beatsPerMinute)
       if (day && bpm > 0) out.restingHr[day] = bpm
+    }
+  })
+  await part('heart rate variability', async () => {
+    for (const p of await listPoints(token, 'daily-heart-rate-variability', `daily_heart_rate_variability.date >= "${fromDate}" AND daily_heart_rate_variability.date < "${addDays(toDate, 1)}"`)) {
+      const v = p.dailyHeartRateVariability as { date?: unknown; averageHeartRateVariabilityMilliseconds?: number } | undefined
+      const day = fromCivil(v?.date)
+      const ms = Number(v?.averageHeartRateVariabilityMilliseconds)
+      if (day && ms > 0) out.hrv[day] = Math.round(ms * 10) / 10
     }
   })
   await part('sleep', async () => {

@@ -17,6 +17,8 @@ export interface ActivityDay {
     remMin?: number
     lightMin?: number
     awakeMin?: number
+    /** Overnight heart rate variability (RMSSD, ms). */
+    hrvMs?: number
   }
   updated_at: string
   deleted_at: string | null
@@ -41,6 +43,7 @@ export function mergeActivity(imp: ActivityImport, existing: Record<string, Acti
   for (const [day, v] of Object.entries(imp.steps)) get(day).steps = v
   for (const [day, v] of Object.entries(imp.caloriesOut)) if (v > 0) get(day).calories_out = v
   for (const [day, v] of Object.entries(imp.restingHr)) get(day).resting_hr = v
+  for (const [day, v] of Object.entries(imp.hrv)) get(day).meta = { ...get(day).meta, hrvMs: v }
   // Naps add to the day's sleep; the longest sleep sets the bed and wake times.
   const byDay = new Map<string, ActivityImport['sleep']>()
   for (const n of imp.sleep) byDay.set(n.day, [...(byDay.get(n.day) ?? []), n])

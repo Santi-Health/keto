@@ -2,6 +2,7 @@ import { useMemo } from 'react'
 import { formatSleep, type ActivityDay } from '../lib/activity'
 import { useData } from '../lib/data'
 import { addNutrients } from '../lib/nutrients'
+import { READINESS_TEXT, readinessFor } from '../lib/readiness'
 import { localDate } from '../lib/targets'
 
 const shift = (date: string, days: number) => {
@@ -51,6 +52,7 @@ export function ActivityCard({ days, onImport, importing }: { days: string[]; on
   return (
     <section className="card">
       <h2>Activity &amp; sleep</h2>
+      <ReadinessBlock days={days} isWeek={isWeek} />
       <div className="stat-grid two-col">
         <div>
           <b>{t?.steps != null ? t.steps.toLocaleString() : '—'}</b>
@@ -97,5 +99,50 @@ export function ActivityCard({ days, onImport, importing }: { days: string[]; on
           ` · on ${balance.length} fully logged day${balance.length > 1 ? 's' : ''}, you ate ${Math.abs(Math.round(avgGap)).toLocaleString()} kcal ${avgGap >= 0 ? 'under' : 'over'} your burn on average`}
       </p>
     </section>
+  )
+}
+
+/** The app's readiness score for the day (or the week's average), with what drove it. */
+function ReadinessBlock({ days, isWeek }: { days: string[]; isWeek: boolean }) {
+  const { activity } = useData()
+  const scores = days.map((d) => readinessFor(d, activity)).filter((r): r is NonNullable<typeof r> => !!r)
+  if (!scores.length) return null
+  const r = scores[scores.length - 1]
+  const score = isWeek ? Math.round(scores.reduce((a, b) => a + b.score, 0) / scores.length) : r.score
+  const band = score >= 70 ? 'high' : score >= 45 ? 'moderate' : 'low'
+  return (
+    <div className={`readiness ${band}`}>
+      <div className="readiness-score">
+        <b>{score}</b>
+        <span>{isWeek ? `readiness avg (${scores.length} days)` : 'readiness'}</span>
+      </div>
+      <div className="readiness-detail">
+        {!isWeek && <div className="small">{READINESS_TEXT[band]}</div>}
+        {isWeek ? (
+          <div className="readiness-days">
+            {days.map((d) => {
+              const x = readinessFor(d, activity)
+              return (
+                <span key={d} className={x ? (x.score >= 70 ? 'high' : x.score >= 45 ? 'moderate' : 'low') : ''} title={d}>
+                  {x?.score ?? '–'}
+                </span>
+              )
+            })}
+          </div>
+        ) : (
+          <ul className="readiness-parts">
+            {r.parts.map((p) => (
+              <li key={p.label}>
+                <b>{p.label}</b> {p.score}: {p.detail}
+              </li>
+            ))}
+          </ul>
+        )}
+        <div className="muted small">
+          The app's own score from HRV, resting heart rate and sleep against your last 30 days (Fitbit's Readiness isn't shared with apps).
+          {!isWeek && r.missing.length ? ` No ${r.missing.join(' or ')} data yet.` : ''}
+        </div>
+      </div>
+    </div>
   )
 }
