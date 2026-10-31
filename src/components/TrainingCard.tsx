@@ -30,17 +30,31 @@ export function TrainingCard({ today, daysSinceStrength, warnings, onLog, routin
       </div>
       {today.length > 0 ? (
         <>
-          <div className="chips" style={{ marginBottom: 8 }}>
+          <div className="session-list">
             {today.map((e) => (
-              <span key={e.id} className="chip">
-                {sessionLabel(e)} · {e.duration_min} min{isHardSession(e) ? ' · hard' : ''}
-                {e.source === 'fitbit' ? ' · ⌚' : ''}
-                {e.meta.fasted ? ' · fasted' : ''}
-              </span>
+              <div key={e.id} className="session-row">
+                <span className="grow">
+                  {sessionLabel(e)}
+                  <span className="muted small">
+                    {' '}
+                    · {e.duration_min} min{isHardSession(e) ? ' · hard' : ''}
+                    {e.meta.fasted ? ' · fasted' : ''}
+                    {e.source === 'fitbit' ? ' · ⌚' : ''}
+                  </span>
+                </span>
+                <span className="session-kcal">
+                  {e.meta.caloriesEstimated ? '~' : ''}+{e.calories ?? 0} kcal
+                </span>
+              </div>
             ))}
+            <div className="session-row session-total">
+              <span className="grow">Extra burned today · {minutes} min</span>
+              <span className="session-kcal">+{active} kcal</span>
+            </div>
           </div>
-          <p className="small" style={{ margin: 0 }}>
-            {minutes} min · <strong>{active} active kcal</strong> burned on top of your resting burn.
+          <p className="muted small" style={{ margin: '6px 0 0' }}>
+            Extra = calories above what you'd burn sitting still for that time (your resting burn is already counted).
+            ~ means estimated from the activity type, intensity and your weight.
           </p>
         </>
       ) : (
