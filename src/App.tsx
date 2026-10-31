@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import { DataProvider, useData } from './lib/data'
 import { averageBurn } from './lib/activity'
+import { useSyncOnOpen } from './lib/backgroundSync'
 import { latest } from './lib/readings'
 import type { Profile } from './lib/types'
 import { useProfile, useSession } from './lib/profileStore'
@@ -85,6 +86,7 @@ function Tracker({ session, recovering = false, onPassphraseChanged = () => {} }
     <DataProvider session={session}>
     <WeightFromReadings weightKg={profile.weightKg} lastId={profile.weightReadingId ?? null} update={update} />
     <BurnFromActivity kcal={profile.fitbitBurnKcal ?? null} update={update} />
+    <SyncOnOpen enabled={!!session} />
     <div className="app">
       <main className="main">
         {tab === 'today' && (
@@ -179,5 +181,11 @@ function BurnFromActivity({ kcal, update }: { kcal: number | null; update: (p: P
   useEffect(() => {
     if (burn && burn.kcal !== kcal) update({ fitbitBurnKcal: burn.kcal, fitbitBurnDays: burn.days })
   }, [burn?.kcal, burn?.days, kcal, update])
+  return null
+}
+
+/** Asks the server for a fresh Fitbit / Google Health sync when the app opens (if background sync is linked). */
+function SyncOnOpen({ enabled }: { enabled: boolean }) {
+  useSyncOnOpen(enabled)
   return null
 }

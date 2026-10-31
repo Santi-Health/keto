@@ -2,6 +2,9 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import { supabase } from './supabase'
 
+/** Window event that makes every synced table pull from the server now. */
+export const REFRESH_EVENT = 'keto:refresh'
+
 export interface SyncedRow {
   id: string
   updated_at: string
@@ -113,8 +116,11 @@ export function useSyncedTable<T extends SyncedRow>(table: string, session: Sess
     sync()
     const onVisible = () => document.visibilityState === 'visible' && sync()
     window.addEventListener('online', sync)
+    // Fired after the server has synced new Fitbit/Google Health data in (see backgroundSync.ts).
+    window.addEventListener(REFRESH_EVENT, sync)
     document.addEventListener('visibilitychange', onVisible)
     return () => {
+      window.removeEventListener(REFRESH_EVENT, sync)
       window.removeEventListener('online', sync)
       document.removeEventListener('visibilitychange', onVisible)
     }

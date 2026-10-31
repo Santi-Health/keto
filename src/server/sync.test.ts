@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { localDateIn, runAll, splitScopes, tzOffsetMs } from './sync'
+import { localDateIn, runAll, splitScopes, syncMe, tzOffsetMs } from './sync'
 
 afterEach(() => vi.unstubAllGlobals())
 
@@ -55,5 +55,30 @@ describe('scopes', () => {
     expect(s.health).toBe('https://www.googleapis.com/auth/googlehealth.activity_and_fitness.readonly https://www.googleapis.com/auth/googlehealth.sleep.readonly')
     expect(s.drive).toBe('https://www.googleapis.com/auth/drive.file')
     expect(splitScopes('https://www.googleapis.com/auth/googlehealth.sleep.readonly').drive).toBeNull()
+  })
+})
+
+describe('sync when the app opens', () => {
+  const env = { supabaseUrl: 'https://x.supabase.co', serviceKey: 's', anonKey: 'a', googleClientId: 'c', googleClientSecret: 'g' }
+  const stub = (tokens: unknown[], lastSync: string | null) =>
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string) => {
+        const json = (b: unknown, status = 200) => new Response(JSON.stringify(b), { status })
+        if (url.includes('/auth/v1/user')) return json({ id: 'u1' })
+        if (url.includes('/google_tokens?')) return json(tokens)
+        if (url.includes('/sync_status?')) return json([{ user_id: 'u1', time_zone: 'America/Los_Angeles', last_sync_at: lastSync }])
+        return json([])
+      }),
+    )
+
+  it('does nothing when background sync is not linked', async () => {
+    stub([], null)
+    expect(await syncMe(env, 'jwt')).toEqual({ ran: false, result: 'not linked' })
+  })
+
+  it('skips when the last sync was a few minutes ago', async () => {
+    stub([{ refresh_token: 'r', scopes: HEALTH }], new Date(Date.now() - 3 * 60_000).toISOString())
+    expect(await syncMe(env, 'jwt')).toEqual({ ran: false, result: 'synced recently' })
   })
 })

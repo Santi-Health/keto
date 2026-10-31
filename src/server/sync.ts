@@ -267,6 +267,32 @@ export async function link(env: Env, appJwt: string, code: string, tz: string): 
   }
 }
 
+/**
+ * Syncs only the signed-in user, right now (the app calls this when it opens). Skips when a sync ran in the
+ * last `minGapMs`, so opening the app repeatedly doesn't hit Google each time.
+ */
+export async function syncMe(env: Env, appJwt: string, minGapMs = 10 * 60_000): Promise<{ ran: boolean; result: string }> {
+  const who = await fetch(`${env.supabaseUrl}/auth/v1/user`, { headers: { apikey: env.anonKey, Authorization: `Bearer ${appJwt}` } })
+  if (!who.ok) throw new Error('Not signed in to the app.')
+  const userId = ((await who.json()) as { id: string }).id
+  const d = db(env)
+  const token = (await d.select<{ refresh_token: string; scopes: string }>('google_tokens', `user_id=eq.${userId}&select=refresh_token,scopes`))[0]
+  if (!token) return { ran: false, result: 'not linked' }
+  const st = (await d.select<SyncStatus & { last_sync_at: string | null }>('sync_status', `user_id=eq.${userId}&select=user_id,time_zone,last_sync_at`))[0]
+  if (st?.last_sync_at && Date.now() - Date.parse(st.last_sync_at) < minGapMs) return { ran: false, result: 'synced recently' }
+  const now = new Date().toISOString()
+  try {
+    const result = await syncUser(env, userId, await tokensFor(env, token.refresh_token, token.scopes), st?.time_zone ?? 'America/Los_Angeles')
+    await d.upsert('sync_status', [{ user_id: userId, last_sync_at: now, last_result: result, last_error: null, needs_relink: false, updated_at: now }], 'user_id')
+    return { ran: true, result }
+  } catch (e) {
+    const relink = e instanceof RelinkNeeded
+    await d.upsert('sync_status', [{ user_id: userId, last_error: (e as Error).message, needs_relink: relink, updated_at: now }], 'user_id')
+    if (relink) await d.remove('google_tokens', `user_id=eq.${userId}`)
+    throw e
+  }
+}
+
 /** Stops background sync for the signed-in user and forgets their Google access. */
 export async function unlink(env: Env, appJwt: string): Promise<void> {
   const who = await fetch(`${env.supabaseUrl}/auth/v1/user`, { headers: { apikey: env.anonKey, Authorization: `Bearer ${appJwt}` } })

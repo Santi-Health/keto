@@ -1156,6 +1156,55 @@ async function link(env, appJwt, code, tz) {
 		throw e;
 	}
 }
+/**
+* Syncs only the signed-in user, right now (the app calls this when it opens). Skips when a sync ran in the
+* last `minGapMs`, so opening the app repeatedly doesn't hit Google each time.
+*/
+async function syncMe(env, appJwt, minGapMs = 6e5) {
+	const who = await fetch(`${env.supabaseUrl}/auth/v1/user`, { headers: {
+		apikey: env.anonKey,
+		Authorization: `Bearer ${appJwt}`
+	} });
+	if (!who.ok) throw new Error("Not signed in to the app.");
+	const userId = (await who.json()).id;
+	const d = db(env);
+	const token = (await d.select("google_tokens", `user_id=eq.${userId}&select=refresh_token,scopes`))[0];
+	if (!token) return {
+		ran: false,
+		result: "not linked"
+	};
+	const st = (await d.select("sync_status", `user_id=eq.${userId}&select=user_id,time_zone,last_sync_at`))[0];
+	if (st?.last_sync_at && Date.now() - Date.parse(st.last_sync_at) < minGapMs) return {
+		ran: false,
+		result: "synced recently"
+	};
+	const now = (/* @__PURE__ */ new Date()).toISOString();
+	try {
+		const result = await syncUser(env, userId, await tokensFor(env, token.refresh_token, token.scopes), st?.time_zone ?? "America/Los_Angeles");
+		await d.upsert("sync_status", [{
+			user_id: userId,
+			last_sync_at: now,
+			last_result: result,
+			last_error: null,
+			needs_relink: false,
+			updated_at: now
+		}], "user_id");
+		return {
+			ran: true,
+			result
+		};
+	} catch (e) {
+		const relink = e instanceof RelinkNeeded;
+		await d.upsert("sync_status", [{
+			user_id: userId,
+			last_error: e.message,
+			needs_relink: relink,
+			updated_at: now
+		}], "user_id");
+		if (relink) await d.remove("google_tokens", `user_id=eq.${userId}`);
+		throw e;
+	}
+}
 /** Stops background sync for the signed-in user and forgets their Google access. */
 async function unlink(env, appJwt) {
 	const who = await fetch(`${env.supabaseUrl}/auth/v1/user`, { headers: {
@@ -1182,6 +1231,7 @@ async function unlink(env, appJwt) {
 *   POST …/health-sync/run     every 4 hours from pg_cron (no sign-in; recently synced users are skipped)
 *   POST …/health-sync/link    from the app: { code, tz } with the app's sign-in token
 *   POST …/health-sync/unlink  from the app, with the app's sign-in token
+*   POST …/health-sync/sync-me from the app when it opens (skipped if synced in the last 10 minutes)
 * Deploy with "Enforce JWT verification" off, since the scheduled call has no sign-in.
 */
 const GOOGLE_CLIENT_ID = "579706392010-f9v75bfl95tcgbuftcvodajimck9dv37.apps.googleusercontent.com";
@@ -1241,6 +1291,10 @@ Deno.serve(async (req) => {
 				result: await link(env(), appJwt, code, tz || "America/Los_Angeles")
 			});
 		}
+		if (path.endsWith("/sync-me")) return json({
+			ok: true,
+			...await syncMe(env(), appJwt)
+		});
 		if (path.endsWith("/unlink")) {
 			await unlink(env(), appJwt);
 			return json({ ok: true });

@@ -3,9 +3,10 @@
  *   POST …/health-sync/run     every 4 hours from pg_cron (no sign-in; recently synced users are skipped)
  *   POST …/health-sync/link    from the app: { code, tz } with the app's sign-in token
  *   POST …/health-sync/unlink  from the app, with the app's sign-in token
+ *   POST …/health-sync/sync-me from the app when it opens (skipped if synced in the last 10 minutes)
  * Deploy with "Enforce JWT verification" off, since the scheduled call has no sign-in.
  */
-import { link, runAll, unlink, type Env } from './sync'
+import { link, runAll, syncMe, unlink, type Env } from './sync'
 
 declare const Deno: { env: { get(k: string): string | undefined }; serve(h: (r: Request) => Promise<Response>): void }
 
@@ -57,6 +58,7 @@ Deno.serve(async (req: Request) => {
       if (!code) return json({ error: 'Missing code' }, 400)
       return json({ ok: true, result: await link(env(), appJwt, code, tz || 'America/Los_Angeles') })
     }
+    if (path.endsWith('/sync-me')) return json({ ok: true, ...(await syncMe(env(), appJwt)) })
     if (path.endsWith('/unlink')) {
       await unlink(env(), appJwt)
       return json({ ok: true })

@@ -7,6 +7,7 @@ import { STATUS_TEXT, estimateKetosis, tomorrowMorning } from '../lib/ketosis'
 import { AminoCard } from '../components/AminoCard'
 import { ActivityCard } from '../components/ActivityCard'
 import { RelinkBanner } from '../components/BackgroundSyncCard'
+import { useOpenSyncState } from '../lib/backgroundSync'
 import { DrinksCard } from '../components/DrinksCard'
 import { ExerciseSheet } from '../components/ExerciseSheet'
 import { TrainingCard } from '../components/TrainingCard'
@@ -53,6 +54,7 @@ function useInstallOffer() {
 export function Today({ profile, targets, onOpenSettings, onToggleRefeed, onNavigate, onUpdateProfile }: Props) {
   const { logsOn, logsWeekEnding, pending, syncError, exercises, exercisesOn, saveExercise, logs, readings, activity, saveActivity, saveReading, cgmDays } = useData()
   const [view, setView] = useState<View>('today')
+  const openSync = useOpenSyncState()
   const backup = useBackup(profile, onUpdateProfile)
   const hasData = logs.length > 0 || readings.length > 0
   const [weekMode, setWeekMode] = useState<'average' | 'total'>('average')
@@ -232,7 +234,8 @@ export function Today({ profile, targets, onOpenSettings, onToggleRefeed, onNavi
           <h1>{isToday ? 'Today' : isWeek ? 'Last 7 days' : 'Yesterday'}</h1>
           <div className="muted small">{date}</div>
         </div>
-        {(pending > 0 || syncError) && (
+        {openSync.running && <span className="badge">Updating from Fitbit…</span>}
+        {!openSync.running && (pending > 0 || syncError) && (
           <span className={`badge ${syncError ? 'warn' : ''}`} title={syncError ?? undefined}>
             {syncError ? 'Sync problem' : `${pending} waiting to sync`}
           </span>
