@@ -308,7 +308,7 @@ select {
 .deficit-chart {
   display: block;
   width: 100%;
-  height: 64px;
+  height: auto;
   margin-top: 8px;
 }
 
