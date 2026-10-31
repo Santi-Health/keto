@@ -51,7 +51,7 @@ The published app shows only a lock screen until you sign in with that email and
 1. Create a new repository named `keto` (it can be private if your GitHub plan allows Pages on private repos; otherwise public is fine, because no secrets or data are in the code).
 2. Push this folder to it:
    ```bash
-   git remote add origin https://github.com/<your-username>/keto.git
+   git remote add origin https://github.com/<your-org>/keto.git
    git push -u origin main
    ```
 3. In the repo: **Settings → Pages → Build and deployment → Source: GitHub Actions**.
