@@ -163,66 +163,89 @@ export function suggestFixes({ dayLogs, history, foods, targets, muscleGoal, fat
   const withAminos = dayLogs.map((l) => ({ ...l, nutrients: estimateAminos(l.nutrients) }))
   const total = addNutrients(withAminos.map((l) => l.nutrients))
 
-  // 1. Leucine, meal by meal.
+  // 1–2. Gaps to close by adding food. Each addition is planned on top of the ones before it, so one food
+  // that covers several gaps is suggested once (with everything it helps), and a gap it already closed is skipped.
+  type Gap = { goal: string; key: keyof Nutrients; label: string; unit: string; target: number; meal?: Meal; have: () => number; partialOk: boolean }
+  type Plan = { u: UsualFood; steps: number; meal?: Meal; already: boolean; goals: Gap[] }
+  const plans: Plan[] = []
+  const planned = (key: keyof Nutrients, meal?: Meal) =>
+    plans.filter((p) => !meal || p.meal === meal).reduce((sum, p) => sum + ((per(p.u, p.steps)[key] as number) ?? 0), 0)
+  const dayHave = (key: keyof Nutrients) => () => ((total[key] as number) ?? 0) + planned(key)
+  const gaps: Gap[] = []
+  // Leucine, meal by meal.
   const leuTarget = LEUCINE_PER_MEAL_G[muscleGoal]
   for (const m of MEALS) {
     const items = withAminos.filter((l) => l.meal === m.value)
     if (!items.length) continue
-    const leu = items.reduce((s, l) => s + (l.nutrients.leuG ?? 0), 0)
-    if (leu >= leuTarget) continue
-    const b = bestAddition(usual, 'leuG', leuTarget - leu, m.value)
-    if (!b) continue
-    const already = items.some((l) => l.food_id === b.u.food.id)
-    out.push({
-      kind: 'add',
-      goal: 'leucine',
-      text: `${add} ${already ? `${amountText(b.u, b.steps)} more ` : `${amountText(b.u, b.steps)} `}${b.u.food.name} ${already ? 'at' : 'to'} ${mealLabel(m.value)}${would}`,
-      effect: `+${b.gain.toFixed(1)} g leucine (${(leu + b.gain).toFixed(1)} of ${leuTarget} g) · +${Math.round(b.kcal)} kcal`,
-    })
+    const leu = items.reduce((sum, l) => sum + (l.nutrients.leuG ?? 0), 0)
+    gaps.push({ goal: 'leucine', key: 'leuG', label: `leucine at ${mealLabel(m.value)}`, unit: 'g', target: leuTarget, meal: m.value, have: () => leu + planned('leuG', m.value), partialOk: true })
   }
+  // Daily nutrients that ran short.
+  for (const g of [
+    { key: 'protein', goal: 'protein', label: 'protein', unit: 'g', target: targets.proteinG },
+    { key: 'fiber', goal: 'fiber', label: 'fiber', unit: 'g', target: targets.fiberG },
+    { key: 'sodiumMg', goal: 'sodium', label: 'sodium', unit: 'mg', target: targets.sodiumMg },
+    { key: 'potassiumMg', goal: 'potassium', label: 'potassium', unit: 'mg', target: targets.potassiumMg },
+    { key: 'magnesiumMg', goal: 'magnesium', label: 'magnesium', unit: 'mg', target: targets.magnesiumMg },
+  ] as const)
+    gaps.push({ ...g, have: dayHave(g.key), partialOk: true })
+  // Vitamins and trace minerals: the two furthest below target (only counted once most of the day's food has
+  // vitamin data, so missing data isn't mistaken for a gap). Only full fixes: a vitamin half-closed isn't worth a line.
+  if (sex && vitaminCoverage(dayLogs.map((l) => l.nutrients)) >= 70)
+    for (const st of microStatus(total, sex, targets.age).filter((x) => x.pct < 80).slice(0, 2))
+      gaps.push({ goal: st.micro.key, key: st.micro.key, label: st.micro.label, unit: st.micro.unit, target: st.target, have: dayHave(st.micro.key), partialOk: true })
 
-  // 2. Daily nutrients that ran short.
-  const kcalRoom = targets.calories != null ? targets.calories - total.kcal : Infinity
-  const shortfalls: { key: keyof Nutrients; goal: string; name: string; unit: string; target: number }[] = [
-    { key: 'protein', goal: 'protein', name: 'protein', unit: 'g', target: targets.proteinG },
-    { key: 'fiber', goal: 'fiber', name: 'fiber', unit: 'g', target: targets.fiberG },
-    { key: 'sodiumMg', goal: 'sodium', name: 'sodium', unit: 'mg', target: targets.sodiumMg },
-    { key: 'potassiumMg', goal: 'potassium', name: 'potassium', unit: 'mg', target: targets.potassiumMg },
-    { key: 'magnesiumMg', goal: 'magnesium', name: 'magnesium', unit: 'mg', target: targets.magnesiumMg },
-  ]
-  for (const s of shortfalls) {
-    const have = (total[s.key] as number) ?? 0
-    const need = s.target - have
-    // Ignore tiny gaps (under 3%) and big ones a single addition can't sensibly close.
-    if (need <= s.target * 0.03) continue
-    const b = bestAddition(usual, s.key, need)
-    if (!b) continue
-    const fmt = (v: number) => (s.unit === 'mg' ? Math.round(v).toLocaleString() : v.toFixed(1))
-    out.push({
-      kind: 'add',
-      goal: s.goal,
-      text: `${add} ${amountText(b.u, b.steps)} ${b.u.food.name}${would}`,
-      effect: `+${fmt(b.gain)} ${s.unit} ${s.name} (${b.partial ? 'gets you to' : 'reaches'} ${fmt(have + b.gain)} of ${fmt(s.target)}) · +${Math.round(b.kcal)} kcal${b.kcal > kcalRoom ? ' (over your calorie target)' : ''}`,
-    })
-  }
-
-  // 2b. Vitamins and trace minerals: the two furthest below target that one usual food can close
-  // (only counted once most of the day's food has vitamin data, so missing data isn't mistaken for a gap).
-  if (sex && vitaminCoverage(dayLogs.map((l) => l.nutrients)) >= 70) {
-    let added = 0
-    for (const st of microStatus(total, sex, targets.age)) {
-      if (added >= 2 || st.pct >= 80) break
-      const b = bestAddition(usual, st.micro.key, st.target - st.value)
-      if (!b) continue
-      const fmt = (v: number) => (v >= 100 ? Math.round(v).toLocaleString() : v >= 10 ? v.toFixed(0) : v.toFixed(1))
-      out.push({
-        kind: 'add',
-        goal: st.micro.key,
-        text: `${add} ${amountText(b.u, b.steps)} ${b.u.food.name}${would}`,
-        effect: `+${fmt(b.gain)} ${st.micro.unit} ${st.micro.label} (${b.partial ? 'gets you to' : 'reaches'} ${fmt(st.value + b.gain)} of ${fmt(st.target)}) · +${Math.round(b.kcal)} kcal`,
+  for (const gap of gaps) {
+    const need = gap.target - gap.have()
+    // Ignore tiny gaps (under 3%).
+    if (need <= gap.target * 0.03) continue
+    // A food already in the plan (for this meal, or any meal for a daily gap) can only grow up to its limit.
+    const planFor = (id: string) => plans.find((x) => x.u.food.id === id && (!gap.meal || !x.meal || x.meal === gap.meal))
+    const room = usual
+      .map((u) => {
+        const p = planFor(u.food.id)
+        if (!p) return u
+        return u.maxSteps > p.steps ? { ...u, maxSteps: u.maxSteps - p.steps } : null
       })
-      added++
+      .filter((u): u is UsualFood => !!u)
+    const pick = bestAddition(room, gap.key, need, gap.meal)
+    if (!pick || (pick.partial && !gap.partialOk)) continue
+    const p = planFor(pick.u.food.id)
+    if (p) {
+      p.steps += pick.steps
+      p.meal ??= gap.meal
+      if (!p.goals.includes(gap)) p.goals.push(gap)
+    } else {
+      const already = !!gap.meal && withAminos.some((l) => l.meal === gap.meal && l.food_id === pick.u.food.id)
+      plans.push({ u: usual.find((x) => x.food.id === pick.u.food.id)!, steps: pick.steps, meal: gap.meal, already, goals: [gap] })
     }
+  }
+
+  const kcalRoom = targets.calories != null ? targets.calories - total.kcal : Infinity
+  const fmt = (v: number) => (v >= 100 ? Math.round(v).toLocaleString() : v >= 10 ? v.toFixed(0) : String(round1(v)))
+  for (const p of plans) {
+    const n = per(p.u, p.steps)
+    // Everything this food helps: the gaps it was picked for, plus any other open gap it closes a real part of.
+    const helps = gaps.filter((g) => {
+      if (g.meal && g.meal !== p.meal) return false
+      const gain = (n[g.key] as number) ?? 0
+      const before = g.have() - gain
+      return p.goals.includes(g) || (before < g.target * 0.97 && gain >= (g.target - before) * 0.15)
+    })
+    const parts = helps.map((g) => {
+      const gain = (n[g.key] as number) ?? 0
+      const after = g.have()
+      return `+${fmt(gain)} ${g.unit} ${g.label} (${after >= g.target * 0.97 ? 'reaches' : 'gets you to'} ${fmt(after)} of ${fmt(g.target)} ${g.unit})`
+    })
+    const kcal = Math.round(n.kcal ?? 0)
+    out.push({
+      kind: 'add',
+      goal: p.goals[0].goal,
+      text: p.meal
+        ? `${add} ${amountText(p.u, p.steps)}${p.already ? ' more' : ''} ${p.u.food.name} ${p.already ? 'at' : 'to'} ${mealLabel(p.meal)}${would}`
+        : `${add} ${amountText(p.u, p.steps)} ${p.u.food.name}${would}`,
+      effect: `${parts.join(' · ')} · +${kcal} kcal${kcal > kcalRoom ? ' (over your calorie target)' : ''}`,
+    })
   }
 
   // 3. Over a limit: trim the biggest contributor, or swap it for something you eat at that meal.

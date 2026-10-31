@@ -67,4 +67,17 @@ describe('suggestions from your usual foods', () => {
     expect(big.some((t) => t.text.includes('NuSalt'))).toBe(false)
     for (const t of tips.filter((x) => x.text.includes('Eggs'))) expect(Number(t.text.match(/(\d+(\.\d+)?) ?×? ?1 egg/)?.[1] ?? 0)).toBeLessThanOrEqual(2)
   })
+  it('suggests a food once, with every gap it helps, counting it before looking at the next gap', () => {
+    // A day full of everything except vitamin D and B12; smoked salmon covers both.
+    const plenty = { folateUg: 1000, vitCMg: 300, vitKUg: 300, vitAUg: 2000, vitEMg: 40, thiaminMg: 3, b6Mg: 4, zincMg: 30, seleniumUg: 150, cholineMg: 1500, calciumMg: 2000, ironMg: 20 }
+    const multi = food('mul', 'Multi', { kcal: 100, protein: 40, fiber: 30, sodiumMg: 4000, potassiumMg: 4000, magnesiumMg: 400, leuG: 3.5, vitDUg: 1, b12Ug: 0.2, ...plenty }, '1 serving', 100)
+    const fish = food('fish', 'Smoked salmon', { kcal: 117, protein: 18.3, fat: 4.3, netCarbs: 0, leuG: 1.49, vitDUg: 17, b12Ug: 3.3 }, '2 oz', 56)
+    const h = [log(fish, 2, '2 oz', 'dinner', 19), log(fish, 2, '2 oz', 'lunch', 12)]
+    const day = [log(multi, 1, '1 serving', 'lunch', 12)]
+    const tips = suggestFixes({ dayLogs: day, history: h, foods: [multi, fish], targets: { ...targets, calories: 3000 }, muscleGoal: 'build', fatBudget: null, past: false, sex: 'male' })
+    const salmon = tips.filter((t) => t.text.includes('Smoked salmon'))
+    expect(salmon).toHaveLength(1)
+    expect(salmon[0].effect).toMatch(/Vitamin D \(reaches/)
+    expect(salmon[0].effect).toMatch(/Vitamin B12 \(reaches/)
+  })
 })
