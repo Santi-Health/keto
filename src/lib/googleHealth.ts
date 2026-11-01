@@ -19,6 +19,8 @@ const API = 'https://health.googleapis.com/v4/users/me'
 interface TokenResponse {
   access_token?: string
   expires_in?: number
+  /** Space-separated scopes the person actually allowed (they can untick some). */
+  scope?: string
   error?: string
   error_description?: string
 }
@@ -78,8 +80,15 @@ export function cachedToken(scope = SCOPE): string | null {
   }
 }
 
+/**
+ * Set when Google refused data (403). Without it the next sign-in silently reuses the old grant
+ * and never shows the boxes again, so the same error repeats on every tap.
+ */
+let consentNeeded = false
+
 /** Gets an access token, showing Google's sign-in/consent popup when needed. Must run from a tap. */
 export async function getGoogleToken(forceConsent = false, scope = SCOPE): Promise<string> {
+  forceConsent ||= consentNeeded
   const cached = !forceConsent && cachedToken(scope)
   if (cached) return cached
   await loadGis()
@@ -89,6 +98,13 @@ export async function getGoogleToken(forceConsent = false, scope = SCOPE): Promi
       scope,
       callback: (r) => {
         if (r.error || !r.access_token) return reject(new Error(r.error_description || r.error || 'Google sign-in was cancelled.'))
+        const missing = scope.split(' ').filter((s) => r.scope && !r.scope.split(' ').includes(s))
+        if (missing.length) {
+          consentNeeded = true
+          const names = missing.map((s) => s.split('.').at(-2)?.replace(/_/g, ' ')).join(', ')
+          return reject(new Error(`Google sign-in left out: ${names}. Tap Import again and tick every box.`))
+        }
+        consentNeeded = false
         try {
           sessionStorage.setItem(keyFor(scope), JSON.stringify({ token: r.access_token, expires: Date.now() + (r.expires_in ?? 3600) * 1000 }))
         } catch {
@@ -118,6 +134,16 @@ export async function getGoogleCode(withDrive = true): Promise<string> {
     })
     client.requestCode()
   })
+}
+
+/** Google's own explanation from an error response, e.g. "(Google: Request had insufficient authentication scopes.)". */
+async function googleReason(res: Response): Promise<string> {
+  try {
+    const body = (await res.json()) as { error?: { message?: string } }
+    return body.error?.message ? `(Google: ${body.error.message})` : ''
+  } catch {
+    return ''
+  }
 }
 
 export function forgetGoogleToken() {
@@ -204,7 +230,8 @@ export async function listGlucose(token: string, from: Date, to: Date): Promise<
     }
     if (res.status === 403) {
       forgetGoogleToken()
-      throw new Error('Google needs your OK to read glucose. Tap Import again and allow "health metrics".')
+      consentNeeded = true
+      throw new Error(`Google needs your OK to read glucose. Tap Import again and tick "health metrics". ${await googleReason(res)}`)
     }
     if (!res.ok) {
       const body = await res.text().catch(() => '')
@@ -230,7 +257,8 @@ async function healthFetch(token: string, url: string, init?: RequestInit): Prom
   }
   if (res.status === 403) {
     forgetGoogleToken()
-    throw new NeedsConsentError('Google needs your OK for this data. Tap Import again and allow it.')
+    consentNeeded = true
+    throw new NeedsConsentError(`Google needs your OK for this data. Tap Import again and allow it. ${await googleReason(res)}`)
   }
   if (!res.ok) {
     const body = await res.text().catch(() => '')
