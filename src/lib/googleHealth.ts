@@ -35,6 +35,7 @@ declare global {
           initTokenClient: (cfg: {
             client_id: string
             scope: string
+            include_granted_scopes?: boolean
             callback: (r: TokenResponse) => void
             error_callback?: (e: { type: string; message?: string }) => void
           }) => TokenClient
@@ -96,6 +97,9 @@ export async function getGoogleToken(forceConsent = false, scope = SCOPE): Promi
     const client = window.google!.accounts.oauth2.initTokenClient({
       client_id: GOOGLE_CLIENT_ID,
       scope,
+      // Google Health refuses tokens that also carry other APIs' scopes (like Drive, once background sync was linked),
+      // so ask for exactly these scopes, not everything granted before.
+      include_granted_scopes: false,
       callback: (r) => {
         if (r.error || !r.access_token) return reject(new Error(r.error_description || r.error || 'Google sign-in was cancelled.'))
         const missing = scope.split(' ').filter((s) => r.scope && !r.scope.split(' ').includes(s))
@@ -231,7 +235,8 @@ export async function listGlucose(token: string, from: Date, to: Date): Promise<
     if (res.status === 403) {
       forgetGoogleToken()
       consentNeeded = true
-      throw new Error(`Google needs your OK to read glucose. Tap Import again and tick "health metrics". ${await googleReason(res)}`)
+      const reason = await googleReason(res)
+      throw new Error(`${/disallowed OAuth scope/i.test(reason) ? 'Google refused this sign-in. Tap Import again.' : 'Google needs your OK to read glucose. Tap Import again and tick "health metrics".'} ${reason}`)
     }
     if (!res.ok) {
       const body = await res.text().catch(() => '')
