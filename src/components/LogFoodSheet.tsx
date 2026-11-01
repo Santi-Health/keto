@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useData } from '../lib/data'
 import { MEALS, mealForTime, portionNutrients, setUsual, usualMealsFor, type Food, type FoodMeta, type LogEntry, type Meal, type NewFood } from '../lib/foods'
+import { learnedPrefixes, suggestDisplayName } from '../lib/quickFoods'
 import { toGrams, unitsFor } from '../lib/units'
 import { DeleteFood } from './DeleteFood'
 import { FoodFlags, MacroStrip, foodSubtitle } from './FoodBits'
@@ -41,8 +42,12 @@ export function defaultTime(date?: string): Date {
 
 export function LogFoodSheet({ food, entry, date, meal: chosenMeal, onClose, onEditFood, onDone, mode = 'log', onSavedFood }: Props) {
   const logging = mode === 'log' || !!entry
-  const { saveFood, logFood, updateLog, deleteLog, updateFood, logs } = useData()
+  const { saveFood, logFood, updateLog, deleteLog, updateFood, logs, foods } = useData()
   const saved = 'id' in food ? food : null
+  // The full name (as detailed as the barcode or label gave) and the shorter display name on buttons.
+  const [fullName, setFullName] = useState(food.name)
+  const [displayName, setDisplayName] = useState(() => food.meta.buttonName ?? suggestDisplayName(food, learnedPrefixes(foods)))
+  const names = () => ({ name: fullName.trim() || food.name, buttonName: displayName.trim() || undefined })
   const units = unitsFor({ unitConversions: food.unit_conversions })
   const firstUnit = food.unit_conversions[0]?.unit ?? 'g'
   const [amount, setAmount] = useState(String(entry?.amount ?? saved?.meta.lastAmount ?? (firstUnit === 'g' ? 100 : 1)))
@@ -82,8 +87,9 @@ export function LogFoodSheet({ food, entry, date, meal: chosenMeal, onClose, onE
         meta: { ...entry.meta, approximate },
       })
     } else {
-      const f = saved ?? saveFood(food)
-      logFood({ ...f, favorite, meta: { ...f.meta, meals: usualMeta.meals, notMeals: usualMeta.notMeals } }, qty, unit, meal, eatenAt)
+      const { name, buttonName } = names()
+      const f = saved ?? saveFood({ ...food, name })
+      logFood({ ...f, name, favorite, meta: { ...f.meta, buttonName, meals: usualMeta.meals, notMeals: usualMeta.notMeals } }, qty, unit, meal, eatenAt)
     }
     onDone?.()
     onClose()
@@ -91,8 +97,9 @@ export function LogFoodSheet({ food, entry, date, meal: chosenMeal, onClose, onE
 
   /** Keep it in My Foods without logging, remembering this amount as its usual portion. */
   function saveOnly() {
-    const f = saved ?? saveFood(food)
-    const keep: Food = { ...f, favorite, meta: { ...f.meta, meals: usualMeta.meals, notMeals: usualMeta.notMeals, ...(valid ? { lastAmount: qty, lastUnit: unit } : {}) } }
+    const { name, buttonName } = names()
+    const f = saved ?? saveFood({ ...food, name })
+    const keep: Food = { ...f, name, favorite, meta: { ...f.meta, buttonName, meals: usualMeta.meals, notMeals: usualMeta.notMeals, ...(valid ? { lastAmount: qty, lastUnit: unit } : {}) } }
     updateFood(keep)
     onSavedFood?.(keep)
     onClose()
@@ -131,6 +138,20 @@ export function LogFoodSheet({ food, entry, date, meal: chosenMeal, onClose, onE
         </p>
       )}
       {food.keto_notes && <p className="notice small">{food.keto_notes}</p>}
+
+      {!entry && (mode !== 'look' || saved) && (
+        <>
+          <div className="field">
+            <label htmlFor="lf-full">Full name</label>
+            <input id="lf-full" type="text" value={fullName} onChange={(e) => setFullName(e.target.value)} />
+          </div>
+          <div className="field">
+            <label htmlFor="lf-display">Display name</label>
+            <input id="lf-display" type="text" value={displayName} onChange={(e) => setDisplayName(e.target.value)} />
+            <div className="hint">How it shows on the Add food buttons.</div>
+          </div>
+        </>
+      )}
 
       <div className="row">
         <div className="field">

@@ -70,9 +70,9 @@ describe('teas', () => {
   })
 })
 
-describe('button order and Kazaar', () => {
-  it('starts with the everyday drinks, with Kazaar where the single espresso was', () => {
-    expect(DRINKS.slice(0, 5).map((d) => d.key)).toEqual(['water', 'coke_zero', 'espresso_double', 'mate_cocido', 'kazar'])
+describe('button order and Nespresso pods', () => {
+  it('starts with the everyday drinks, with the pods right after espresso', () => {
+    expect(DRINKS.slice(0, 7).map((d) => d.key)).toEqual(['water', 'coke_zero', 'espresso_double', 'kazar', 'volluto_decaf', 'ba_lungo', 'mate_cocido'])
     expect(DRINKS.some((d) => d.key === 'espresso_single')).toBe(false)
     expect(drinkByKey('espresso_single')).toBeDefined() // still reachable from the Single/Double switch
   })
@@ -84,6 +84,18 @@ describe('button order and Kazaar', () => {
     expect(asksForMilk(k)).toBe(true)
     const n = portionNutrients({ ...drinkFood(k), id: 'k', favorite: false, use_count: 0, last_used_at: null, updated_at: '', deleted_at: null }, 40)
     expect(n.caffeineMg).toBeCloseTo(120, 0)
+  })
+
+  it('logs Decaf Volluto and BA Lungo as one pod each, asking about milk', async () => {
+    const { asksForMilk } = await import('./drinks')
+    for (const [key, ml, caffeine] of [['volluto_decaf', 40, 3], ['ba_lungo', 110, 85]] as const) {
+      const d = drinkByKey(key)!
+      expect(drinkPortion(d)).toEqual({ amount: 1, unit: 'pod' })
+      expect(asksForMilk(d)).toBe(true)
+      const food = asFood(drinkFood(d))
+      expect(food.unit_conversions[0].grams).toBe(ml)
+      expect(portionNutrients(food, ml).caffeineMg).toBeCloseTo(caffeine, 0)
+    }
   })
 })
 

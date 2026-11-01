@@ -22,6 +22,8 @@ export type DrinkKey =
   | 'te_con_leche'
   | 'rooibos'
   | 'kazar'
+  | 'volluto_decaf'
+  | 'ba_lungo'
   | 'fairlife_choc_bottle'
 
 export interface Drink {
@@ -52,6 +54,8 @@ const SHOT_G = 30
 const FL_OZ_G = 29.6
 /** A Nespresso OriginalLine pod brewed as an espresso (40 ml). */
 const POD_G = 40
+/** A Nespresso lungo pod brewed long (110 ml). */
+const LUNGO_POD_G = 110
 
 const soda = (caffeineMg: number, sodiumMg: number, potassiumMg = 0): Nutrients => ({
   kcal: 0,
@@ -188,6 +192,33 @@ const ALL: Drink[] = [
     // Nespresso doesn't publish per-pod caffeine; Kazaar is a robusta-heavy intensity-12 blend. Set at the high
     // end of the 80–120 mg range on purpose (the user's choice), and treated as a fixed value.
     perServing: { kcal: 2, protein: 0.1, fat: 0, carbs: 0.3, netCarbs: 0.3, sodiumMg: 3, potassiumMg: 45, magnesiumMg: 30, caffeineMg: 120 },
+    container: { unit: 'pod', grams: POD_G },
+  },
+  {
+    key: 'volluto_decaf',
+    label: 'Decaf Volluto',
+    serving: 'Nespresso pod',
+    oz: 1.4,
+    hydration: false,
+    color: '#c8a26b',
+    // Volluto Decaffeinato, brewed as a 40 ml espresso. Decaf keeps a few mg of caffeine; Nespresso doesn't
+    // publish it, so it's estimated, with the minerals from USDA espresso.
+    perServing: { kcal: 2, protein: 0.1, fat: 0, carbs: 0.3, netCarbs: 0.3, sodiumMg: 3, potassiumMg: 45, magnesiumMg: 30, caffeineMg: 3 },
+    estimated: ['caffeineMg', 'potassiumMg', 'magnesiumMg'],
+    container: { unit: 'pod', grams: POD_G },
+  },
+  {
+    key: 'ba_lungo',
+    label: 'BA Lungo',
+    serving: 'Nespresso lungo pod',
+    oz: LUNGO_POD_G / ML_PER_OZ,
+    hydration: false,
+    color: '#5b7fa3',
+    // Buenos Aires Lungo, brewed as a 110 ml lungo. Nespresso doesn't publish per-pod caffeine; its lungo pods
+    // run about 80–90 mg, so 85 mg. Minerals from USDA brewed coffee for 110 ml.
+    perServing: { kcal: 1, protein: 0.1, fat: 0, carbs: 0, netCarbs: 0, sodiumMg: 2, potassiumMg: 54, magnesiumMg: 3, caffeineMg: 85 },
+    estimated: ['caffeineMg', 'potassiumMg', 'magnesiumMg'],
+    container: { unit: 'pod', grams: LUNGO_POD_G },
   },
   {
     key: 'fairlife_choc_bottle',
@@ -208,8 +239,10 @@ const ORDER: DrinkKey[] = [
   'water',
   'coke_zero',
   'espresso_double',
-  'mate_cocido',
   'kazar',
+  'volluto_decaf',
+  'ba_lungo',
+  'mate_cocido',
   'sparkling_water',
   'diet_coke',
   'diet_pepsi',
@@ -228,14 +261,14 @@ export const DRINKS: Drink[] = ORDER.map((k) => ALL.find((d) => d.key === k)!)
 export const ALL_DRINKS = ALL
 
 /** Drinks that ask which milk went in before logging. */
-export const asksForMilk = (d: Drink) => d.key.startsWith('espresso') || d.key === 'kazar'
+export const asksForMilk = (d: Drink) => d.key.startsWith('espresso') || d.container?.unit === 'pod'
 
 export const drinkByKey = (key: string) => ALL.find((d) => d.key === key)
 
 /** Food row for a soda or espresso (single and double share one food): nutrients per 100 g plus a serving unit. */
 export function drinkFood(d: Drink): NewFood {
   const isEspresso = d.key.startsWith('espresso')
-  const grams = d.container ? d.container.grams : d.flOz ? d.flOz * FL_OZ_G : d.key === 'kazar' ? POD_G : isEspresso ? SHOT_G * (d.key === 'espresso_double' ? 2 : 1) : CAN_G
+  const grams = d.container ? d.container.grams : d.flOz ? d.flOz * FL_OZ_G : isEspresso ? SHOT_G * (d.key === 'espresso_double' ? 2 : 1) : CAN_G
   const per100: Nutrients = {}
   for (const [k, v] of Object.entries(d.perServing ?? {})) per100[k as keyof Nutrients] = Math.round((v * 100 * 1000) / grams) / 1000
   return {
@@ -244,7 +277,7 @@ export function drinkFood(d: Drink): NewFood {
     barcode: null,
     per_100g: per100,
     unit_conversions: [
-      d.container ? { unit: d.container.unit, grams: d.container.grams } : d.flOz ? { unit: 'fl oz', grams: FL_OZ_G } : d.key === 'kazar' ? { unit: 'pod', grams: POD_G } : { unit: isEspresso ? 'shot' : 'can', grams: isEspresso ? SHOT_G : CAN_G },
+      d.container ? { unit: d.container.unit, grams: d.container.grams } : d.flOz ? { unit: 'fl oz', grams: FL_OZ_G } : { unit: isEspresso ? 'shot' : 'can', grams: isEspresso ? SHOT_G : CAN_G },
     ],
     ingredients_text: null,
     keto_notes: d.sweeteners?.length ? `${d.perServing?.sugars ? 'No added sugar' : 'Zero sugar'}; sweetened with ${d.sweeteners.join(' and ')}.` : null,
@@ -262,9 +295,7 @@ export const drinkPortion = (d: Drink) =>
     ? { amount: 1, unit: d.container.unit }
     : d.flOz
     ? { amount: d.flOz, unit: 'fl oz' }
-    : d.key === 'kazar'
-      ? { amount: 1, unit: 'pod' }
-      : d.key === 'espresso_double'
+    : d.key === 'espresso_double'
       ? { amount: 2, unit: 'shot' }
       : d.key === 'espresso_single'
         ? { amount: 1, unit: 'shot' }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { brandsToShow, foodIcon, nutCount, sectionsOf, veryFrequentAt, portionText, servingOf, shortName } from './quickFoods'
+import { brandsToShow, foodIcon, learnedPrefixes, nutCount, suggestDisplayName, sectionsOf, veryFrequentAt, portionText, servingOf, shortName } from './quickFoods'
 
 const f = (name: string, brand: string | null = null, meta = {}, id = name) => ({ id, name, brand, meta, source: 'manual' as const })
 
@@ -93,5 +93,13 @@ describe('food buttons', () => {
     expect(nutCount(f('Almonds'), 14.2)).toBe('~12 almonds')
     expect(nutCount(f('Almond butter'), 32)).toBe(null)
     expect(nutCount(f('Blueberries'), 74)).toBe(null)
+  })
+  it('suggests display names with the brand short forms you use, learning new ones from your renames', () => {
+    const prefixes = learnedPrefixes([f('Baby Spinach', 'Trader Joe\'s', { buttonName: 'TJ Baby Spinach' }), f('Avocados', null, { buttonName: 'Avocados' })])
+    expect(suggestDisplayName(f('Organic Almond Butter', 'Kirkland Signature'), prefixes)).toBe('Kirk Organic Almond Butter')
+    expect(suggestDisplayName(f('Unsalted Butter', "Trader Joe's"), prefixes)).toBe('TJ Unsalted Butter')
+    expect(suggestDisplayName(f('Light Mayonnaise', 'Best Foods'), prefixes)).toBe('BF Light Mayo')
+    expect(suggestDisplayName(f('Smoked salmon'), prefixes)).toBe('Smoked salmon')
+    expect(suggestDisplayName(f('Heinz Tomato Ketchup', 'Heinz'), prefixes)).toBe('Heinz Ketchup')
   })
 })

@@ -31,12 +31,51 @@ const NAMED: { match: RegExp; brand?: RegExp; name: string }[] = [
   { match: /\begg whites?\b/, brand: /kirkland/, name: 'Kirk Egg Whites' },
 ]
 
-/** A two-or-three word name for a button: "Sola Sweet & Buttery Keto Bread" → "Keto Bread". */
+/** The display name on buttons: the one you set, a name chosen for that food, or a short version of the full name. */
 export function shortName(food: Pick<Food, 'name' | 'brand' | 'meta'>): string {
   if (food.meta.buttonName?.trim()) return food.meta.buttonName.trim()
+  return namedFor(food) ?? autoName(food)
+}
+
+function namedFor(food: Pick<Food, 'name' | 'brand'>): string | null {
   const full = `${food.brand ?? ''} ${food.name}`.toLowerCase()
-  const named = NAMED.find((r) => r.match.test(full) && (!r.brand || !food.brand || r.brand.test(food.brand.toLowerCase())))
-  if (named) return named.name
+  return NAMED.find((r) => r.match.test(full) && (!r.brand || !food.brand || r.brand.test(food.brand.toLowerCase())))?.name ?? null
+}
+
+/** Brand short forms you've used in display names; your own renames add to these. */
+const BRAND_PREFIXES: Record<string, string> = { 'best foods': 'BF', kirkland: 'Kirk', "nature's own": 'Nat Own', natures: 'Nat Own', heinz: 'Heinz', johnsonville: 'Johnsonville' }
+/** "Kirkland Signature" → "kirkland": brands compare on their first word (two for "Best Foods", "Nature's Own"). */
+const brandKey = (brand: string) => {
+  const words = brand.toLowerCase().replace(/[^a-z' ]/g, '').trim().split(/\s+/)
+  return BRAND_PREFIXES[words.slice(0, 2).join(' ')] != null ? words.slice(0, 2).join(' ') : words[0]
+}
+
+/**
+ * Brand short forms learned from your display names: a food named "Kirk Egg Whites" whose automatic
+ * name is "Egg Whites" teaches that Kirkland is "Kirk".
+ */
+export function learnedPrefixes(foods: Pick<Food, 'name' | 'brand' | 'meta'>[]): Record<string, string> {
+  const out = { ...BRAND_PREFIXES }
+  for (const f of foods) {
+    const shown = f.meta.buttonName?.trim()
+    if (!shown || !f.brand) continue
+    const base = autoName(f)
+    if (shown.length > base.length && shown.toLowerCase().endsWith(base.toLowerCase())) out[brandKey(f.brand)] = shown.slice(0, -base.length).trim()
+  }
+  return out
+}
+
+/** The display name to suggest when logging or editing: your brand short form in front of the short name. */
+export function suggestDisplayName(food: Pick<Food, 'name' | 'brand' | 'meta'>, prefixes: Record<string, string>): string {
+  const named = namedFor(food)
+  if (named) return named
+  const base = autoName(food)
+  const prefix = food.brand ? prefixes[brandKey(food.brand)] : undefined
+  return prefix && !base.toLowerCase().startsWith(prefix.toLowerCase()) ? `${prefix} ${base}` : base
+}
+
+/** A two-or-three word name from the full name: "Sola Sweet & Buttery Keto Bread" → "Keto Bread". */
+function autoName(food: Pick<Food, 'name' | 'brand'>): string {
   let name = unshout(food.name).replace(/\([^)]*\)/g, ' ').replace(/\s+/g, ' ').trim()
   // A brand repeated at the start of the name adds nothing on the button.
   if (food.brand && name.toLowerCase().startsWith(food.brand.toLowerCase())) name = name.slice(food.brand.length).replace(/^[\s,:-]+/, '')

@@ -223,7 +223,7 @@ function EspressoSheet({
 }) {
   const milkFoods = MILKS.map((m) => ({ m, food: foods.find((f) => f.meta.externalId === `drink:milk_${m.key}`) }))
   const last = milkFoods.filter((x) => x.food?.last_used_at).sort((a, b) => b.food!.last_used_at!.localeCompare(a.food!.last_used_at!))[0]
-  // Espresso has a Single/Double switch; a pod (Kazaar) is always one.
+  // Espresso has a Single/Double switch; a pod (Kazaar, Decaf Volluto, BA Lungo) is always one.
   const isEspresso = drink.key.startsWith('espresso')
   const [shots, setShots] = useState<'espresso_single' | 'espresso_double'>(isEspresso ? (drink.key as 'espresso_single') : 'espresso_single')
   const [milk, setMilk] = useState<MilkKey | 'none'>(last?.m.key ?? 'fairlife_fat_free')

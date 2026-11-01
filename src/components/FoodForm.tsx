@@ -1,7 +1,8 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useData } from '../lib/data'
 import { completeNutrients, type Food, type NewFood } from '../lib/foods'
 import type { SugarAlcoholType } from '../lib/nutrition'
+import { learnedPrefixes, suggestDisplayName } from '../lib/quickFoods'
 import type { NutrientKey, Nutrients } from '../lib/nutrients'
 import type { UnitConversion } from '../lib/units'
 import { MERCURY_PPM, detectFishSpecies, type FishSpecies } from '../lib/watchlist'
@@ -59,7 +60,7 @@ const SUGAR_ALCOHOLS: { value: SugarAlcoholType; label: string }[] = [
 const round = (n: number) => Math.round(n * 100) / 100
 
 export function FoodForm({ food, barcode, onClose, onSaved }: Props) {
-  const { saveFood } = useData()
+  const { saveFood, foods } = useData()
   const firstServing = food?.unit_conversions[0]
   // Edit per serving when the food has one (that's what labels show), otherwise per 100 g.
   const [servingG, setServingG] = useState(String(firstServing?.grams ?? 100))
@@ -75,6 +76,10 @@ export function FoodForm({ food, barcode, onClose, onSaved }: Props) {
   })
   const [name, setName] = useState(food?.name ?? '')
   const [brand, setBrand] = useState(food?.brand ?? '')
+  // Display name on buttons: yours once set; until then a suggestion that follows the name and brand.
+  const [display, setDisplay] = useState<string | null>(food?.meta.buttonName ?? null)
+  const suggested = useMemo(() => suggestDisplayName({ name: name.trim(), brand: brand.trim() || null, meta: {} }, learnedPrefixes(foods)), [name, brand, foods])
+  const displayName = display ?? suggested
   const [code, setCode] = useState(food?.barcode ?? barcode ?? '')
   const [ingredients, setIngredients] = useState(food?.ingredients_text ?? '')
   const [euLabel, setEuLabel] = useState(food?.carbs_exclude_fiber ?? false)
@@ -126,6 +131,7 @@ export function FoodForm({ food, barcode, onClose, onSaved }: Props) {
       fields_estimated: food?.fields_estimated ?? [],
       meta: {
         ...food?.meta,
+        buttonName: displayName.trim() || undefined,
         fishSpecies: fish || null,
         sweeteners: sweetenerList,
         novaGroup: ultra ? 4 : food?.meta.novaGroup === 4 ? null : (food?.meta.novaGroup ?? null),
@@ -162,8 +168,13 @@ export function FoodForm({ food, barcode, onClose, onSaved }: Props) {
         </div>
       )}
       <div className="field">
-        <label htmlFor="ff-name">Name</label>
+        <label htmlFor="ff-name">Full name</label>
         <input id="ff-name" type="text" value={name} onChange={(e) => setName(e.target.value)} onBlur={onNameBlur} />
+      </div>
+      <div className="field">
+        <label htmlFor="ff-display">Display name</label>
+        <input id="ff-display" type="text" value={displayName} onChange={(e) => setDisplay(e.target.value)} />
+        <div className="hint">How it shows on the Add food buttons.</div>
       </div>
       <div className="row">
         <div className="field">
