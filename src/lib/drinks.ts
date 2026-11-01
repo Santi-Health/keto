@@ -54,6 +54,8 @@ const SHOT_G = 30
 const FL_OZ_G = 29.6
 /** A Nespresso OriginalLine pod brewed as an espresso (40 ml). */
 const POD_G = 40
+/** A Nespresso ristretto pod brewed short (25 ml). */
+const RISTRETTO_POD_G = 25
 /** A Nespresso lungo pod brewed long (110 ml). */
 const LUNGO_POD_G = 110
 
@@ -195,17 +197,18 @@ const ALL: Drink[] = [
     container: { unit: 'pod', grams: POD_G },
   },
   {
+    // Ispirazione Ristretto Decaffeinato (the key predates the name; kept so earlier logs still match).
     key: 'volluto_decaf',
-    label: 'Decaf Volluto',
+    label: 'Decaf Ristretto',
     serving: 'Nespresso pod',
-    oz: 1.4,
+    oz: RISTRETTO_POD_G / ML_PER_OZ,
     hydration: false,
-    color: '#c8a26b',
-    // Volluto Decaffeinato, brewed as a 40 ml espresso. Decaf keeps a few mg of caffeine; Nespresso doesn't
-    // publish it, so it's estimated, with the minerals from USDA espresso.
-    perServing: { kcal: 2, protein: 0.1, fat: 0, carbs: 0.3, netCarbs: 0.3, sodiumMg: 3, potassiumMg: 45, magnesiumMg: 30, caffeineMg: 3 },
+    color: '#1c1a1a',
+    // Brewed as a 25 ml ristretto. Decaf keeps a few mg of caffeine; Nespresso doesn't publish it, so it's
+    // estimated, with the minerals from USDA espresso.
+    perServing: { kcal: 1.5, protein: 0.1, fat: 0, carbs: 0.2, netCarbs: 0.2, sodiumMg: 2, potassiumMg: 30, magnesiumMg: 20, caffeineMg: 3 },
     estimated: ['caffeineMg', 'potassiumMg', 'magnesiumMg'],
-    container: { unit: 'pod', grams: POD_G },
+    container: { unit: 'pod', grams: RISTRETTO_POD_G },
   },
   {
     key: 'ba_lungo',
@@ -213,7 +216,7 @@ const ALL: Drink[] = [
     serving: 'Nespresso lungo pod',
     oz: LUNGO_POD_G / ML_PER_OZ,
     hydration: false,
-    color: '#5b7fa3',
+    color: '#46464c',
     // Buenos Aires Lungo, brewed as a 110 ml lungo. Nespresso doesn't publish per-pod caffeine; its lungo pods
     // run about 80–90 mg, so 85 mg. Minerals from USDA brewed coffee for 110 ml.
     perServing: { kcal: 1, protein: 0.1, fat: 0, carbs: 0, netCarbs: 0, sodiumMg: 2, potassiumMg: 54, magnesiumMg: 3, caffeineMg: 85 },

@@ -86,9 +86,9 @@ describe('button order and Nespresso pods', () => {
     expect(n.caffeineMg).toBeCloseTo(120, 0)
   })
 
-  it('logs Decaf Volluto and BA Lungo as one pod each, asking about milk', async () => {
+  it('logs Decaf Ristretto and BA Lungo as one pod each, asking about milk', async () => {
     const { asksForMilk } = await import('./drinks')
-    for (const [key, ml, caffeine] of [['volluto_decaf', 40, 3], ['ba_lungo', 110, 85]] as const) {
+    for (const [key, ml, caffeine] of [['volluto_decaf', 25, 3], ['ba_lungo', 110, 85]] as const) {
       const d = drinkByKey(key)!
       expect(drinkPortion(d)).toEqual({ amount: 1, unit: 'pod' })
       expect(asksForMilk(d)).toBe(true)

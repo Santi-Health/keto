@@ -5,6 +5,7 @@ import { buildLogEntry, portionNutrients, type Food, type LogEntry } from '../li
 import { mealForTime } from '../lib/foods'
 import { localDate } from '../lib/targets'
 import { deviceTz } from '../lib/time'
+import { DrinkIcon } from './DrinkIcon'
 import { Segmented } from './Fields'
 import { Sheet } from './Sheet'
 
@@ -157,7 +158,7 @@ export function DrinksCard({ days, waterTargetOz }: Props) {
       {isToday && <div className="drink-grid">
         {DRINKS.map((d) => (
           <button key={d.key} type="button" className="drink-btn" onClick={() => add(d)} aria-label={`Log ${label(d)}, ${d.serving}`}>
-            <span className="drink-dot" style={{ background: d.color }} aria-hidden="true" />
+            <DrinkIcon drink={d.key} color={d.color} />
             <span className="drink-name">{d.key.startsWith('espresso') ? 'Espresso' : d.label}</span>
             <span className="drink-serving">{d.serving}</span>
             {counts[d.key] ? <span className="drink-count">{counts[d.key]}</span> : null}
@@ -223,7 +224,7 @@ function EspressoSheet({
 }) {
   const milkFoods = MILKS.map((m) => ({ m, food: foods.find((f) => f.meta.externalId === `drink:milk_${m.key}`) }))
   const last = milkFoods.filter((x) => x.food?.last_used_at).sort((a, b) => b.food!.last_used_at!.localeCompare(a.food!.last_used_at!))[0]
-  // Espresso has a Single/Double switch; a pod (Kazaar, Decaf Volluto, BA Lungo) is always one.
+  // Espresso has a Single/Double switch; a pod (Kazaar, Decaf Ristretto, BA Lungo) is always one.
   const isEspresso = drink.key.startsWith('espresso')
   const [shots, setShots] = useState<'espresso_single' | 'espresso_double'>(isEspresso ? (drink.key as 'espresso_single') : 'espresso_single')
   const [milk, setMilk] = useState<MilkKey | 'none'>(last?.m.key ?? 'fairlife_fat_free')
