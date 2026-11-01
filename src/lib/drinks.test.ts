@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { DRINKS, MILKS, drinkByKey, drinkFood, drinkPortion, hydration, milkFood } from './drinks'
+import { DRINKS, MILKS, drinkByKey, drinkFood, drinkPortion, hydration, milkFood, glasses, liters, ML_PER_OZ } from './drinks'
 import { portionNutrients, type Food } from './foods'
 
 const asFood = (f: ReturnType<typeof drinkFood>): Food => ({ ...f, id: 'x', favorite: false, use_count: 0, last_used_at: null, updated_at: '', deleted_at: null })
@@ -81,5 +81,19 @@ describe('hydration', () => {
     const h = hydration(0, [{ grams: 296, caffeineMg: 600 }])
     expect(h.caffeineLossOz).toBeCloseTo(2.4, 1)
     expect(h.totalOz).toBeCloseTo(10 - 2.4, 1)
+  })
+})
+
+describe('drinks tracker glasses', () => {
+  it('fills 1½ glasses for a 355 ml can and draws enough empty ones for the goal', () => {
+    expect(glasses(12, 2000 / ML_PER_OZ)).toEqual([1, 0.5, 0, 0, 0, 0, 0, 0])
+  })
+  it('adds glasses past the goal', () => {
+    expect(glasses((750 / ML_PER_OZ), 500 / ML_PER_OZ)).toEqual([1, 1, 1])
+  })
+  it('shows liters, or ml under half a liter', () => {
+    expect(liters(12)).toBe('350 ml')
+    expect(liters(2000 / ML_PER_OZ)).toBe('2 L')
+    expect(liters(1440 / ML_PER_OZ)).toBe('1.4 L')
   })
 })

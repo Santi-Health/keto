@@ -79,21 +79,38 @@ const espresso = (shots: number): Nutrients => ({
 // brewed yerba mate values (no USDA entry), so its caffeine and minerals are estimates.
 const tea = (n: Partial<Nutrients>): Nutrients => ({ kcal: 0, protein: 0, fat: 0, carbs: 0, netCarbs: 0, sugars: 0, ...n })
 
+export const ML_PER_OZ = 29.5735
+/** One glass on the drinks tracker; water and sparkling water log a glass per tap. */
+export const GLASS_ML = 250
+
+/** Fluid ounces as liters for display: "1.4 L", or "350 ml" under half a liter. */
+export const liters = (oz: number) => {
+  const ml = oz * ML_PER_OZ
+  return ml < 500 ? `${Math.round(ml / 10) * 10} ml` : `${(Math.round(ml / 100) / 10).toLocaleString()} L`
+}
+
+/** Glasses to draw for a day's fluids: enough for the goal (more when over it), each empty, half or full. */
+export function glasses(totalOz: number, targetOz: number): (0 | 0.5 | 1)[] {
+  const halves = Math.round((totalOz * ML_PER_OZ) / (GLASS_ML / 2))
+  const n = Math.max(Math.ceil((targetOz * ML_PER_OZ) / GLASS_ML), Math.ceil(halves / 2))
+  return Array.from({ length: n }, (_, i) => (halves >= 2 * (i + 1) ? 1 : halves === 2 * i + 1 ? 0.5 : 0))
+}
+
 const ALL: Drink[] = [
-  { key: 'water', label: 'Water', serving: '1 cup (8 oz)', oz: 8, hydration: true, color: 'var(--water)', perServing: null },
-  { key: 'sparkling_water', label: 'Sparkling water', serving: '1 cup (8 oz)', oz: 8, hydration: true, color: 'var(--water)', perServing: null },
-  { key: 'diet_coke', label: 'Diet Coke', serving: '12 oz can', oz: 12, hydration: false, color: '#b8b8b8', perServing: soda(46, 40), sweeteners: ['aspartame'] },
-  { key: 'coke_zero', label: 'Coke Zero', serving: '12 oz can', oz: 12, hydration: false, color: '#e4002b', perServing: soda(34, 40, 60), sweeteners: ['aspartame', 'acesulfame K'] },
-  { key: 'diet_pepsi', label: 'Diet Pepsi', serving: '12 oz can', oz: 12, hydration: false, color: '#1f4fa0', perServing: soda(35, 35), sweeteners: ['aspartame', 'acesulfame K'] },
-  { key: 'squirt_zero', label: 'Squirt Zero', serving: '12 oz can', oz: 12, hydration: false, color: '#f2c200', perServing: soda(0, 40), sweeteners: ['aspartame', 'acesulfame K'], estimated: ['sodiumMg'] },
-  { key: 'fanta_zero', label: 'Fanta Zero', serving: '12 oz can', oz: 12, hydration: false, color: '#ff8200', perServing: soda(0, 40), sweeteners: ['aspartame', 'acesulfame K'], estimated: ['sodiumMg'] },
-  { key: 'sprite_zero', label: 'Sprite Zero', serving: '12 oz can', oz: 12, hydration: false, color: '#00a651', perServing: soda(0, 35), sweeteners: ['aspartame', 'acesulfame K'], estimated: ['sodiumMg'] },
+  { key: 'water', label: 'Water', serving: '1 glass (250 ml)', oz: GLASS_ML / ML_PER_OZ, hydration: true, color: 'var(--water)', perServing: null },
+  { key: 'sparkling_water', label: 'Sparkling water', serving: '1 glass (250 ml)', oz: GLASS_ML / ML_PER_OZ, hydration: true, color: 'var(--water)', perServing: null },
+  { key: 'diet_coke', label: 'Diet Coke', serving: '355 ml can', oz: 12, hydration: false, color: '#b8b8b8', perServing: soda(46, 40), sweeteners: ['aspartame'] },
+  { key: 'coke_zero', label: 'Coke Zero', serving: '355 ml can', oz: 12, hydration: false, color: '#e4002b', perServing: soda(34, 40, 60), sweeteners: ['aspartame', 'acesulfame K'] },
+  { key: 'diet_pepsi', label: 'Diet Pepsi', serving: '355 ml can', oz: 12, hydration: false, color: '#1f4fa0', perServing: soda(35, 35), sweeteners: ['aspartame', 'acesulfame K'] },
+  { key: 'squirt_zero', label: 'Squirt Zero', serving: '355 ml can', oz: 12, hydration: false, color: '#f2c200', perServing: soda(0, 40), sweeteners: ['aspartame', 'acesulfame K'], estimated: ['sodiumMg'] },
+  { key: 'fanta_zero', label: 'Fanta Zero', serving: '355 ml can', oz: 12, hydration: false, color: '#ff8200', perServing: soda(0, 40), sweeteners: ['aspartame', 'acesulfame K'], estimated: ['sodiumMg'] },
+  { key: 'sprite_zero', label: 'Sprite Zero', serving: '355 ml can', oz: 12, hydration: false, color: '#00a651', perServing: soda(0, 35), sweeteners: ['aspartame', 'acesulfame K'], estimated: ['sodiumMg'] },
   { key: 'espresso_single', label: 'Espresso', serving: 'single shot', oz: 1, hydration: false, color: '#6f4e37', perServing: espresso(1) },
   { key: 'espresso_double', label: 'Espresso', serving: 'double shot', oz: 2, hydration: false, color: '#6f4e37', perServing: espresso(2) },
   {
     key: 'mate_cocido',
     label: 'Mate cocido',
-    serving: '10 oz + 2 oz Fairlife',
+    serving: '300 ml + 60 ml Fairlife',
     oz: 12,
     hydration: false,
     color: '#7a8b3a',
@@ -105,7 +122,7 @@ const ALL: Drink[] = [
   {
     key: 'te_con_leche',
     label: 'Té con leche',
-    serving: '10 oz + 2 oz Fairlife',
+    serving: '300 ml + 60 ml Fairlife',
     oz: 12,
     hydration: false,
     color: '#8b4a2b',
@@ -116,7 +133,7 @@ const ALL: Drink[] = [
   {
     key: 'rooibos',
     label: 'Rooibos',
-    serving: '10 oz, no caffeine',
+    serving: '300 ml, no caffeine',
     oz: 10,
     hydration: false,
     color: '#b5452b',

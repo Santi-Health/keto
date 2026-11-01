@@ -1,3 +1,4 @@
+import { liters } from '../lib/drinks'
 import { useEffect, useMemo, useState } from 'react'
 import { MacroStrip } from '../components/FoodBits'
 import { FoodForm } from '../components/FoodForm'
@@ -80,7 +81,7 @@ function readingText(r: ReadingRow, unit: WeightUnit): string {
     case 'lab':
       return `${r.meta.test ?? 'Lab'} ${r.value}${r.unit === '%' ? '%' : ` ${r.unit ?? ''}`}`
     case 'water':
-      return `Water ${(r.value ?? 0) / 8} cups (${r.value} oz)`
+      return `Water ${liters(r.value ?? 0)}`
     case 'body_scan':
       return `Body scan: ${r.value}% body fat`
   }
@@ -178,7 +179,7 @@ export function Log({ weightKg, hr, weightUnit, netCarbLimit, proteinTarget, dat
               <span>Readings</span>
               {waterOz > 0 && (
                 <span>
-                  {waterOz / 8} {waterOz === 8 ? 'cup' : 'cups'} water ({waterOz} oz)
+                  {liters(waterOz)} water
                 </span>
               )}
             </div>

@@ -1,12 +1,11 @@
 import { useState } from 'react'
 import { useData } from '../lib/data'
-import { ALL_DRINKS, CAFFEINE_FREE_MG, DRINKS, MILKS, asksForMilk, drinkFood, drinkPortion, hydration, milkFood, type Drink, type DrinkKey, type MilkKey } from '../lib/drinks'
+import { ALL_DRINKS, CAFFEINE_FREE_MG, DRINKS, glasses, liters, MILKS, asksForMilk, drinkFood, drinkPortion, hydration, milkFood, type Drink, type DrinkKey, type MilkKey } from '../lib/drinks'
 import { buildLogEntry, portionNutrients, type Food, type LogEntry } from '../lib/foods'
 import { mealForTime } from '../lib/foods'
 import { localDate } from '../lib/targets'
 import { deviceTz } from '../lib/time'
 import { Segmented } from './Fields'
-import { Bar } from './Progress'
 import { Sheet } from './Sheet'
 
 interface Props {
@@ -133,18 +132,24 @@ export function DrinksCard({ days, waterTargetOz }: Props) {
   return (
     <section className="card">
       <h2>Drinks{days.length > 1 ? ' (7-day totals)' : ''}</h2>
-      <Bar label={days.length > 1 ? 'Fluids, daily average' : 'Fluids'} value={Math.round((fluid.total / 8) * 10) / 10} target={Math.round((waterTargetOz / 8) * 10) / 10} unit="cups" color="var(--water)" />
+      <div className="bar-head">
+        <span className="bar-label">{days.length > 1 ? 'Fluids, daily average' : 'Fluids'}</span>
+        <span className="muted">
+          {liters(fluid.total)} / {liters(waterTargetOz)}
+        </span>
+      </div>
+      <Glasses fills={glasses(fluid.total, waterTargetOz)} />
       {fluid.drinks > 0 && (
         <p className="muted small" style={{ margin: '0 0 4px' }}>
-          {Math.round((waterOz / 8) * 10) / 10} cups water + {Math.round((fluid.drinks / 8) * 10) / 10} from other drinks
+          {liters(waterOz)} water + {liters(fluid.drinks)} from other drinks
           {fluid.loss > 0.05
-            ? ` − ${Math.round((fluid.loss / 8) * 10) / 10} for caffeine over ${CAFFEINE_FREE_MG} mg.`
+            ? ` − ${liters(fluid.loss)} for caffeine over ${CAFFEINE_FREE_MG} mg.`
             : '. Coffee, tea and sodas hydrate like water at your caffeine level.'}
         </p>
       )}
       {(tally.length > 0 || counts.sparkling_water) && (
         <p className="muted small" style={{ margin: '0 0 8px' }}>
-          {counts.sparkling_water ? `${counts.sparkling_water} cup${counts.sparkling_water > 1 ? 's' : ''} sparkling in the water total. ` : ''}
+          {counts.sparkling_water ? `${counts.sparkling_water} glass${counts.sparkling_water > 1 ? 'es' : ''} sparkling in the water total. ` : ''}
           {tally.length > 0 && `${isToday ? 'Also today' : 'Also'}: ${tally.join(' · ')}${caffeine > 0 ? ` · ${Math.round(caffeine)} mg caffeine` : ''}.`}
         </p>
       )}
@@ -185,6 +190,22 @@ export function DrinksCard({ days, waterTargetOz }: Props) {
         <EspressoSheet drink={espresso} foods={foods} onLog={logEspresso} onClose={() => setEspresso(null)} />
       )}
     </section>
+  )
+}
+
+/** A row of glasses, 250 ml each, filled as the day's fluids add up. */
+function Glasses({ fills }: { fills: (0 | 0.5 | 1)[] }) {
+  const full = fills.reduce<number>((a, b) => a + b, 0)
+  return (
+    <div className="glasses" role="img" aria-label={`${full} of ${fills.length} glasses`}>
+      {fills.map((f, i) => (
+        <svg key={i} viewBox="0 0 24 32" className="glass">
+          {/* Water, then the glass outline on top. The glass narrows toward the bottom. */}
+          {f > 0 && <path d={f === 1 ? 'M4.6 6 L19.4 6 L17.6 29 L6.4 29 Z' : 'M5.8 17.5 L18.2 17.5 L17.6 29 L6.4 29 Z'} className="glass-water" />}
+          <path d="M3 2 L21 2 L18 30 L6 30 Z" className="glass-rim" />
+        </svg>
+      ))}
+    </div>
   )
 }
 

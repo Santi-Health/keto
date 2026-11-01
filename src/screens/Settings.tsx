@@ -1,3 +1,4 @@
+import { ML_PER_OZ } from '../lib/drinks'
 import { useState } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import { NumberField, Segmented } from '../components/Fields'
@@ -196,7 +197,7 @@ export function Settings({ profile, update, targets, session, sync, recovering, 
               <NumberField label="Magnesium" value={profile.magnesiumMg} suffix="mg" step={10} onChange={(magnesiumMg) => update({ magnesiumMg })} />
               <NumberField label="Fiber" value={profile.fiberG} suffix="g" onChange={(fiberG) => update({ fiberG })} />
             </div>
-            <NumberField label="Fluids (water + other drinks)" value={profile.waterOz / 8} step={0.5} suffix="cups (8 oz) / day" onChange={(cups) => update({ waterOz: cups * 8 })} />
+            <NumberField label="Fluids (water + other drinks)" value={Math.round((profile.waterOz * ML_PER_OZ) / 100) / 10} step={0.25} suffix="liters / day" onChange={(l) => update({ waterOz: (l * 1000) / ML_PER_OZ })} />
             <p className="muted small" style={{ margin: 0 }}>
               Electrolyte defaults follow common keto guidance (sodium 3,000–5,000 mg, potassium 3,500–4,700 mg, magnesium
               300–500 mg). This is general guidance, not medical advice.

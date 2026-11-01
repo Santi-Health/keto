@@ -1322,6 +1322,29 @@ input[type='time'] {
 }
 
 /* Drinks card */
+.glasses {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 6px 0 10px;
+}
+
+.glass {
+  width: 22px;
+  height: 29px;
+}
+
+.glass-rim {
+  fill: none;
+  stroke: var(--text-2);
+  stroke-width: 1.5;
+  stroke-linejoin: round;
+}
+
+.glass-water {
+  fill: var(--water);
+}
+
 .drink-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
