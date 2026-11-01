@@ -37,6 +37,15 @@ describe('milk in espresso', () => {
 })
 
 describe('teas', () => {
+  it('matches the fairlife chocolate label for a whole 340 ml bottle', () => {
+    const f = { ...milkFood(MILKS.find((m) => m.key === 'fairlife_chocolate')!), id: 'c', favorite: false, use_count: 0, last_used_at: null, updated_at: '', deleted_at: null }
+    const n = portionNutrients(f, (340 / ML_PER_OZ) * 30.5)
+    expect(Math.round(n.kcal!)).toBe(150)
+    expect(Math.round(n.protein!)).toBe(30)
+    expect(Math.round(n.netCarbs!)).toBe(3)
+    expect(Math.round(n.sodiumMg!)).toBe(230)
+    expect(f.meta.sweeteners).toContain('sucralose')
+  })
   it('logs mate cocido and té con leche as 10 fl oz with 2 oz Fairlife, rooibos alone', () => {
     const mate = drinkByKey('mate_cocido')!
     expect(drinkPortion(mate)).toEqual({ amount: 10, unit: 'fl oz' })

@@ -232,14 +232,45 @@ export interface Milk {
 /** Milk is about 3% denser than water. */
 const G_PER_FL_OZ = 30.5
 
+/** A label's numbers for a whole bottle of `ml`, as per 100 g. */
+const perBottle = (n: Nutrients, ml: number): Nutrients => {
+  const k = 100 / ((ml / ML_PER_OZ) * G_PER_FL_OZ)
+  return Object.fromEntries(Object.entries(n).map(([key, v]) => [key, Math.round(v * k * 1000) / 1000])) as Nutrients
+}
+
 export const MILKS: Milk[] = [
   {
     key: 'fairlife_chocolate',
     label: 'Fairlife chocolate',
-    // 2% reduced-fat chocolate, per cup: 140 kcal, 4.5 g fat, 13 g carbs, 12 g sugar, 13 g protein.
-    per100g: { kcal: 57.4, protein: 5.33, fat: 1.84, satFat: 1.23, carbs: 5.33, netCarbs: 5.33, sugars: 4.92, cholesterolMg: 8.2, sodiumMg: 102, potassiumMg: 164, calciumMg: 156 },
-    sweeteners: ['sucralose', 'acesulfame K'],
-    estimated: ['sodiumMg', 'potassiumMg'],
+    // fairlife Nutrition Plan chocolate, from the bottle's label: 1 bottle (340 ml) is 150 kcal, 30 g protein,
+    // 4 g carbs (1 g fiber, 2 g sugar, none added). Phosphorus 510 mg, iodine 100 mcg and chloride 480 mg aren't tracked.
+    per100g: perBottle(
+      {
+        kcal: 150,
+        protein: 30,
+        fat: 2.5,
+        satFat: 1.5,
+        transFat: 0,
+        cholesterolMg: 25,
+        sodiumMg: 230,
+        carbs: 4,
+        fiber: 1,
+        netCarbs: 3,
+        sugars: 2,
+        addedSugars: 0,
+        vitDUg: 5,
+        calciumMg: 730,
+        ironMg: 1.9,
+        potassiumMg: 460,
+        vitAUg: 200,
+        b12Ug: 1.4,
+        magnesiumMg: 50,
+        zincMg: 6,
+        seleniumUg: 20,
+      },
+      340,
+    ),
+    sweeteners: ['monk fruit', 'acesulfame K', 'sucralose', 'stevia'],
   },
   {
     key: 'fairlife_fat_free',
