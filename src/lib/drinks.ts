@@ -22,6 +22,7 @@ export type DrinkKey =
   | 'te_con_leche'
   | 'rooibos'
   | 'kazar'
+  | 'fairlife_choc_bottle'
 
 export interface Drink {
   key: DrinkKey
@@ -41,6 +42,8 @@ export interface Drink {
   flOz?: number
   /** Milk that always goes in, logged as its own entry in the same tap. */
   milk?: { key: MilkKey; oz: number }
+  /** Logged as one of these (a bottle) instead of a can. */
+  container?: { unit: string; grams: number }
 }
 
 const CAN_G = 355
@@ -95,6 +98,40 @@ export function glasses(totalOz: number, targetOz: number): (0 | 0.5 | 1)[] {
   const n = Math.max(Math.ceil((targetOz * ML_PER_OZ) / GLASS_ML), Math.ceil(halves / 2))
   return Array.from({ length: n }, (_, i) => (halves >= 2 * (i + 1) ? 1 : halves === 2 * i + 1 ? 0.5 : 0))
 }
+
+/** Milk weighs about 3% more than water: grams per fluid ounce. */
+const G_PER_FL_OZ = 30.5
+/** A 340 ml bottle of milk drink, in grams. */
+const BOTTLE_340_G = (340 / ML_PER_OZ) * G_PER_FL_OZ
+
+/**
+ * fairlife Nutrition Plan chocolate, from the bottle's label: 1 bottle (340 ml) is 150 kcal, 30 g protein,
+ * 4 g carbs (1 g fiber, 2 g sugar, none added). Phosphorus 510 mg, iodine 100 mcg and chloride 480 mg aren't tracked.
+ */
+const FAIRLIFE_CHOC_BOTTLE: Nutrients = {
+  kcal: 150,
+  protein: 30,
+  fat: 2.5,
+  satFat: 1.5,
+  transFat: 0,
+  cholesterolMg: 25,
+  sodiumMg: 230,
+  carbs: 4,
+  fiber: 1,
+  netCarbs: 3,
+  sugars: 2,
+  addedSugars: 0,
+  vitDUg: 5,
+  calciumMg: 730,
+  ironMg: 1.9,
+  potassiumMg: 460,
+  vitAUg: 200,
+  b12Ug: 1.4,
+  magnesiumMg: 50,
+  zincMg: 6,
+  seleniumUg: 20,
+}
+const FAIRLIFE_SWEETENERS = ['monk fruit', 'acesulfame K', 'sucralose', 'stevia']
 
 const ALL: Drink[] = [
   { key: 'water', label: 'Water', serving: '1 glass (250 ml)', oz: GLASS_ML / ML_PER_OZ, hydration: true, color: 'var(--water)', perServing: null },
@@ -152,7 +189,19 @@ const ALL: Drink[] = [
     // end of the 80–120 mg range on purpose (the user's choice), and treated as a fixed value.
     perServing: { kcal: 2, protein: 0.1, fat: 0, carbs: 0.3, netCarbs: 0.3, sodiumMg: 3, potassiumMg: 45, magnesiumMg: 30, caffeineMg: 120 },
   },
+  {
+    key: 'fairlife_choc_bottle',
+    label: 'Fairlife choc',
+    serving: '340 ml bottle',
+    oz: 340 / ML_PER_OZ,
+    hydration: false,
+    color: '#5a3825',
+    perServing: FAIRLIFE_CHOC_BOTTLE,
+    sweeteners: FAIRLIFE_SWEETENERS,
+    container: { unit: 'bottle', grams: BOTTLE_340_G },
+  },
 ]
+
 
 /** Button order: the everyday drinks first. */
 const ORDER: DrinkKey[] = [
@@ -169,6 +218,7 @@ const ORDER: DrinkKey[] = [
   'sprite_zero',
   'te_con_leche',
   'rooibos',
+  'fairlife_choc_bottle',
 ]
 
 /** The buttons, in order. Single espresso isn't a button; it's the Single/Double switch in the espresso sheet. */
@@ -185,7 +235,7 @@ export const drinkByKey = (key: string) => ALL.find((d) => d.key === key)
 /** Food row for a soda or espresso (single and double share one food): nutrients per 100 g plus a serving unit. */
 export function drinkFood(d: Drink): NewFood {
   const isEspresso = d.key.startsWith('espresso')
-  const grams = d.flOz ? d.flOz * FL_OZ_G : d.key === 'kazar' ? POD_G : isEspresso ? SHOT_G * (d.key === 'espresso_double' ? 2 : 1) : CAN_G
+  const grams = d.container ? d.container.grams : d.flOz ? d.flOz * FL_OZ_G : d.key === 'kazar' ? POD_G : isEspresso ? SHOT_G * (d.key === 'espresso_double' ? 2 : 1) : CAN_G
   const per100: Nutrients = {}
   for (const [k, v] of Object.entries(d.perServing ?? {})) per100[k as keyof Nutrients] = Math.round((v * 100 * 1000) / grams) / 1000
   return {
@@ -194,10 +244,10 @@ export function drinkFood(d: Drink): NewFood {
     barcode: null,
     per_100g: per100,
     unit_conversions: [
-      d.flOz ? { unit: 'fl oz', grams: FL_OZ_G } : d.key === 'kazar' ? { unit: 'pod', grams: POD_G } : { unit: isEspresso ? 'shot' : 'can', grams: isEspresso ? SHOT_G : CAN_G },
+      d.container ? { unit: d.container.unit, grams: d.container.grams } : d.flOz ? { unit: 'fl oz', grams: FL_OZ_G } : d.key === 'kazar' ? { unit: 'pod', grams: POD_G } : { unit: isEspresso ? 'shot' : 'can', grams: isEspresso ? SHOT_G : CAN_G },
     ],
     ingredients_text: null,
-    keto_notes: d.sweeteners?.length ? `Zero sugar; sweetened with ${d.sweeteners.join(' and ')}.` : null,
+    keto_notes: d.sweeteners?.length ? `${d.perServing?.sugars ? 'No added sugar' : 'Zero sugar'}; sweetened with ${d.sweeteners.join(' and ')}.` : null,
     carbs_exclude_fiber: false,
     source: 'manual',
     confidence: d.estimated?.length ? 'medium' : 'high',
@@ -208,7 +258,9 @@ export function drinkFood(d: Drink): NewFood {
 
 /** Amount and unit to log for one tap. */
 export const drinkPortion = (d: Drink) =>
-  d.flOz
+  d.container
+    ? { amount: 1, unit: d.container.unit }
+    : d.flOz
     ? { amount: d.flOz, unit: 'fl oz' }
     : d.key === 'kazar'
       ? { amount: 1, unit: 'pod' }
@@ -229,9 +281,6 @@ export interface Milk {
   estimated?: string[]
 }
 
-/** Milk is about 3% denser than water. */
-const G_PER_FL_OZ = 30.5
-
 /** A label's numbers for a whole bottle of `ml`, as per 100 g. */
 const perBottle = (n: Nutrients, ml: number): Nutrients => {
   const k = 100 / ((ml / ML_PER_OZ) * G_PER_FL_OZ)
@@ -242,35 +291,9 @@ export const MILKS: Milk[] = [
   {
     key: 'fairlife_chocolate',
     label: 'Fairlife chocolate',
-    // fairlife Nutrition Plan chocolate, from the bottle's label: 1 bottle (340 ml) is 150 kcal, 30 g protein,
-    // 4 g carbs (1 g fiber, 2 g sugar, none added). Phosphorus 510 mg, iodine 100 mcg and chloride 480 mg aren't tracked.
-    per100g: perBottle(
-      {
-        kcal: 150,
-        protein: 30,
-        fat: 2.5,
-        satFat: 1.5,
-        transFat: 0,
-        cholesterolMg: 25,
-        sodiumMg: 230,
-        carbs: 4,
-        fiber: 1,
-        netCarbs: 3,
-        sugars: 2,
-        addedSugars: 0,
-        vitDUg: 5,
-        calciumMg: 730,
-        ironMg: 1.9,
-        potassiumMg: 460,
-        vitAUg: 200,
-        b12Ug: 1.4,
-        magnesiumMg: 50,
-        zincMg: 6,
-        seleniumUg: 20,
-      },
-      340,
-    ),
-    sweeteners: ['monk fruit', 'acesulfame K', 'sucralose', 'stevia'],
+    // The same fairlife Nutrition Plan chocolate as the bottle button, poured into coffee.
+    per100g: perBottle(FAIRLIFE_CHOC_BOTTLE, 340),
+    sweeteners: FAIRLIFE_SWEETENERS,
   },
   {
     key: 'fairlife_fat_free',

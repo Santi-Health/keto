@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { useData } from '../lib/data'
 import { MEALS, mealForTime, portionNutrients, setUsual, usualMealsFor, type Food, type FoodMeta, type LogEntry, type Meal, type NewFood } from '../lib/foods'
 import { toGrams, unitsFor } from '../lib/units'
+import { DeleteFood } from './DeleteFood'
 import { FoodFlags, MacroStrip, foodSubtitle } from './FoodBits'
 import { Sheet } from './Sheet'
 
@@ -233,6 +234,7 @@ export function LogFoodSheet({ food, entry, date, meal: chosenMeal, onClose, onE
             Delete entry
           </button>
         )}
+        {saved && !entry && <DeleteFood food={saved} onDeleted={onClose} />}
       </div>
     </Sheet>
   )

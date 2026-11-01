@@ -46,6 +46,17 @@ describe('teas', () => {
     expect(Math.round(n.sodiumMg!)).toBe(230)
     expect(f.meta.sweeteners).toContain('sucralose')
   })
+  it('logs the Fairlife chocolate button as one bottle with the label numbers, last in the row', () => {
+    const d = drinkByKey('fairlife_choc_bottle')!
+    expect(DRINKS[DRINKS.length - 1].key).toBe('fairlife_choc_bottle')
+    expect(drinkPortion(d)).toEqual({ amount: 1, unit: 'bottle' })
+    const food = asFood(drinkFood(d))
+    const n = portionNutrients(food, food.unit_conversions[0].grams)
+    expect(Math.round(n.kcal!)).toBe(150)
+    expect(Math.round(n.protein!)).toBe(30)
+    expect(Math.round(n.calciumMg!)).toBe(730)
+    expect(food.keto_notes).toMatch(/^No added sugar/)
+  })
   it('logs mate cocido and té con leche as 10 fl oz with 2 oz Fairlife, rooibos alone', () => {
     const mate = drinkByKey('mate_cocido')!
     expect(drinkPortion(mate)).toEqual({ amount: 10, unit: 'fl oz' })

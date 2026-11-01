@@ -44,8 +44,8 @@ export function DrinksCard({ days, waterTargetOz }: Props) {
   for (const l of drinkLogs) {
     const ext = foodById[l.food_id!].meta.externalId!.slice('drink:'.length)
     const key = (ext === 'espresso' ? (l.amount >= 2 ? 'espresso_double' : 'espresso_single') : ext) as DrinkKey
-    // Cans count by amount, so half a can shows as ½.
-    counts[key] = (counts[key] ?? 0) + (l.unit === 'can' ? l.amount : 1)
+    // Cans and bottles count by amount, so half a can shows as ½.
+    counts[key] = (counts[key] ?? 0) + (l.unit === 'can' || l.unit === 'bottle' ? l.amount : 1)
   }
   const caffeine = drinkLogs.reduce((s, l) => s + (l.nutrients.caffeineMg ?? 0), 0)
   const label = (d: Drink) => (d.key.startsWith('espresso') ? `${d.serving.split(' ')[0]} espresso` : d.label)
@@ -77,7 +77,7 @@ export function DrinksCard({ days, waterTargetOz }: Props) {
     }
     const { entry, food } = logDrinkFood(d, now)
     const ids = [entry.id]
-    if (entry.unit === 'can') {
+    if (entry.unit === 'can' || entry.unit === 'bottle') {
       setUndo({ kind: 'log', ids, label: label(d), can: { entry, food } })
       return
     }
@@ -111,9 +111,9 @@ export function DrinksCard({ days, waterTargetOz }: Props) {
     return { entry: logFood(food, amount, unit, mealForTime(at), at), food }
   }
 
-  /** You only had half the can: same entry, half the amount (and half the caffeine, sodium and fluid). */
+  /** You only had half the can or bottle: same entry, half the amount (and half the caffeine, sodium and fluid). */
   function halfCan(u: NonNullable<Undo['can']>) {
-    const half = buildLogEntry(u.food, 0.5, 'can', u.entry.meal, new Date(u.entry.eaten_at))
+    const half = buildLogEntry(u.food, 0.5, u.entry.unit, u.entry.meal, new Date(u.entry.eaten_at))
     updateLog({ ...u.entry, ...half, id: u.entry.id })
     setUndo((x) => (x ? { ...x, label: `½ ${x.label}`, can: undefined } : x))
   }
@@ -168,7 +168,7 @@ export function DrinksCard({ days, waterTargetOz }: Props) {
         <div className="row-btns" style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 8 }}>
         {undo.can && (
           <button type="button" className="btn secondary small-btn" onClick={() => halfCan(undo.can!)}>
-            Make it ½ can
+            Make it ½ {undo.can.entry.unit}
           </button>
         )}
         <button

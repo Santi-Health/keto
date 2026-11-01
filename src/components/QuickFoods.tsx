@@ -4,6 +4,7 @@ import { MEALS, portionNutrients, type Food, type LogEntry, type Meal } from '..
 import { SECTIONS, foodIcon, frac, nutCount, portionText, sectionsOf, servingOf, shortName } from '../lib/quickFoods'
 import type { SavedMeal } from '../lib/savedMeals'
 import { toGrams } from '../lib/units'
+import { DeleteFood } from './DeleteFood'
 import { defaultTime } from './LogFoodSheet'
 import { Sheet } from './Sheet'
 
@@ -142,7 +143,7 @@ export function QuickLogSheet({
           </button>
         </div>
       ) : (
-        <p className="quick-links">
+        <div className="quick-links">
           <button type="button" onClick={onMore}>
             Other amount or time
           </button>
@@ -152,7 +153,8 @@ export function QuickLogSheet({
           <button type="button" onClick={() => setRenaming(true)}>
             Rename button
           </button>
-        </p>
+          <DeleteFood food={food} onDeleted={onClose} asLink />
+        </div>
       )}
       <div className="section-chips" role="group" aria-label="Sections on the Add screen">
         <span className="muted small">Sections</span>

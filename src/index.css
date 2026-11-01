@@ -1410,6 +1410,31 @@ input[type='time'] {
   margin: 8px 0 4px;
 }
 
+.delete-link {
+  padding: 0;
+  font: inherit;
+  font-size: 0.85rem;
+  color: var(--danger, #c0392b);
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+
+.delete-confirm {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 0 0;
+}
+
+.delete-confirm > span {
+  flex: 1 1 100%;
+  text-align: center;
+}
+
 .quick-links {
   display: flex;
   flex-wrap: wrap;
