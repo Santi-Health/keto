@@ -1,5 +1,6 @@
 import type { Food, NewFood } from '../lib/foods'
 import { scaleNutrients } from '../lib/nutrients'
+import { unshout } from '../lib/quickFoods'
 
 /** The serving a package label would use: the food's first portion, or 100 g if it has none. */
 export function labelServing(food: Food | NewFood): { label: string; grams: number } {
@@ -26,7 +27,7 @@ export function FoodRow({ food, onPick, onDismiss, dismissLabel }: { food: Food 
       <span className="food-card-name">
         {saved?.favorite && <span className="star">★</span>}
         {food.source === 'recipe' && <span aria-hidden="true">🍳 </span>}
-        {food.name}
+        {unshout(food.name)}
         {food.brand && <span className="muted"> · {food.brand}</span>}
       </span>
       <span className="food-card-serving">per {serving.label}</span>

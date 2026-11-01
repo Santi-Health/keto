@@ -12,8 +12,14 @@ const NOUNS =
   /^(bread|bagels?|buns?|rolls?|tortillas?|wraps?|yogurt|milk|cheese|butter|eggs?|salmon|tuna|chicken|turkey|beef|steak|pork|ham|bacon|sausages?|jerky|shrimp|avocados?|nuts|almonds|bars?|shakes?|powder|chips|crackers|cookies|cereal|granola|sauce|soup|salad|chocolate|coffee|tea|kefir|cream|oil|pasta|noodles|rice|pizza|burgers?|patties|meatballs)$/i
 
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
-/** "CANADIAN BACON" → "Canadian Bacon"; names with some lowercase are left alone. */
-const unshout = (s: string) => (/[a-z]/.test(s) ? s : s.toLowerCase().replace(/\b[a-z]/g, (c) => c.toUpperCase()))
+/** Short all-caps words that are real abbreviations, kept as they are. */
+const ACRONYMS = new Set(['USDA', 'MCT', 'BBQ', 'ALMI', 'DHA', 'EPA'])
+/**
+ * No shouting in names: "CANADIAN BACON" → "Canadian Bacon", "Keto Bread (SOLA)" → "Keto Bread (Sola)".
+ * Short capitals like "BF" or "TJ" stay, being the user's own short forms.
+ */
+export const unshout = (s: string) =>
+  s.replace(/\b[A-Z][A-Z']{2,}\b/g, (w) => (ACRONYMS.has(w) || (w.length < 4 && /[a-z]/.test(s)) ? w : w.charAt(0) + w.slice(1).toLowerCase()))
 
 /**
  * Names chosen for specific foods, matched on brand + name (the button says these instead of a guess).
@@ -248,7 +254,7 @@ export function foodIcon(food: Pick<Food, 'name' | 'brand' | 'meta' | 'source'>)
 
 // --- Nut counts ---------------------------------------------------------------------------
 
-/** About how many are in an ounce (28 g), from USDA and the nut boards; pecans and walnuts in halves. Olives too. */
+/** About how many are in an ounce (28 g), from USDA and the nut boards; pecans and walnuts in halves. Olives too. The name is what a portion that already counts them says. */
 const PER_OZ: [RegExp, number, string][] = [
   [/almond/, 23, 'almonds'],
   [/pistachio/, 49, 'pistachios'],
@@ -266,14 +272,15 @@ const PER_OZ: [RegExp, number, string][] = [
 /** Foods made from nuts that aren't counted by the nut. */
 const NOT_WHOLE_NUT = /\b(butter|flour|milk|meal|oil|bar|paste|tapenade|sliced|slivered|chopped|ground|crust|cookie)\b/i
 
-/** "~23 almonds" for a portion of whole nuts, or null for anything else. */
-export function nutCount(food: Pick<Food, 'name'>, grams: number): string | null {
+/** "~23" (almonds, olives…) for a portion of whole nuts or olives, or null for anything else. */
+export function nutCount(food: Pick<Food, 'name'>, grams: number, unit = ''): string | null {
   if (NOT_WHOLE_NUT.test(food.name)) return null
   const n = food.name.toLowerCase()
   const hit = PER_OZ.find(([re]) => re.test(n))
-  if (!hit) return null
+  // A portion that already counts them ("5 olives") needs no estimate.
+  if (!hit || unit.toLowerCase().includes(hit[2].split(' ')[0].replace(/s$/, ''))) return null
   const count = Math.round((grams / 28.35) * hit[1])
-  return count > 0 ? `~${count} ${hit[2]}` : null
+  return count > 0 ? `~${count}` : null
 }
 
 // --- Portions ------------------------------------------------------------------------------
@@ -294,7 +301,14 @@ export function servingOf(food: Pick<Food, 'unit_conversions'>): { amount: numbe
 }
 
 /** How a portion reads on a button: "2 eggs", "½ slice", "1 serving", "150 g". */
+/** Short words for portions: "serv." and "cont."; slice and can stay whole. */
+const abbreviate = (s: string) => s.replace(/\bservings?\b/g, 'serv.').replace(/\bcontainers?\b/g, 'cont.')
+
 export function portionText(amount: number, unit: string): string {
+  return abbreviate(portionWords(amount, unit))
+}
+
+function portionWords(amount: number, unit: string): string {
   const m = unit.match(/^1 (.+)$/)
   // Portions that carry their own amount ("½ fruit", "2 oz", "5 berries"): as is, or "2 × 2 oz".
   if (!m) return /^[\d½¼¾]/.test(unit) ? (amount === 1 ? unit : `${frac(amount)} × ${unit}`) : `${frac(amount)} ${unit}`

@@ -1,7 +1,8 @@
+
 import { useMemo, useState } from 'react'
 import { useData } from '../lib/data'
 import { MEALS, mealForTime, portionNutrients, setUsual, usualMealsFor, type Food, type FoodMeta, type LogEntry, type Meal, type NewFood } from '../lib/foods'
-import { learnedPrefixes, suggestDisplayName } from '../lib/quickFoods'
+import { learnedPrefixes, suggestDisplayName, unshout } from '../lib/quickFoods'
 import { toGrams, unitsFor } from '../lib/units'
 import { DeleteFood } from './DeleteFood'
 import { FoodFlags, MacroStrip, foodSubtitle } from './FoodBits'
@@ -120,7 +121,7 @@ export function LogFoodSheet({ food, entry, date, meal: chosenMeal, onClose, onE
 
   return (
     <Sheet
-      title={food.name}
+      title={unshout(food.name)}
       subtitle={
         logging
           ? `${entry ? 'Editing' : 'Logging to'} ${MEALS.find((m) => m.value === meal)!.label.toLowerCase()} · ${foodSubtitle(food)}`

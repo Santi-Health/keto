@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useData } from '../lib/data'
 import { MEALS, portionNutrients, type Food, type LogEntry, type Meal } from '../lib/foods'
-import { SECTIONS, frac, nutCount, portionText, sectionsOf, servingOf, shortName } from '../lib/quickFoods'
+import { SECTIONS, frac, nutCount, portionText, sectionsOf, servingOf, shortName, unshout } from '../lib/quickFoods'
 import type { SavedMeal } from '../lib/savedMeals'
 import { toGrams } from '../lib/units'
 import { DeleteFood } from './DeleteFood'
@@ -51,16 +51,19 @@ export function FoodButtons({
   )
 }
 
-/** The serving on a button: "1 slice", "1 oz · ~23" for whole nuts, "1 serving (~3 olives)". */
-function servingText(food: Food): string {
-  const { amount, unit } = servingOf(food)
-  const count = nutCount(food, toGrams({ unitConversions: food.unit_conversions }, amount, unit).grams)
+/**
+ * What one portion reads as: "1 slice", "1 oz (~23)" for whole nuts, "1 serv. (~3)" for olives,
+ * and recipes with their weight, "1 serv. (300 g)".
+ */
+function portionLabel(food: Food, amount: number, unit: string): string {
+  const grams = toGrams({ unitConversions: food.unit_conversions }, amount, unit).grams
+  const extra = food.source === 'recipe' ? `${Math.round(grams)} g` : nutCount(food, grams, unit)
   const portion = portionText(amount, unit)
-  // No count when the serving already is one ("5 olives").
-  if (!count || portion.includes(count.split(' ').pop()!)) return portion
-  // "1 serving (~3 olives)"; by weight, just the number: "1 oz · ~23".
-  return /serving/.test(portion) ? `${portion} (${count})` : `${portion} · ${count.split(' ')[0]}`
+  return extra ? `${portion} (${extra})` : portion
 }
+
+/** The serving on a button. */
+const servingText = (food: Food) => portionLabel(food, servingOf(food).amount, servingOf(food).unit)
 
 const STEPS = [0.5, 1, 1.5, 2]
 
@@ -94,8 +97,7 @@ export function QuickLogSheet({
   const amount = serving.amount * steps
   const grams = toGrams({ unitConversions: food.unit_conversions }, amount, serving.unit).grams
   const n = useMemo(() => portionNutrients(food, grams), [food, grams])
-  const count = nutCount(food, grams)
-  const portion = `${portionText(amount, serving.unit)}${count ? ` (${count})` : ''}`
+  const portion = portionLabel(food, amount, serving.unit)
   const mealLabel = MEALS.find((m) => m.value === meal)!.label.toLowerCase()
   const sections = sectionsOf(food)
   const fmt = (v: number | undefined, d = 0) => (v == null ? '—' : (Math.round(v * 10 ** d) / 10 ** d).toLocaleString())
@@ -112,10 +114,10 @@ export function QuickLogSheet({
   }
 
   return (
-    <Sheet title={food.name} subtitle={food.brand ?? undefined} onClose={onClose}>
+    <Sheet title={unshout(food.name)} subtitle={food.brand ?? undefined} onClose={onClose}>
       <span className="label">
         How much
-        {serving.unit !== 'g' && ` · ${portionText(1, serving.unit)}${portionText(1, serving.unit).startsWith('1 serving') ? '' : ' per serving'}`}
+        {serving.unit !== 'g' && ` · ${portionText(1, serving.unit)}${portionText(1, serving.unit).startsWith('1 serv.') ? '' : ' per serv.'}`}
       </span>
       <div className="portion-steps" role="group" aria-label="Servings">
         {STEPS.map((s) => (

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { brandsToShow, foodIcon, learnedPrefixes, nutCount, suggestDisplayName, sectionsOf, veryFrequentAt, portionText, servingOf, shortName } from './quickFoods'
+import { brandsToShow, foodIcon, learnedPrefixes, nutCount, unshout, suggestDisplayName, sectionsOf, veryFrequentAt, portionText, servingOf, shortName } from './quickFoods'
 
 const f = (name: string, brand: string | null = null, meta = {}, id = name) => ({ id, name, brand, meta, source: 'manual' as const })
 
@@ -88,11 +88,11 @@ describe('food buttons', () => {
     for (const [name, brand, want] of cases) expect(shortName(f(name, brand))).toBe(want)
   })
   it('counts whole nuts in a portion', () => {
-    expect(nutCount(f('Almonds'), 28.35)).toBe('~23 almonds')
-    expect(nutCount(f('Pistachios, dry roasted'), 28.35)).toBe('~49 pistachios')
-    expect(nutCount(f('Almonds'), 14.2)).toBe('~12 almonds')
+    expect(nutCount(f('Almonds'), 28.35)).toBe('~23')
+    expect(nutCount(f('Pistachios, dry roasted'), 28.35)).toBe('~49')
+    expect(nutCount(f('Almonds'), 14.2)).toBe('~12')
     expect(nutCount(f('Almond butter'), 32)).toBe(null)
-    expect(nutCount(f('Kalamata olives', 'Mezzetta'), 15)).toBe('~3 olives')
+    expect(nutCount(f('Kalamata olives', 'Mezzetta'), 15)).toBe('~3')
     expect(nutCount(f('Olive tapenade'), 15)).toBe(null)
     expect(nutCount(f('Extra virgin olive oil'), 14)).toBe(null)
     expect(nutCount(f('Blueberries'), 74)).toBe(null)
@@ -115,10 +115,20 @@ describe('food buttons', () => {
     expect(sectionsOf(f('Strawberry Greek yogurt'))).toEqual([])
   })
   it('keeps servings short: the count, without the weight', () => {
-    expect(portionText(1, '1 serving (3 slices (56 g))')).toBe('1 serving (3 slices)')
-    expect(portionText(1, '1 serving (3 slices, 56 g)')).toBe('1 serving (3 slices)')
-    expect(portionText(1, '1 serving (3 slices)')).toBe('1 serving (3 slices)')
-    expect(portionText(2, '1 serving (3 slices (56 g))')).toBe('2 servings')
-    expect(portionText(1, '1 serving (56 g)')).toBe('1 serving')
+    expect(portionText(1, '1 serving (3 slices (56 g))')).toBe('1 serv. (3 slices)')
+    expect(portionText(1, '1 serving (3 slices, 56 g)')).toBe('1 serv. (3 slices)')
+    expect(portionText(1, '1 serving (3 slices)')).toBe('1 serv. (3 slices)')
+    expect(portionText(2, '1 serving (3 slices (56 g))')).toBe('2 serv.')
+    expect(portionText(1, '1 serving (56 g)')).toBe('1 serv.')
+  })
+  it('shortens serving and container, counts already given, and calms capitals', () => {
+    expect(portionText(1, '1 container')).toBe('1 cont.')
+    expect(portionText(2, '1 container (150 g)')).toBe('2 cont.')
+    expect(portionText(1, '1 slice')).toBe('1 slice')
+    expect(nutCount(f('Green olives'), 15, '5 olives')).toBe(null)
+    expect(unshout('CANADIAN BACON')).toBe('Canadian Bacon')
+    expect(unshout('Keto Bread (SOLA)')).toBe('Keto Bread (Sola)')
+    expect(unshout('BF Light Mayo')).toBe('BF Light Mayo')
+    expect(unshout('MCT oil')).toBe('MCT oil')
   })
 })

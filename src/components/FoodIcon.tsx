@@ -219,8 +219,8 @@ const DRAWN: [RegExp, (full: string, unit: string) => ReactNode, RegExp?][] = [
   [/\boikos\b/, (full) => <OikosCup flavor={full} />],
   [/canadian bacon|back bacon|peameal/, () => <CanadianBacon />],
   [/\bnu ?salt\b/, () => <NuSalt />],
-  [/\bmayo(nnaise)?\b|\baioli\b/, () => <Jar color="#f6d860" label="MAYO" ink="#2f5fb3" />],
-  [/\bketchup\b|\bcatsup\b/, () => <Jar color="#d6262b" label="KETCHUP" ink="#d6262b" />],
+  [/\bmayo(nnaise)?\b|\baioli\b/, () => <Jar color="#f6d860" label="Mayo" ink="#2f5fb3" />],
+  [/\bketchup\b|\bcatsup\b/, () => <Jar color="#d6262b" label="Ketchup" ink="#d6262b" />],
   // Ground pepper, not bell or chili peppers.
   [/\bpepper\b/, () => <PepperShaker />, /bell|jalape|poblano|chili|sweet|stuffed|roasted|banana pepper|serrano|habanero|flakes/],
   // Cheese snacks are a bag of puffs, not cheese.

@@ -122,7 +122,7 @@ const DRAWINGS: Partial<Record<DrinkKey | 'espresso', () => ReactNode>> = {
       body="#1b1b1b"
       lines={[
         { t: 'Coke', fill: '#e4002b', size: 7, y: 20, w: 15 },
-        { t: 'ZERO', fill: '#fff', size: 5, y: 27, w: 12 },
+        { t: 'Zero', fill: '#fff', size: 5, y: 27, w: 12 },
       ]}
     />
   ),
@@ -147,7 +147,7 @@ const DRAWINGS: Partial<Record<DrinkKey | 'espresso', () => ReactNode>> = {
       }
       lines={[
         { t: 'Pepsi', fill: '#1f4fa0', size: 6.5, y: 24, w: 15 },
-        { t: 'DIET', fill: '#1f4fa0', size: 4.6, y: 30.5, w: 10 },
+        { t: 'Diet', fill: '#1f4fa0', size: 4.6, y: 30.5, w: 10 },
       ]}
     />
   ),
@@ -156,7 +156,7 @@ const DRAWINGS: Partial<Record<DrinkKey | 'espresso', () => ReactNode>> = {
       body="#ffe14d"
       lines={[
         { t: 'Squirt', fill: '#1e8a3a', size: 6.5, y: 20, w: 15 },
-        { t: 'ZERO', fill: '#1b1b1b', size: 5, y: 27, w: 12 },
+        { t: 'Zero', fill: '#1b1b1b', size: 5, y: 27, w: 12 },
       ]}
     />
   ),
@@ -165,7 +165,7 @@ const DRAWINGS: Partial<Record<DrinkKey | 'espresso', () => ReactNode>> = {
       body="#ff8200"
       lines={[
         { t: 'Fanta', fill: '#1d4f9c', size: 7, y: 20, w: 15 },
-        { t: 'ZERO', fill: '#fff', size: 5, y: 27, w: 12 },
+        { t: 'Zero', fill: '#fff', size: 5, y: 27, w: 12 },
       ]}
     />
   ),
@@ -174,18 +174,18 @@ const DRAWINGS: Partial<Record<DrinkKey | 'espresso', () => ReactNode>> = {
       body="#00a651"
       lines={[
         { t: 'Sprite', fill: '#fff', size: 6.5, y: 20, w: 15 },
-        { t: 'ZERO', fill: '#ffe600', size: 5, y: 27, w: 12 },
+        { t: 'Zero', fill: '#ffe600', size: 5, y: 27, w: 12 },
       ]}
     />
   ),
   espresso: () => <Espresso />,
-  kazar: () => <Pod color="#1d2a52" text="KAZAAR" ink="#fff" />,
+  kazar: () => <Pod color="#1d2a52" text="Kazaar" ink="#fff" />,
   // From the user's photo: the decaf is black with a copper-red band and red DECAFFEINATO; BA Lungo is gunmetal.
-  volluto_decaf: () => <Pod color="#1c1a1a" text="DECAF" ink="#e0412a" rim="#8a3a22" />,
+  volluto_decaf: () => <Pod color="#1c1a1a" text="Decaf" ink="#e0412a" rim="#8a3a22" />,
   ba_lungo: () => <Pod color="#46464c" top="#8c8c93" text="BA" ink="#fff" rim="#9a9aa0" />,
   mate_cocido: () => <Mate />,
   te_con_leche: () => <TeaCup tea="#c9a27e" />,
-  rooibos: () => <TeaCup tea="#d9622b" label="ROOIBOS" />,
+  rooibos: () => <TeaCup tea="#d9622b" label="Rooibos" />,
   fairlife_choc_bottle: () => <FairlifeBottle />,
 }
 

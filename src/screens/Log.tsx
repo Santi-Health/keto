@@ -13,6 +13,7 @@ import type { HrProfile } from '../lib/googleHealth'
 import { sessionLabel, type Exercise } from '../lib/exercise'
 import { MEALS, type Food, type LogEntry, type Meal, type NewFood } from '../lib/foods'
 import { addNutrients, type NutrientKey, type Nutrients } from '../lib/nutrients'
+import { unshout } from '../lib/quickFoods'
 import { CONTEXTS, KG_PER_LB, URINE_LEVELS, type ReadingRow } from '../lib/readings'
 import { localDate } from '../lib/targets'
 import { entryTime } from '../lib/time'
@@ -273,7 +274,7 @@ export function Log({ weightKg, hr, weightUnit, netCarbLimit, proteinTarget, dat
                   >
                     <span className="grow">
                       <span className="title" style={{ display: 'block' }}>
-                        {e.food_name}
+                        {unshout(e.food_name)}
                       </span>
                       <span className="sub" style={{ display: 'block' }}>
                         {formatAmount(e.amount, e.unit)} ·{' '}

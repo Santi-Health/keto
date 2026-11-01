@@ -3,6 +3,7 @@ import type { ActivityDay } from '../lib/activity'
 import { deficitSoFar } from '../lib/deficit'
 import { sessionLabel, type Exercise } from '../lib/exercise'
 import { MEALS, type LogEntry } from '../lib/foods'
+import { unshout } from '../lib/quickFoods'
 
 interface Props {
   day: string
@@ -108,7 +109,7 @@ export function DeficitNow({ day, bmr, logs, exercises, activity, goal, calorieL
       meal: value,
       label,
       kcal: Math.round(items.reduce((s, l) => s + (l.nutrients.kcal ?? 0), 0)),
-      foods: [...new Set(items.map((l) => l.food_name.replace(/\s*\(.*\)$/, '')))].join(', '),
+      foods: [...new Set(items.map((l) => unshout(l.food_name.replace(/\s*\(.*\)$/, ''))))].join(', '),
     }
   }).filter((m) => m.foods)
   const gid = useId()
