@@ -311,7 +311,9 @@ export function portionText(amount: number, unit: string): string {
 function portionWords(amount: number, unit: string): string {
   const m = unit.match(/^1 (.+)$/)
   // Portions that carry their own amount ("½ fruit", "2 oz", "5 berries"): as is, or "2 × 2 oz".
-  if (!m) return /^[\d½¼¾]/.test(unit) ? (amount === 1 ? unit : `${frac(amount)} × ${unit}`) : `${frac(amount)} ${unit}`
+  // Counted containers take a plural: "2 shots", "2 cans".
+  const counted = amount > 1 && /^(shot|can|pod|bottle)$/.test(unit) ? `${unit}s` : unit
+  if (!m) return /^[\d½¼¾]/.test(unit) ? (amount === 1 ? unit : `${frac(amount)} × ${unit}`) : `${frac(amount)} ${counted}`
   // Weights inside a serving add clutter: "1 serving (3 slices (56 g))" → "1 serving (3 slices)".
   const serving = m[1].match(/^serving \((.*)\)$/)?.[1]?.replace(/\s*[(,]?\s*[\d.]+\s*(g|grams?|oz|ml)\)?\s*$/i, '').trim()
   if (serving && !/^1 /.test(serving)) return amount === 1 ? `1 serving (${serving})` : `${frac(amount)} servings`

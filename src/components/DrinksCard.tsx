@@ -3,6 +3,7 @@ import { useData } from '../lib/data'
 import { ALL_DRINKS, CAFFEINE_FREE_MG, DRINKS, glasses, liters, MILKS, asksForMilk, drinkFood, drinkPortion, hydration, milkFood, type Drink, type DrinkKey, type MilkKey } from '../lib/drinks'
 import { buildLogEntry, portionNutrients, type Food, type LogEntry } from '../lib/foods'
 import { mealForTime } from '../lib/foods'
+import { portionText, unshout } from '../lib/quickFoods'
 import { localDate } from '../lib/targets'
 import { deviceTz } from '../lib/time'
 import { DrinkIcon } from './DrinkIcon'
@@ -50,6 +51,23 @@ export function DrinksCard({ days, waterTargetOz }: Props) {
   }
   const caffeine = drinkLogs.reduce((s, l) => s + (l.nutrients.caffeineMg ?? 0), 0)
   const label = (d: Drink) => (d.key.startsWith('espresso') ? `${d.serving.split(' ')[0]} espresso` : d.label)
+
+  // Every drink logged that day, newest first, so a mistake can be removed later (not only right after the tap).
+  const [removing, setRemoving] = useState(false)
+  const entries = [
+    ...water.map((r) => ({
+      id: r.id,
+      at: r.taken_at,
+      name: `${r.meta.drink === 'sparkling_water' ? 'Sparkling water' : 'Water'} · ${liters(r.value ?? 0)}`,
+      remove: () => deleteReading(r.id),
+    })),
+    ...drinkLogs.map((l) => ({
+      id: l.id,
+      at: l.eaten_at,
+      name: `${unshout(foodById[l.food_id!]?.name ?? l.food_name)} · ${portionText(l.amount, l.unit)}`,
+      remove: () => deleteLog(l.id),
+    })),
+  ].sort((a, b) => b.at.localeCompare(a.at))
 
   function add(d: Drink) {
     const now = new Date()
@@ -186,6 +204,26 @@ export function DrinksCard({ days, waterTargetOz }: Props) {
           Undo {undo.label}
         </button>
         </div>
+      )}
+      {days.length === 1 && entries.length > 0 && (
+        <>
+          <button type="button" className="more-link" aria-expanded={removing} onClick={() => setRemoving(!removing)}>
+            {removing ? 'Done removing' : 'Remove a drink ›'}
+          </button>
+          {removing && (
+            <ul className="drink-entries">
+              {entries.map((e) => (
+                <li key={e.id}>
+                  <span className="muted small">{new Date(e.at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}</span>
+                  <span className="drink-entry-name">{e.name}</span>
+                  <button type="button" className="icon-btn" aria-label={`Remove ${e.name}`} onClick={e.remove}>
+                    ×
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </>
       )}
       {espresso && (
         <EspressoSheet drink={espresso} foods={foods} onLog={logEspresso} onClose={() => setEspresso(null)} />

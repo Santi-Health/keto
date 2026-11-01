@@ -125,6 +125,8 @@ describe('food buttons', () => {
     expect(portionText(1, '1 container')).toBe('1 cont.')
     expect(portionText(2, '1 container (150 g)')).toBe('2 cont.')
     expect(portionText(1, '1 slice')).toBe('1 slice')
+    expect(portionText(2, 'shot')).toBe('2 shots')
+    expect(portionText(1, 'can')).toBe('1 can')
     expect(nutCount(f('Green olives'), 15, '5 olives')).toBe(null)
     expect(unshout('CANADIAN BACON')).toBe('Canadian Bacon')
     expect(unshout('Keto Bread (SOLA)')).toBe('Keto Bread (Sola)')
