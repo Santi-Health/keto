@@ -31,7 +31,7 @@ const toLocalInput = (d: Date) => {
   return new Date(d.getTime() - off).toISOString().slice(0, 16)
 }
 
-function defaultTime(date?: string): Date {
+export function defaultTime(date?: string): Date {
   const now = new Date()
   if (!date) return now
   const d = new Date(`${date}T12:00:00`)

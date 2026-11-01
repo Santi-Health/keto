@@ -1345,6 +1345,132 @@ input[type='time'] {
   fill: var(--water);
 }
 
+.food-ico {
+  font-size: 1.35rem;
+  line-height: 1.2;
+}
+
+.food-btn .drink-name {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
+.food-brand {
+  max-width: 100%;
+  overflow: hidden;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--text-2);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.food-btn.saved {
+  border-style: dashed;
+}
+
+.fold {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  padding: 10px 2px;
+  font: inherit;
+  font-weight: 600;
+  color: var(--text);
+  background: none;
+  border: 0;
+  border-top: 1px solid var(--border);
+  cursor: pointer;
+}
+
+.fold span {
+  font-size: 0.85rem;
+  font-weight: 400;
+  color: var(--text-2);
+}
+
+.fold + .drink-grid {
+  margin-bottom: 8px;
+}
+
+.more-link,
+.quick-links button {
+  padding: 0;
+  font: inherit;
+  font-size: 0.85rem;
+  color: var(--accent);
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+
+.more-link {
+  display: block;
+  margin: 8px 0 4px;
+}
+
+.quick-links {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px 16px;
+  margin: 12px 0 0;
+}
+
+.portion-steps {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+  margin: 6px 0 12px;
+}
+
+.portion-steps button {
+  padding: 10px 0;
+  font: inherit;
+  font-weight: 600;
+  color: var(--text);
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+.portion-steps button[aria-pressed='true'] {
+  color: var(--bg);
+  background: var(--text);
+  border-color: var(--text);
+}
+
+.portion-macros {
+  display: flex;
+  justify-content: space-between;
+  margin: 4px 0 14px;
+  font-size: 0.85rem;
+  color: var(--text-2);
+}
+
+.portion-macros b {
+  display: block;
+  font-size: 1.1rem;
+  color: var(--text);
+}
+
+.just-logged {
+  display: flex;
+  margin: 10px 0 0;
+  padding: 10px 12px;
+  background: var(--accent-soft);
+  border-radius: 12px;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.just-logged span {
+  flex: 1 1 160px;
+}
+
 .drink-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));

@@ -1,20 +1,24 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { BarcodeScanner } from '../components/BarcodeScanner'
 import { ClaudeChatSheet } from '../components/ClaudeChatSheet'
 import { FoodForm } from '../components/FoodForm'
 import { FoodRow } from '../components/FoodRow'
 import { LogFoodSheet, type AddMode } from '../components/LogFoodSheet'
+import { FoodButtons, QuickLogSheet, type QuickItem } from '../components/QuickFoods'
 import { RecipeBuilder } from '../components/RecipeBuilder'
 import { LogSavedMealSheet } from '../components/SavedMealSheets'
 import { useData } from '../lib/data'
 import { lookupBarcode } from '../lib/foodApi'
 import type { RestaurantDish } from '../lib/foodJson'
-import { MEALS, mealForTime, setUsual, suggestForMeal, type Food, type Meal, type NewFood } from '../lib/foods'
-import { mealTotals, type SavedMeal } from '../lib/savedMeals'
+import { MEALS, mealForTime, rankFoods, suggestForMeal, type Food, type Meal, type NewFood } from '../lib/foods'
+import { brandsToShow, isFruitOrNut } from '../lib/quickFoods'
+import type { SavedMeal } from '../lib/savedMeals'
+import { localDate } from '../lib/targets'
 import { useFoodSearch } from '../lib/useFoodSearch'
 
 type Overlay =
   | { kind: 'log'; food: Food | NewFood }
+  | { kind: 'quick'; food: Food }
   | { kind: 'form'; food?: Food | NewFood; barcode?: string }
   | { kind: 'scan' }
   | { kind: 'recipe'; recipe?: Food; dish?: RestaurantDish }
@@ -33,17 +37,27 @@ interface Props {
 }
 
 export function Add({ startScan, startClaude, date, onLogged }: Props) {
-  const { foods, logs, updateFood, savedMeals, foodById } = useData()
+  const { foods, logs, savedMeals, foodById, logsOn, deleteLog } = useData()
   const [meal, setMeal] = useState<Meal>(() => mealForTime(new Date()))
   const mealLabel = MEALS.find((m) => m.value === meal)!.label
-  const usual = suggestForMeal(foods, logs, meal)
   const [query, setQuery] = useState('')
   const { q, mine, results, searching, error } = useFoodSearch(query, 40)
   // Meals saved for this slot first, then by how often they're used.
-  const meals = [...savedMeals].sort(
-    (a, b) => Number(b.meta.meal === meal) - Number(a.meta.meal === meal) || b.use_count - a.use_count || a.name.localeCompare(b.name),
-  )
-  const recipes = foods.filter((f) => f.source === 'recipe').sort((a, b) => a.name.localeCompare(b.name))
+  const meals = [...savedMeals].sort((a, b) => b.use_count - a.use_count || a.name.localeCompare(b.name))
+  // Buttons: each meal's usual foods, fruits & nuts on their own, and everything folded at the bottom.
+  const brands = useMemo(() => brandsToShow(foods), [foods])
+  const fruitsNuts = useMemo(() => rankFoods(foods.filter(isFruitOrNut)), [foods])
+  const usualFor = (m: Meal) => suggestForMeal(foods, logs, m, 40).filter((f) => !isFruitOrNut(f))
+  const counts: Record<string, number> = {}
+  for (const l of logsOn(date ?? localDate())) if (l.meal === meal && l.food_id) counts[l.food_id] = (counts[l.food_id] ?? 0) + 1
+  const [open, setOpen] = useState<Record<string, boolean>>({})
+  const toggle = (k: string) => setOpen((o) => ({ ...o, [k]: !o[k] }))
+  const [justLogged, setJustLogged] = useState<{ id: string; text: string } | null>(null)
+  const pick = (it: QuickItem) => {
+    if (it.kind === 'meal') return setOverlay({ kind: 'meal', savedMeal: it.meal })
+    setOverlay(mode === 'log' ? { kind: 'quick', food: it.food } : { kind: 'log', food: it.food })
+  }
+  const asItems = (fs: Food[]): QuickItem[] => fs.map((food) => ({ kind: 'food', food }))
   const [overlay, setOverlay] = useState<Overlay>(startScan ? { kind: 'scan' } : startClaude ? { kind: 'claude' } : null)
   const [notice, setNotice] = useState<string | null>(null)
   // Log it, save it for later (a recipe ingredient, tonight's dinner), or just look (at the supermarket).
@@ -159,73 +173,100 @@ export function Add({ startScan, startClaude, date, onLogged }: Props) {
         </div>
         {notice && <p className="notice small" style={{ marginBottom: 0 }}>{notice}</p>}
 
+        {justLogged && (
+          <div className="small just-logged" role="status">
+            <span>
+              Logged {justLogged.text}.
+            </span>
+            <button type="button" className="btn secondary small-btn" onClick={() => {
+                deleteLog(justLogged.id)
+                setJustLogged(null)
+              }}>
+              Undo
+            </button>
+            <button type="button" className="btn small-btn" onClick={logged}>
+              Done
+            </button>
+          </div>
+        )}
+
         {!q && (
           <>
-            <div className="section-label">Saved meals</div>
-            {meals.length ? (
-              <div className="food-grid">
-                {meals.map((m) => {
-                  const t = mealTotals(m.items, foodById)
-                  return (
-                    <button key={m.id} type="button" className="saved-meal" onClick={() => setOverlay({ kind: 'meal', savedMeal: m })}>
-                      <b>{m.name}</b>
-                      <span className="muted small">
-                        {m.items.map((i) => (i.foodId && foodById[i.foodId]?.name) || i.food.name).join(' · ')}
-                      </span>
-                      <span className="small">
-                        {Math.round(t.kcal)} kcal · {t.netCarbs.toFixed(1)} g net · {Math.round(t.protein)} g protein
-                      </span>
+            <div className="section-label">{mealLabel}</div>
+            {(() => {
+              const usual = usualFor(meal)
+              const shown = open[meal] ? usual : usual.slice(0, 9)
+              const mealsHere = mode === 'log' ? meals.filter((m) => m.meta.meal === meal) : []
+              const items = [...asItems(shown), ...mealsHere.map((m): QuickItem => ({ kind: 'meal', meal: m }))]
+              return items.length ? (
+                <>
+                  <FoodButtons items={items} brands={brands} counts={counts} onPick={pick} />
+                  {usual.length > 9 && (
+                    <button type="button" className="more-link" onClick={() => toggle(meal)}>
+                      {open[meal] ? 'Fewer' : `More ${mealLabel.toLowerCase()} foods ›`}
                     </button>
-                  )
-                })}
-              </div>
-            ) : (
-              <p className="muted small">None yet. On the Log tab, tap "Save as meal" next to any meal to reuse it in one tap.</p>
+                  )}
+                </>
+              ) : (
+                <p className="muted small">Nothing yet. Foods you log at {mealLabel.toLowerCase()} show up here as buttons.</p>
+              )
+            })()}
+
+            {MEALS.filter((m) => m.value !== meal).map((m) => {
+              const usual = usualFor(m.value)
+              if (!usual.length) return null
+              return (
+                <div key={m.value}>
+                  <button type="button" className="fold" aria-expanded={!!open[`fold-${m.value}`]} onClick={() => toggle(`fold-${m.value}`)}>
+                    {m.label} <span>{open[`fold-${m.value}`] ? '▾' : `${Math.min(usual.length, 9)} foods ›`}</span>
+                  </button>
+                  {open[`fold-${m.value}`] && <FoodButtons items={asItems(usual.slice(0, 9))} brands={brands} counts={counts} onPick={pick} />}
+                </div>
+              )
+            })}
+
+            {fruitsNuts.length > 0 && (
+              <>
+                <div className="section-label">Fruits &amp; nuts</div>
+                <FoodButtons items={asItems(open.fruits ? fruitsNuts : fruitsNuts.slice(0, 9))} brands={brands} counts={counts} onPick={pick} />
+                {fruitsNuts.length > 9 && (
+                  <button type="button" className="more-link" onClick={() => toggle('fruits')}>
+                    {open.fruits ? 'Fewer' : `More fruits & nuts ›`}
+                  </button>
+                )}
+              </>
             )}
 
-            <div className="section-label">Usual for {mealLabel.toLowerCase()}</div>
-            {usual.length ? (
+            <button type="button" className="fold" style={{ marginTop: 12 }} aria-expanded={!!open.all} onClick={() => toggle('all')}>
+              All my foods <span>{open.all ? '▾' : `${foods.length + (mode === 'log' ? meals.length : 0)} ›`}</span>
+            </button>
+            {open.all &&
+              (foods.length ? (
+                <FoodButtons
+                  items={[...(mode === 'log' ? meals.map((m): QuickItem => ({ kind: 'meal', meal: m })) : []), ...asItems(rankFoods(foods))]}
+                  brands={brands}
+                  counts={counts}
+                  onPick={pick}
+                />
+              ) : (
+                <p className="muted small">Foods you save or log show up here.</p>
+              ))}
+          </>
+        )}
+
+        {q && (
+          <>
+            <div className="section-label">My foods</div>
+            {mine.length ? (
               <div className="food-grid">
-                {usual.map((f) => (
-                  <FoodRow
-                    key={f.id}
-                    food={f}
-                    onPick={() => setOverlay({ kind: 'log', food: f })}
-                    onDismiss={() => updateFood({ ...f, meta: setUsual(f.meta, meal, false) })}
-                    dismissLabel={`Not usual for ${mealLabel.toLowerCase()}`}
-                  />
+                {mine.map((f) => (
+                  <FoodRow key={f.id} food={f} onPick={() => setOverlay({ kind: 'log', food: f })} />
                 ))}
               </div>
             ) : (
-              <p className="muted small">
-                Nothing yet. Foods you log at {mealLabel.toLowerCase()} show up here, or tag a food with its usual meals when you log it.
-              </p>
+              <p className="muted small">No saved foods match.</p>
             )}
           </>
-        )}
-
-        {!q && recipes.length > 0 && (
-          <>
-            <div className="section-label">My recipes</div>
-            <div className="food-grid">
-              {recipes.map((f) => (
-                <FoodRow key={f.id} food={f} onPick={() => setOverlay({ kind: 'log', food: f })} />
-              ))}
-            </div>
-          </>
-        )}
-
-        <div className="section-label">{q ? 'My foods' : 'My foods: favorites and most used'}</div>
-        {mine.length ? (
-          <div className="food-grid">
-            {(q ? mine : mine.filter((f) => f.source !== 'recipe')).map((f) => (
-              <FoodRow key={f.id} food={f} onPick={() => setOverlay({ kind: 'log', food: f })} />
-            ))}
-          </div>
-        ) : (
-          <p className="muted small">
-            {q ? 'No saved foods match.' : 'Foods you log show up here, with favorites and the ones you use most at the top.'}
-          </p>
         )}
 
         {q.length >= 3 && (
@@ -243,6 +284,23 @@ export function Add({ startScan, startClaude, date, onLogged }: Props) {
         )}
       </div>
 
+      {overlay?.kind === 'quick' && (
+        <QuickLogSheet
+          food={foodById[overlay.food.id] ?? overlay.food}
+          meal={meal}
+          date={date}
+          onClose={close}
+          onLogged={(entry, text) => {
+            setOverlay(null)
+            setJustLogged({ id: entry.id, text: `${text} to ${mealLabel.toLowerCase()}` })
+          }}
+          onMore={() => setOverlay({ kind: 'log', food: foodById[overlay.food.id] ?? overlay.food })}
+          onEdit={() => {
+            const f = foodById[overlay.food.id] ?? overlay.food
+            setOverlay(f.source === 'recipe' ? { kind: 'recipe', recipe: f } : { kind: 'form', food: f })
+          }}
+        />
+      )}
       {overlay?.kind === 'scan' && <BarcodeScanner onDetected={onDetected} onClose={close} />}
       {overlay?.kind === 'log' && (
         <LogFoodSheet

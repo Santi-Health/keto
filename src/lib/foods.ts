@@ -41,6 +41,10 @@ export interface FoodMeta {
   /** Vitamins were looked up for this food (so it isn't looked up again), and where they came from. */
   vitaminsChecked?: boolean
   vitaminsFrom?: string
+  /** Name on its Add-screen button, when the user renamed it. */
+  buttonName?: string
+  /** Section on the Add screen, when the user moved it in or out of Fruits & nuts. */
+  group?: 'fruits_nuts' | 'other'
 }
 
 /** Row shape of the `foods` table. */
