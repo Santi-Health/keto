@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { brandsToShow, foodIcon, isFruitOrNut, portionText, servingOf, shortName } from './quickFoods'
+import { brandsToShow, foodIcon, sectionOf, portionText, servingOf, shortName } from './quickFoods'
 
 const f = (name: string, brand: string | null = null, meta = {}, id = name) => ({ id, name, brand, meta, source: 'manual' as const })
 
@@ -18,16 +18,30 @@ describe('food buttons', () => {
     expect(b).toEqual({ a: 'Sola', b: 'Base Culture' })
   })
   it('finds fruits and nuts, leaving out flours and milks, and follows your choice', () => {
-    expect(isFruitOrNut(f('Blueberries'))).toBe(true)
-    expect(isFruitOrNut(f('Nuts, macadamia nuts, raw'))).toBe(true)
-    expect(isFruitOrNut(f('Almond flour'))).toBe(false)
-    expect(isFruitOrNut(f('Unsweetened almond milk'))).toBe(false)
-    expect(isFruitOrNut(f('Avocado'))).toBe(false)
-    expect(isFruitOrNut(f('Avocado', null, { group: 'fruits_nuts' }))).toBe(true)
-    expect(isFruitOrNut(f('Pecans', null, { group: 'other' }))).toBe(false)
+    expect(sectionOf(f('Blueberries'))).toBe('fruits_nuts')
+    expect(sectionOf(f('Nuts, macadamia nuts, raw'))).toBe('fruits_nuts')
+    expect(sectionOf(f('Olives, ripe, canned'))).toBe('fruits_nuts')
+    expect(sectionOf(f('Kalamata olives', 'Mezzetta'))).toBe('fruits_nuts')
+    expect(sectionOf(f('Extra virgin olive oil'))).toBe('condiments')
+    expect(sectionOf(f('Avocado oil'))).toBe('condiments')
+    expect(sectionOf(f('Tuna in olive oil'))).toBe(null)
+    expect(sectionOf(f('Almond flour'))).toBe(null)
+    expect(sectionOf(f('Unsweetened almond milk'))).toBe(null)
+    expect(sectionOf(f('Avocado'))).toBe(null)
+    expect(sectionOf(f('Avocado', null, { group: 'fruits_nuts' }))).toBe('fruits_nuts')
+    expect(sectionOf(f('Pecans', null, { group: 'other' }))).toBe(null)
+  })
+  it('finds condiments, leaving out peppers you eat as a vegetable', () => {
+    for (const n of ['Mayonnaise', 'Avocado oil mayo', 'Ketchup, no sugar added', 'Dijon mustard', 'Sriracha', 'Ranch dressing', 'Basil pesto', 'Coconut aminos', 'Black pepper', 'NuSalt', 'Everything bagel seasoning'])
+      expect(sectionOf(f(n))).toBe('condiments')
+    expect(sectionOf(f('Red bell pepper'))).toBe(null)
+    expect(sectionOf(f('Salt and pepper chicken'))).toBe(null)
+    expect(sectionOf(f('Pecans', null, { group: 'condiments' }))).toBe('condiments')
   })
   it('picks an icon and reads portions', () => {
     expect(foodIcon(f('Keto bread'))).toBe('🍞')
+    expect(foodIcon(f('Avocado oil mayo'))).toBe('🫙')
+    expect(foodIcon(f('Black pepper'))).toBe('🧂')
     expect(foodIcon(f('Sola Sweet & Buttery Keto Bread', 'Sola'))).toBe('🍞')
     expect(foodIcon(f('Large eggs'))).toBe('🥚')
     expect(servingOf({ unit_conversions: [{ unit: '1 slice', grams: 30 }] })).toEqual({ amount: 1, unit: '1 slice' })

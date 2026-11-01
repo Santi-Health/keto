@@ -11,7 +11,7 @@ import { useData } from '../lib/data'
 import { lookupBarcode } from '../lib/foodApi'
 import type { RestaurantDish } from '../lib/foodJson'
 import { MEALS, mealForTime, rankFoods, suggestForMeal, type Food, type Meal, type NewFood } from '../lib/foods'
-import { brandsToShow, isFruitOrNut } from '../lib/quickFoods'
+import { brandsToShow, sectionOf } from '../lib/quickFoods'
 import type { SavedMeal } from '../lib/savedMeals'
 import { localDate } from '../lib/targets'
 import { useFoodSearch } from '../lib/useFoodSearch'
@@ -44,10 +44,13 @@ export function Add({ startScan, startClaude, date, onLogged }: Props) {
   const { q, mine, results, searching, error } = useFoodSearch(query, 40)
   // Meals saved for this slot first, then by how often they're used.
   const meals = [...savedMeals].sort((a, b) => b.use_count - a.use_count || a.name.localeCompare(b.name))
-  // Buttons: each meal's usual foods, fruits & nuts on their own, and everything folded at the bottom.
-  const brands = useMemo(() => brandsToShow(foods), [foods])
-  const fruitsNuts = useMemo(() => rankFoods(foods.filter(isFruitOrNut)), [foods])
-  const usualFor = (m: Meal) => suggestForMeal(foods, logs, m, 40).filter((f) => !isFruitOrNut(f))
+  // Buttons, from your own foods only: each meal's usual foods, fruits & nuts and condiments on their own,
+  // and everything folded at the bottom. Drinks have their own buttons on Today, so they're left out.
+  const myFoods = useMemo(() => foods.filter((f) => !f.meta.externalId?.startsWith('drink:')), [foods])
+  const brands = useMemo(() => brandsToShow(myFoods), [myFoods])
+  const fruitsNuts = useMemo(() => rankFoods(myFoods.filter((f) => sectionOf(f) === 'fruits_nuts')), [myFoods])
+  const condiments = useMemo(() => rankFoods(myFoods.filter((f) => sectionOf(f) === 'condiments')), [myFoods])
+  const usualFor = (m: Meal) => suggestForMeal(myFoods, logs, m, 40).filter((f) => !sectionOf(f))
   const counts: Record<string, number> = {}
   for (const l of logsOn(date ?? localDate())) if (l.meal === meal && l.food_id) counts[l.food_id] = (counts[l.food_id] ?? 0) + 1
   const [open, setOpen] = useState<Record<string, boolean>>({})
@@ -225,25 +228,32 @@ export function Add({ startScan, startClaude, date, onLogged }: Props) {
               )
             })}
 
-            {fruitsNuts.length > 0 && (
-              <>
-                <div className="section-label">Fruits &amp; nuts</div>
-                <FoodButtons items={asItems(open.fruits ? fruitsNuts : fruitsNuts.slice(0, 9))} brands={brands} counts={counts} onPick={pick} />
-                {fruitsNuts.length > 9 && (
-                  <button type="button" className="more-link" onClick={() => toggle('fruits')}>
-                    {open.fruits ? 'Fewer' : `More fruits & nuts ›`}
-                  </button>
-                )}
-              </>
+            {(
+              [
+                ['fruits', 'Fruits & nuts', fruitsNuts],
+                ['condiments', 'Condiments', condiments],
+              ] as const
+            ).map(([key, title, list]) =>
+              list.length ? (
+                <div key={key}>
+                  <div className="section-label">{title}</div>
+                  <FoodButtons items={asItems(open[key] ? list : list.slice(0, 9))} brands={brands} counts={counts} onPick={pick} />
+                  {list.length > 9 && (
+                    <button type="button" className="more-link" onClick={() => toggle(key)}>
+                      {open[key] ? 'Fewer' : `More ${title.toLowerCase()} ›`}
+                    </button>
+                  )}
+                </div>
+              ) : null,
             )}
 
             <button type="button" className="fold" style={{ marginTop: 12 }} aria-expanded={!!open.all} onClick={() => toggle('all')}>
-              All my foods <span>{open.all ? '▾' : `${foods.length + (mode === 'log' ? meals.length : 0)} ›`}</span>
+              All my foods <span>{open.all ? '▾' : `${myFoods.length + (mode === 'log' ? meals.length : 0)} ›`}</span>
             </button>
             {open.all &&
-              (foods.length ? (
+              (myFoods.length ? (
                 <FoodButtons
-                  items={[...(mode === 'log' ? meals.map((m): QuickItem => ({ kind: 'meal', meal: m })) : []), ...asItems(rankFoods(foods))]}
+                  items={[...(mode === 'log' ? meals.map((m): QuickItem => ({ kind: 'meal', meal: m })) : []), ...asItems(rankFoods(myFoods))]}
                   brands={brands}
                   counts={counts}
                   onPick={pick}

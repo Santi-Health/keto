@@ -54,15 +54,29 @@ const FRUIT_NUT =
 /** Foods made from fruit or nuts that aren't eaten as fruit or nuts. */
 const NOT_FRUIT_NUT = /\b(milk|flour|bread|crust|cake|cookie|muffin|bar|oil|juice|yogurt|ice cream|chocolate|cereal|granola|sauce|dressing)\b/i
 
-/** Whether a food goes in the Fruits & nuts section: tagged by you, or recognized by name. */
-export function isFruitOrNut(food: Pick<Food, 'name' | 'meta' | 'source'>): boolean {
-  if (food.meta.group) return food.meta.group === 'fruits_nuts'
-  return food.source !== 'recipe' && FRUIT_NUT.test(food.name) && !NOT_FRUIT_NUT.test(food.name)
+// --- Condiments ----------------------------------------------------------------------------
+
+const CONDIMENT =
+  /\b(mayo(nnaise)?|aioli|ketchup|catsup|mustard|hot sauce|sriracha|tabasco|cholula|buffalo sauce|bbq sauce|barbecue sauce|soy sauce|tamari|coconut aminos|fish sauce|worcestershire|teriyaki|salsa|pico de gallo|chimichurri|pesto|tahini|relish|horseradish|wasabi|ranch|dressing|vinaigrette|vinegar|lemon juice|lime juice|salt|nusalt|pepper(corns)?|seasoning|spices?|everything bagel|garlic powder|onion powder|paprika|cumin|oregano|cinnamon|chili flakes|red pepper flakes|sweetener|stevia|monk fruit|allulose|erythritol|(olive|avocado|coconut|mct|sesame|canola|sunflower|cooking|vegetable) oil)\b/i
+/** "Pepper" the seasoning, not bell or jalapeño peppers; olive oil, not tuna in olive oil. */
+const NOT_CONDIMENT = /\bin (\w+ )?oil\b|\b(bell|jalape[nñ]o|poblano|sweet|stuffed|roasted|chicken|steak|beef|salmon|pork|bread|chips|nuts|almonds)\b/i
+
+export type FoodSection = 'fruits_nuts' | 'condiments'
+
+/** Which bottom section a food goes in, if any: where you moved it, or recognized by name. Condiments win ("pesto"). */
+export function sectionOf(food: Pick<Food, 'name' | 'meta' | 'source'>): FoodSection | null {
+  if (food.meta.group) return food.meta.group === 'other' ? null : food.meta.group
+  if (food.source === 'recipe') return null
+  if (CONDIMENT.test(food.name) && !NOT_CONDIMENT.test(food.name)) return 'condiments'
+  if (FRUIT_NUT.test(food.name) && !NOT_FRUIT_NUT.test(food.name)) return 'fruits_nuts'
+  return null
 }
 
 // --- Icons ---------------------------------------------------------------------------------
 
 const ICONS: [RegExp, string][] = [
+  [/mayo|aioli|ketchup|mustard|sauce|sriracha|tabasco|salsa|dressing|vinaigrette|ranch|pesto|vinegar|aminos|relish|tahini|horseradish/, '🫙'],
+  [/salt|black pepper|peppercorn|seasoning|spice|paprika|cumin|oregano|cinnamon|flakes/, '🧂'],
   [/blueberr|blackberr/, '🫐'],
   [/strawberr|raspberr|berr/, '🍓'],
   [/cherr/, '🍒'],
