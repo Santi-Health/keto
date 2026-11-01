@@ -56,7 +56,7 @@ describe('food buttons', () => {
   it('puts cheese and cold meats in Picada, not cream cheese or ham steaks', () => {
     for (const n of ['Manchego cheese', 'Brie', 'Genoa salami', 'Prosciutto di Parma', 'Jamón serrano', 'Sliced ham', 'Chorizo', 'Cheddar cheese, sharp'])
       expect(sectionsOf(f(n))).toEqual(['picada'])
-    for (const n of ['Cream cheese', 'Cheese, cream', 'Cottage cheese', 'Ham steak', 'Grated parmesan'])
+    for (const n of ['Cream cheese', 'Cheese, cream', 'Cottage cheese', 'Ham steak', 'Grated parmesan', 'Cheese Bites Onion', 'Cheddar cheese crisps'])
       expect(sectionsOf(f(n))).toEqual([])
     expect(sectionsOf(f('Olives', null, { sections: ['picada'] }))).toEqual(['picada'])
     expect(sectionsOf(f('Olives', null, { group: 'other' }))).toEqual([])

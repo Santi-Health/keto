@@ -134,7 +134,7 @@ const NOT_CONDIMENT = /\bin (\w+ )?oil\b|\b(bell|jalape[nñ]o|poblano|sweet|stuf
 const PICADA =
   /\b(cheeses?|brie|camembert|manchego|gouda|cheddar|parmesan|parmigiano|pecorino|gruy[eè]re|comt[eé]|mozzarella|burrata|feta|provolone|havarti|emmental|swiss|roquefort|gorgonzola|stilton|halloumi|queso|salami|prosciutto|jam[oó]n|serrano|chorizo|mortadella|pepperoni|soppressata|sopressata|bresaola|coppa|capicola|pastrami|lomo|salchich[oó]n|deli (ham|turkey)|sliced (ham|turkey)|ham|olives?)\b/i
 /** Cheese and meats that aren't for a picada: spreads, cheese in dishes, cooked ham steaks. */
-const NOT_PICADA = /\b(cream cheese|cottage|ricotta|mascarpone|sauce|dressing|crackers|chips|crisps|pizza|burger|omelet|quesadilla|soup|bread|oil|steak|hamburger|powder|grated)\b/i
+const NOT_PICADA = /\b(cream cheese|cottage|ricotta|mascarpone|sauce|dressing|crackers|chips|crisps|bites|puffs|curls|whisps|pizza|burger|omelet|quesadilla|soup|bread|oil|steak|hamburger|powder|grated)\b/i
 
 export type FoodSection = 'fruits_nuts' | 'picada' | 'condiments'
 /** Bottom sections, top to bottom; Condiments is last. */

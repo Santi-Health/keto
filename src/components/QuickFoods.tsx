@@ -56,7 +56,8 @@ function servingText(food: Food): string {
   const { amount, unit } = servingOf(food)
   const count = nutCount(food, toGrams({ unitConversions: food.unit_conversions }, amount, unit).grams)
   const portion = portionText(amount, unit)
-  if (!count) return portion
+  // No count when the serving already is one ("5 olives").
+  if (!count || portion.includes(count.split(' ').pop()!)) return portion
   // "1 serving (~3 olives)"; by weight, just the number: "1 oz · ~23".
   return /serving/.test(portion) ? `${portion} (${count})` : `${portion} · ${count.split(' ')[0]}`
 }
