@@ -1418,6 +1418,15 @@ input[type='time'] {
   margin: 12px 0 0;
 }
 
+.section-chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin-top: 10px;
+}
+
 .portion-steps {
   display: grid;
   grid-template-columns: repeat(4, 1fr);

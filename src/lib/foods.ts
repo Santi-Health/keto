@@ -43,8 +43,10 @@ export interface FoodMeta {
   vitaminsFrom?: string
   /** Name on its Add-screen button, when the user renamed it. */
   buttonName?: string
-  /** Section on the Add screen, when the user moved it: Fruits & nuts, Condiments, or back with the meals. */
+  /** Earlier single-section choice; `sections` replaces it. */
   group?: 'fruits_nuts' | 'condiments' | 'other'
+  /** Bottom sections on the Add screen the user put it in ([] = none, back with the meals only). */
+  sections?: ('fruits_nuts' | 'picada' | 'condiments')[]
 }
 
 /** Row shape of the `foods` table. */

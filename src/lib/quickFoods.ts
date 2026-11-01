@@ -61,15 +61,57 @@ const CONDIMENT =
 /** "Pepper" the seasoning, not bell or jalapeño peppers; olive oil, not tuna in olive oil. */
 const NOT_CONDIMENT = /\bin (\w+ )?oil\b|\b(bell|jalape[nñ]o|poblano|sweet|stuffed|roasted|chicken|steak|beef|salmon|pork|bread|chips|nuts|almonds)\b/i
 
-export type FoodSection = 'fruits_nuts' | 'condiments'
+// --- Picada: cheese, cold meats and olives ------------------------------------------------
 
-/** Which bottom section a food goes in, if any: where you moved it, or recognized by name. Condiments win ("pesto"). */
-export function sectionOf(food: Pick<Food, 'name' | 'meta' | 'source'>): FoodSection | null {
-  if (food.meta.group) return food.meta.group === 'other' ? null : food.meta.group
-  if (food.source === 'recipe') return null
-  if (CONDIMENT.test(food.name) && !NOT_CONDIMENT.test(food.name)) return 'condiments'
-  if (FRUIT_NUT.test(food.name) && !NOT_FRUIT_NUT.test(food.name)) return 'fruits_nuts'
-  return null
+const PICADA =
+  /\b(cheeses?|brie|camembert|manchego|gouda|cheddar|parmesan|parmigiano|pecorino|gruy[eè]re|comt[eé]|mozzarella|burrata|feta|provolone|havarti|emmental|swiss|roquefort|gorgonzola|stilton|halloumi|queso|salami|prosciutto|jam[oó]n|serrano|chorizo|mortadella|pepperoni|soppressata|sopressata|bresaola|coppa|capicola|pastrami|lomo|salchich[oó]n|deli (ham|turkey)|sliced (ham|turkey)|ham|olives?)\b/i
+/** Cheese and meats that aren't for a picada: spreads, cheese in dishes, cooked ham steaks. */
+const NOT_PICADA = /\b(cream cheese|cottage|ricotta|mascarpone|sauce|dressing|crackers|chips|crisps|pizza|burger|omelet|quesadilla|soup|bread|oil|steak|hamburger|powder|grated)\b/i
+
+export type FoodSection = 'fruits_nuts' | 'picada' | 'condiments'
+/** Bottom sections, top to bottom; Condiments is last. */
+export const SECTIONS: { key: FoodSection; title: string }[] = [
+  { key: 'fruits_nuts', title: 'Fruits & nuts' },
+  { key: 'picada', title: 'Picada' },
+  { key: 'condiments', title: 'Condiments' },
+]
+
+/**
+ * Which bottom sections a food goes in: the ones you chose, or recognized by name. A food can be in more
+ * than one (olives are fruit and picada); a condiment isn't also a fruit or nut ("coconut aminos").
+ */
+export function sectionsOf(food: Pick<Food, 'name' | 'meta' | 'source'>): FoodSection[] {
+  if (food.meta.sections) return food.meta.sections
+  // Chosen before foods could be in several sections.
+  if (food.meta.group) return food.meta.group === 'other' ? [] : [food.meta.group]
+  if (food.source === 'recipe') return []
+  const n = food.name
+  const out: FoodSection[] = []
+  const condiment = CONDIMENT.test(n) && !NOT_CONDIMENT.test(n)
+  if (!condiment && FRUIT_NUT.test(n) && !NOT_FRUIT_NUT.test(n)) out.push('fruits_nuts')
+  // The short name too, for USDA order: "Cheese, cream" is cream cheese.
+  if (PICADA.test(n) && !NOT_PICADA.test(n) && !NOT_PICADA.test(shortName({ name: n, brand: null, meta: {} }))) out.push('picada')
+  if (condiment) out.push('condiments')
+  return out
+}
+
+/** Logged at this meal on at least this many of the last 30 days: often enough to show with the meal too. */
+export const VERY_FREQUENT_DAYS = 4
+
+/** Whether a food is eaten at a meal often enough to show there even though it has its own section. */
+export function veryFrequentAt(
+  foodId: string,
+  meal: string,
+  logs: { food_id: string | null; meal: string; eaten_at: string }[],
+  now = Date.now(),
+): boolean {
+  const days = new Set<string>()
+  for (const l of logs) {
+    if (l.food_id !== foodId || l.meal !== meal) continue
+    const t = Date.parse(l.eaten_at)
+    if (now - t <= 30 * 86_400_000) days.add(new Date(t).toDateString())
+  }
+  return days.size >= VERY_FREQUENT_DAYS
 }
 
 // --- Icons ---------------------------------------------------------------------------------
@@ -103,6 +145,7 @@ const ICONS: [RegExp, string][] = [
   [/shrimp|prawn/, '🦐'],
   [/crab|lobster/, '🦀'],
   [/chicken|turkey/, '🍗'],
+  [/prosciutto|jam[oó]n|serrano|mortadella|pepperoni|soppressata|bresaola|coppa|capicola|pastrami|salchich/, '🥓'],
   [/steak|beef|burger|lamb|pork|ham\b|sausage|chorizo|salami|meat/, '🥩'],
   [/butter/, '🧈'],
   [/cheese|mozzarella|cheddar|parmesan|brie|feta/, '🧀'],

@@ -13,7 +13,7 @@ import { lookupBarcode } from '../lib/foodApi'
 import type { RestaurantDish } from '../lib/foodJson'
 import { MEALS, mealForTime, rankFoods, suggestForMeal, type Food, type Meal, type NewFood } from '../lib/foods'
 import { ALL_DRINKS, MILKS } from '../lib/drinks'
-import { brandsToShow, sectionOf } from '../lib/quickFoods'
+import { SECTIONS, brandsToShow, sectionsOf, veryFrequentAt } from '../lib/quickFoods'
 import type { SavedMeal } from '../lib/savedMeals'
 import { localDate } from '../lib/targets'
 import { useFoodSearch } from '../lib/useFoodSearch'
@@ -51,13 +51,13 @@ export function Add({ startScan, startClaude, date, waterTargetOz, onLogged }: P
   const { q, mine, results, searching, error } = useFoodSearch(query, 40)
   // Meals saved for this slot first, then by how often they're used.
   const meals = [...savedMeals].sort((a, b) => b.use_count - a.use_count || a.name.localeCompare(b.name))
-  // Buttons, from your own foods only: each meal's usual foods, fruits & nuts and condiments on their own,
+  // Buttons, from your own foods only: each meal's usual foods, then fruits & nuts, picada and condiments,
   // and everything folded at the bottom. Drinks have their own buttons on Today, so they're left out.
   const myFoods = useMemo(() => foods.filter((f) => !f.meta.externalId?.startsWith('drink:') && !DRINK_NAMES.has(f.name.toLowerCase())), [foods])
   const brands = useMemo(() => brandsToShow(myFoods), [myFoods])
-  const fruitsNuts = useMemo(() => rankFoods(myFoods.filter((f) => sectionOf(f) === 'fruits_nuts')), [myFoods])
-  const condiments = useMemo(() => rankFoods(myFoods.filter((f) => sectionOf(f) === 'condiments')), [myFoods])
-  const usualFor = (m: Meal) => suggestForMeal(myFoods, logs, m, 40).filter((f) => !sectionOf(f))
+  const bySection = useMemo(() => SECTIONS.map((sec) => ({ ...sec, list: rankFoods(myFoods.filter((f) => sectionsOf(f).includes(sec.key))) })), [myFoods])
+  // A food with its own section shows with a meal too only when it's eaten there very often.
+  const usualFor = (m: Meal) => suggestForMeal(myFoods, logs, m, 40).filter((f) => !sectionsOf(f).length || veryFrequentAt(f.id, m, logs))
   const counts: Record<string, number> = {}
   for (const l of logsOn(date ?? localDate())) if (l.meal === meal && l.food_id) counts[l.food_id] = (counts[l.food_id] ?? 0) + 1
   const [open, setOpen] = useState<Record<string, boolean>>({})
@@ -235,12 +235,7 @@ export function Add({ startScan, startClaude, date, waterTargetOz, onLogged }: P
               )
             })}
 
-            {(
-              [
-                ['fruits', 'Fruits & nuts', fruitsNuts],
-                ['condiments', 'Condiments', condiments],
-              ] as const
-            ).map(([key, title, list]) =>
+            {bySection.map(({ key, title, list }) =>
               list.length ? (
                 <div key={key}>
                   <div className="section-label">{title}</div>

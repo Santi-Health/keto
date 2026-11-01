@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useData } from '../lib/data'
 import { MEALS, portionNutrients, type Food, type LogEntry, type Meal } from '../lib/foods'
-import { foodIcon, frac, portionText, sectionOf, servingOf, shortName, type FoodSection } from '../lib/quickFoods'
+import { SECTIONS, foodIcon, frac, portionText, sectionsOf, servingOf, shortName } from '../lib/quickFoods'
 import type { SavedMeal } from '../lib/savedMeals'
 import { toGrams } from '../lib/units'
 import { defaultTime } from './LogFoodSheet'
@@ -85,8 +85,7 @@ export function QuickLogSheet({
   }, [food, amount, serving.unit])
   const portion = portionText(amount, serving.unit)
   const mealLabel = MEALS.find((m) => m.value === meal)!.label.toLowerCase()
-  const section = sectionOf(food)
-  const moveTo = (group: FoodSection | 'other') => updateFood({ ...food, meta: { ...food.meta, group } })
+  const sections = sectionsOf(food)
   const fmt = (v: number | undefined, d = 0) => (v == null ? '—' : (Math.round(v * 10 ** d) / 10 ** d).toLocaleString())
 
   function log() {
@@ -147,22 +146,25 @@ export function QuickLogSheet({
           <button type="button" onClick={() => setRenaming(true)}>
             Rename button
           </button>
-          {section ? (
-            <button type="button" onClick={() => moveTo('other')}>
-              Take out of {section === 'fruits_nuts' ? 'Fruits & nuts' : 'Condiments'}
-            </button>
-          ) : (
-            <>
-              <button type="button" onClick={() => moveTo('fruits_nuts')}>
-                Move to Fruits &amp; nuts
-              </button>
-              <button type="button" onClick={() => moveTo('condiments')}>
-                Move to Condiments
-              </button>
-            </>
-          )}
         </p>
       )}
+      <div className="section-chips" role="group" aria-label="Sections on the Add screen">
+        <span className="muted small">Sections</span>
+        {SECTIONS.map((sec) => {
+          const on = sections.includes(sec.key)
+          return (
+            <button
+              key={sec.key}
+              type="button"
+              className={`chip-btn ${on ? 'on' : ''}`}
+              aria-pressed={on}
+              onClick={() => updateFood({ ...food, meta: { ...food.meta, group: undefined, sections: on ? sections.filter((k) => k !== sec.key) : [...sections, sec.key] } })}
+            >
+              {sec.title}
+            </button>
+          )
+        })}
+      </div>
     </Sheet>
   )
 }
