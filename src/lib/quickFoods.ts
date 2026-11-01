@@ -12,11 +12,32 @@ const NOUNS =
   /^(bread|bagels?|buns?|rolls?|tortillas?|wraps?|yogurt|milk|cheese|butter|eggs?|salmon|tuna|chicken|turkey|beef|steak|pork|ham|bacon|sausages?|jerky|shrimp|avocados?|nuts|almonds|bars?|shakes?|powder|chips|crackers|cookies|cereal|granola|sauce|soup|salad|chocolate|coffee|tea|kefir|cream|oil|pasta|noodles|rice|pizza|burgers?|patties|meatballs)$/i
 
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
+/** "CANADIAN BACON" → "Canadian Bacon"; names with some lowercase are left alone. */
+const unshout = (s: string) => (/[a-z]/.test(s) ? s : s.toLowerCase().replace(/\b[a-z]/g, (c) => c.toUpperCase()))
+
+/**
+ * Names chosen for specific foods, matched on brand + name (the button says these instead of a guess).
+ * `brand`: the food's brand must match it, or the food has no brand.
+ */
+const NAMED: { match: RegExp; brand?: RegExp; name: string }[] = [
+  { match: /\blight mayo/, brand: /best foods|hellmann/, name: 'BF Light Mayo' },
+  { match: /\bketchup\b/, brand: /heinz/, name: 'Heinz Ketchup' },
+  { match: /\bnu ?salt\b/, name: 'NuSalt' },
+  { match: /\bcanadian bacon\b/, name: 'Canadian Bacon' },
+  { match: /\bprotein sushi roll/, name: 'Protein Sushi Roll' },
+  { match: /\bbrat(s|wurst)?\b/, brand: /johnsonville/, name: 'Johnsonville Brats Original' },
+  { match: /\boutside skirt\b/, name: 'Outside Skirt' },
+  { match: /\bketo\b.*\bsoft white\b|\bsoft white\b.*\bketo\b/, brand: /nature'?s own/, name: 'Nat Own Keto Bread' },
+  { match: /\begg whites?\b/, brand: /kirkland/, name: 'Kirk Egg Whites' },
+]
 
 /** A two-or-three word name for a button: "Sola Sweet & Buttery Keto Bread" → "Keto Bread". */
 export function shortName(food: Pick<Food, 'name' | 'brand' | 'meta'>): string {
   if (food.meta.buttonName?.trim()) return food.meta.buttonName.trim()
-  let name = food.name.replace(/\([^)]*\)/g, ' ').replace(/\s+/g, ' ').trim()
+  const full = `${food.brand ?? ''} ${food.name}`.toLowerCase()
+  const named = NAMED.find((r) => r.match.test(full) && (!r.brand || !food.brand || r.brand.test(food.brand.toLowerCase())))
+  if (named) return named.name
+  let name = unshout(food.name).replace(/\([^)]*\)/g, ' ').replace(/\s+/g, ' ').trim()
   // A brand repeated at the start of the name adds nothing on the button.
   if (food.brand && name.toLowerCase().startsWith(food.brand.toLowerCase())) name = name.slice(food.brand.length).replace(/^[\s,:-]+/, '')
   const segs = name.split(/\s*,\s*|\s+-\s+/).filter(Boolean)
@@ -172,6 +193,33 @@ export function foodIcon(food: Pick<Food, 'name' | 'brand' | 'meta' | 'source'>)
   // The short name first, so "Sweet & Buttery Keto Bread" is bread, not butter.
   for (const n of [shortName(food).toLowerCase(), food.name.toLowerCase()]) for (const [re, icon] of ICONS) if (re.test(n)) return icon
   return food.source === 'recipe' ? '🍲' : '🍽️'
+}
+
+// --- Nut counts ---------------------------------------------------------------------------
+
+/** About how many are in an ounce (28 g), from USDA and the nut boards; pecans and walnuts in halves. */
+const PER_OZ: [RegExp, number, string][] = [
+  [/almond/, 23, 'almonds'],
+  [/pistachio/, 49, 'pistachios'],
+  [/cashew/, 18, 'cashews'],
+  [/macadamia/, 11, 'macadamias'],
+  [/pecan/, 19, 'pecan halves'],
+  [/walnut/, 14, 'walnut halves'],
+  [/hazelnut|filbert/, 21, 'hazelnuts'],
+  [/brazil nut/, 6, 'Brazil nuts'],
+  [/peanut/, 28, 'peanuts'],
+]
+/** Foods made from nuts that aren't counted by the nut. */
+const NOT_WHOLE_NUT = /\b(butter|flour|milk|meal|oil|bar|paste|sliced|slivered|chopped|ground|crust|cookie)\b/i
+
+/** "~23 almonds" for a portion of whole nuts, or null for anything else. */
+export function nutCount(food: Pick<Food, 'name'>, grams: number): string | null {
+  if (NOT_WHOLE_NUT.test(food.name)) return null
+  const n = food.name.toLowerCase()
+  const hit = PER_OZ.find(([re]) => re.test(n))
+  if (!hit) return null
+  const count = Math.round((grams / 28.35) * hit[1])
+  return count > 0 ? `~${count} ${hit[2]}` : null
 }
 
 // --- Portions ------------------------------------------------------------------------------

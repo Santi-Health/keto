@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { brandsToShow, foodIcon, sectionsOf, veryFrequentAt, portionText, servingOf, shortName } from './quickFoods'
+import { brandsToShow, foodIcon, nutCount, sectionsOf, veryFrequentAt, portionText, servingOf, shortName } from './quickFoods'
 
 const f = (name: string, brand: string | null = null, meta = {}, id = name) => ({ id, name, brand, meta, source: 'manual' as const })
 
@@ -69,5 +69,29 @@ describe('food buttons', () => {
     expect(veryFrequentAt('cheese', 'breakfast', [at(1), at(1), at(1), at(1)], now)).toBe(false)
     expect(veryFrequentAt('cheese', 'breakfast', [at(1), at(2), at(3), at(40)], now)).toBe(false)
     expect(veryFrequentAt('cheese', 'lunch', [at(1), at(2), at(3), at(5)], now)).toBe(false)
+  })
+  it('uses the names you chose for specific foods, and calms ALL CAPS', () => {
+    const cases: [string, string | null, string][] = [
+      ['Light Mayonnaise', 'Best Foods', 'BF Light Mayo'],
+      ['Tomato Ketchup', 'Heinz', 'Heinz Ketchup'],
+      ['NuSalt Salt Substitute', null, 'NuSalt'],
+      ['Salt', null, 'Salt'],
+      ['CANADIAN BACON', null, 'Canadian Bacon'],
+      ['High Protein Sushi Roll (salmon)', null, 'Protein Sushi Roll'],
+      ['Original Brats', 'Johnsonville', 'Johnsonville Brats Original'],
+      ['Beef, plate, outside skirt steak, separable lean and fat, trimmed to 0" fat, all grades, raw', null, 'Outside Skirt'],
+      ['Keto Soft White Bread', "Nature's Own", 'Nat Own Keto Bread'],
+      ['Egg Whites', 'Kirkland Signature', 'Kirk Egg Whites'],
+      ['Egg Whites', 'Egg Beaters', 'Egg Whites'],
+      ['SHARP CHEDDAR', null, 'Sharp Cheddar'],
+    ]
+    for (const [name, brand, want] of cases) expect(shortName(f(name, brand))).toBe(want)
+  })
+  it('counts whole nuts in a portion', () => {
+    expect(nutCount(f('Almonds'), 28.35)).toBe('~23 almonds')
+    expect(nutCount(f('Pistachios, dry roasted'), 28.35)).toBe('~49 pistachios')
+    expect(nutCount(f('Almonds'), 14.2)).toBe('~12 almonds')
+    expect(nutCount(f('Almond butter'), 32)).toBe(null)
+    expect(nutCount(f('Blueberries'), 74)).toBe(null)
   })
 })
