@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useState } from 'react'
 import { BarcodeScanner } from '../components/BarcodeScanner'
+import { DrinksCard } from '../components/DrinksCard'
 import { ClaudeChatSheet } from '../components/ClaudeChatSheet'
 import { FoodForm } from '../components/FoodForm'
 import { FoodRow } from '../components/FoodRow'
@@ -11,6 +12,7 @@ import { useData } from '../lib/data'
 import { lookupBarcode } from '../lib/foodApi'
 import type { RestaurantDish } from '../lib/foodJson'
 import { MEALS, mealForTime, rankFoods, suggestForMeal, type Food, type Meal, type NewFood } from '../lib/foods'
+import { ALL_DRINKS, MILKS } from '../lib/drinks'
 import { brandsToShow, sectionOf } from '../lib/quickFoods'
 import type { SavedMeal } from '../lib/savedMeals'
 import { localDate } from '../lib/targets'
@@ -33,10 +35,15 @@ interface Props {
   startClaude?: boolean
   /** Day to log on (YYYY-MM-DD), when adding to a past day from the Log screen. */
   date?: string
+  /** Daily fluid goal, for the drinks card at the bottom. */
+  waterTargetOz: number
   onLogged: () => void
 }
 
-export function Add({ startScan, startClaude, date, onLogged }: Props) {
+/** Names of the drink-button drinks and milks, so a copy saved by hand doesn't show up as a food button either. */
+const DRINK_NAMES = new Set([...ALL_DRINKS.map((d) => d.label), ...MILKS.map((m) => `${m.label} milk`)].map((n) => n.toLowerCase()))
+
+export function Add({ startScan, startClaude, date, waterTargetOz, onLogged }: Props) {
   const { foods, logs, savedMeals, foodById, logsOn, deleteLog } = useData()
   const [meal, setMeal] = useState<Meal>(() => mealForTime(new Date()))
   const mealLabel = MEALS.find((m) => m.value === meal)!.label
@@ -46,7 +53,7 @@ export function Add({ startScan, startClaude, date, onLogged }: Props) {
   const meals = [...savedMeals].sort((a, b) => b.use_count - a.use_count || a.name.localeCompare(b.name))
   // Buttons, from your own foods only: each meal's usual foods, fruits & nuts and condiments on their own,
   // and everything folded at the bottom. Drinks have their own buttons on Today, so they're left out.
-  const myFoods = useMemo(() => foods.filter((f) => !f.meta.externalId?.startsWith('drink:')), [foods])
+  const myFoods = useMemo(() => foods.filter((f) => !f.meta.externalId?.startsWith('drink:') && !DRINK_NAMES.has(f.name.toLowerCase())), [foods])
   const brands = useMemo(() => brandsToShow(myFoods), [myFoods])
   const fruitsNuts = useMemo(() => rankFoods(myFoods.filter((f) => sectionOf(f) === 'fruits_nuts')), [myFoods])
   const condiments = useMemo(() => rankFoods(myFoods.filter((f) => sectionOf(f) === 'condiments')), [myFoods])
@@ -293,6 +300,13 @@ export function Add({ startScan, startClaude, date, onLogged }: Props) {
           </>
         )}
       </div>
+
+      {/* Drinks keep their one-tap buttons, at the very bottom (today only, like on Today). */}
+      {(!date || date === localDate()) && mode === 'log' && !q && (
+        <div style={{ marginTop: 12 }}>
+          <DrinksCard days={[localDate()]} waterTargetOz={waterTargetOz} />
+        </div>
+      )}
 
       {overlay?.kind === 'quick' && (
         <QuickLogSheet

@@ -133,6 +133,7 @@ function Tracker({ session, recovering = false, onPassphraseChanged = () => {} }
             startScan={param === 'scan'}
             startClaude={param === 'claude'}
             date={isDate(param) ? param : undefined}
+            waterTargetOz={profile.waterOz}
             onLogged={() => go(isDate(param) ? `log/${param}` : 'today')}
           />
         )}
