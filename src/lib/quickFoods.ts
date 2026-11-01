@@ -77,6 +77,11 @@ export function suggestDisplayName(food: Pick<Food, 'name' | 'brand' | 'meta'>, 
 /** A two-or-three word name from the full name: "Sola Sweet & Buttery Keto Bread" → "Keto Bread". */
 function autoName(food: Pick<Food, 'name' | 'brand'>): string {
   let name = unshout(food.name).replace(/\([^)]*\)/g, ' ').replace(/\s+/g, ' ').trim()
+  // Oikos cups go by their flavor: "Oikos Triple Zero Banana Cream Greek Yogurt" → "Oikos Banana Cream".
+  if (/\boikos\b/i.test(name)) {
+    const flavor = name.replace(/\b(oikos|triple|zero|pro|greek|nonfat|non-fat|blended|yogh?urt|cultured|dairy|product|cup)\b/gi, ' ').replace(/[,\s]+/g, ' ').trim()
+    return `Oikos ${flavor.split(' ').slice(0, 2).join(' ')}`.trim()
+  }
   // A brand repeated at the start of the name adds nothing on the button.
   if (food.brand && name.toLowerCase().startsWith(food.brand.toLowerCase())) name = name.slice(food.brand.length).replace(/^[\s,:-]+/, '')
   const segs = name.split(/\s*,\s*|\s+-\s+/).filter(Boolean)
@@ -112,7 +117,10 @@ export function brandsToShow(foods: Pick<Food, 'id' | 'name' | 'brand' | 'meta'>
 const FRUIT_NUT =
   /\b(berr(y|ies)|strawberr|blueberr|raspberr|blackberr|cranberr|apples?|bananas?|oranges?|clementines?|mandarins?|lemons?|limes?|grapes?|melon|watermelon|cantaloupe|cherr(y|ies)|peach(es)?|pears?|plums?|kiwi|mango(es)?|pineapple|papaya|figs?|dates|coconut|almonds?|walnuts?|pecans?|macadamias?|cashews?|pistachios?|hazelnuts?|brazil nuts?|peanuts?|pine nuts?|nuts|chia|flax(seed)?|pumpkin seeds?|pepitas|sunflower seeds?|hemp seeds?|olives?)/i
 /** Foods made from fruit or nuts that aren't eaten as fruit or nuts. */
-const NOT_FRUIT_NUT = /\b(milk|flour|bread|crust|cake|cookie|muffin|bar|oil|juice|yogurt|ice cream|chocolate|cereal|granola|sauce|dressing)\b/i
+const NOT_FRUIT_NUT = /\b(milk|flour|bread|crust|cake|cookie|muffin|bar|oil|juice|yogurt|yoghurt|oikos|skyr|kefir|ice cream|chocolate|cereal|granola|sauce|dressing)\b/i
+
+/** Yogurts, including brands whose names don't say so ("Oikos Triple Zero Banana Cream"). */
+export const YOGURT = /\b(yogh?urt|oikos|skyr|chobani|fage|siggi'?s?|kefir|activia|ratio)\b/i
 
 // --- Condiments ----------------------------------------------------------------------------
 
@@ -177,6 +185,8 @@ export function veryFrequentAt(
 // --- Icons ---------------------------------------------------------------------------------
 
 const ICONS: [RegExp, string][] = [
+  // Before the fruits, so a banana yogurt is a yogurt.
+  [YOGURT, '🥣'],
   [/mayo|aioli|ketchup|mustard|sauce|sriracha|tabasco|salsa|dressing|vinaigrette|ranch|pesto|vinegar|aminos|relish|tahini|horseradish/, '🫙'],
   [/salt|black pepper|peppercorn|seasoning|spice|paprika|cumin|oregano|cinnamon|flakes/, '🧂'],
   [/blueberr|blackberr/, '🫐'],
@@ -209,7 +219,6 @@ const ICONS: [RegExp, string][] = [
   [/steak|beef|burger|lamb|pork|ham\b|sausage|chorizo|salami|meat/, '🥩'],
   [/butter/, '🧈'],
   [/cheese|mozzarella|cheddar|parmesan|brie|feta/, '🧀'],
-  [/yogurt|kefir/, '🥣'],
   [/milk|cream\b/, '🥛'],
   [/bread|toast|bun\b|roll\b|bagel|tortilla|wrap/, '🍞'],
   [/broccoli|cauliflower/, '🥦'],
@@ -229,14 +238,17 @@ const ICONS: [RegExp, string][] = [
 
 /** An emoji for a food's button, from its name; recipes get a pot. */
 export function foodIcon(food: Pick<Food, 'name' | 'brand' | 'meta' | 'source'>): string {
+  const full = `${food.brand ?? ''} ${food.name}`
+  // A yogurt is a yogurt whatever its flavor ("Oikos Triple Zero Banana Cream").
+  if (YOGURT.test(full)) return '🥣'
   // The short name first, so "Sweet & Buttery Keto Bread" is bread, not butter.
-  for (const n of [shortName(food).toLowerCase(), food.name.toLowerCase()]) for (const [re, icon] of ICONS) if (re.test(n)) return icon
+  for (const n of [shortName(food).toLowerCase(), `${food.brand ?? ''} ${food.name}`.toLowerCase()]) for (const [re, icon] of ICONS) if (re.test(n)) return icon
   return food.source === 'recipe' ? '🍲' : '🍽️'
 }
 
 // --- Nut counts ---------------------------------------------------------------------------
 
-/** About how many are in an ounce (28 g), from USDA and the nut boards; pecans and walnuts in halves. */
+/** About how many are in an ounce (28 g), from USDA and the nut boards; pecans and walnuts in halves. Olives too. */
 const PER_OZ: [RegExp, number, string][] = [
   [/almond/, 23, 'almonds'],
   [/pistachio/, 49, 'pistachios'],
@@ -247,9 +259,12 @@ const PER_OZ: [RegExp, number, string][] = [
   [/hazelnut|filbert/, 21, 'hazelnuts'],
   [/brazil nut/, 6, 'Brazil nuts'],
   [/peanut/, 28, 'peanuts'],
+  // Olives by size: kalamatas are large (~4.5 g each), most jarred olives medium (~3.5 g).
+  [/kalamata|castelvetrano|cerignola/, 6, 'olives'],
+  [/olive/, 8, 'olives'],
 ]
 /** Foods made from nuts that aren't counted by the nut. */
-const NOT_WHOLE_NUT = /\b(butter|flour|milk|meal|oil|bar|paste|sliced|slivered|chopped|ground|crust|cookie)\b/i
+const NOT_WHOLE_NUT = /\b(butter|flour|milk|meal|oil|bar|paste|tapenade|sliced|slivered|chopped|ground|crust|cookie)\b/i
 
 /** "~23 almonds" for a portion of whole nuts, or null for anything else. */
 export function nutCount(food: Pick<Food, 'name'>, grams: number): string | null {
@@ -283,6 +298,9 @@ export function portionText(amount: number, unit: string): string {
   const m = unit.match(/^1 (.+)$/)
   // Portions that carry their own amount ("½ fruit", "2 oz", "5 berries"): as is, or "2 × 2 oz".
   if (!m) return /^[\d½¼¾]/.test(unit) ? (amount === 1 ? unit : `${frac(amount)} × ${unit}`) : `${frac(amount)} ${unit}`
+  // Weights inside a serving add clutter: "1 serving (3 slices (56 g))" → "1 serving (3 slices)".
+  const serving = m[1].match(/^serving \((.*)\)$/)?.[1]?.replace(/\s*[(,]?\s*[\d.]+\s*(g|grams?|oz|ml)\)?\s*$/i, '').trim()
+  if (serving && !/^1 /.test(serving)) return amount === 1 ? `1 serving (${serving})` : `${frac(amount)} servings`
   // "1 serving (1 bar (40 g))" reads as the inner portion.
   const inner = m[1].match(/^serving \(1 (.*)\)$/)?.[1]
   const base = (inner ?? m[1]).replace(/\s*\([^)]*\)\s*$/, '')

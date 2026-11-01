@@ -1345,6 +1345,12 @@ input[type='time'] {
   fill: var(--water);
 }
 
+.food-svg {
+  display: block;
+  width: 30px;
+  height: 30px;
+}
+
 .food-ico {
   font-size: 1.35rem;
   line-height: 1.2;

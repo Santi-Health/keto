@@ -1,10 +1,11 @@
 import { useMemo, useState } from 'react'
 import { useData } from '../lib/data'
 import { MEALS, portionNutrients, type Food, type LogEntry, type Meal } from '../lib/foods'
-import { SECTIONS, foodIcon, frac, nutCount, portionText, sectionsOf, servingOf, shortName } from '../lib/quickFoods'
+import { SECTIONS, frac, nutCount, portionText, sectionsOf, servingOf, shortName } from '../lib/quickFoods'
 import type { SavedMeal } from '../lib/savedMeals'
 import { toGrams } from '../lib/units'
 import { DeleteFood } from './DeleteFood'
+import { FoodIcon } from './FoodIcon'
 import { defaultTime } from './LogFoodSheet'
 import { Sheet } from './Sheet'
 
@@ -37,7 +38,7 @@ export function FoodButtons({
         ) : (
           <button key={it.food.id} type="button" className="drink-btn food-btn" onClick={() => onPick(it)} aria-label={`${it.food.name}${it.food.brand ? `, ${it.food.brand}` : ''}`}>
             <span className="food-ico" aria-hidden="true">
-              {foodIcon(it.food)}
+              <FoodIcon food={it.food} />
             </span>
             <span className="drink-name">{shortName(it.food)}</span>
             {brands[it.food.id] && <span className="food-brand">{brands[it.food.id]}</span>}
@@ -50,11 +51,14 @@ export function FoodButtons({
   )
 }
 
-/** The serving on a button: "1 slice", or "1 oz · ~23" for whole nuts. */
+/** The serving on a button: "1 slice", "1 oz · ~23" for whole nuts, "1 serving (~3 olives)". */
 function servingText(food: Food): string {
   const { amount, unit } = servingOf(food)
   const count = nutCount(food, toGrams({ unitConversions: food.unit_conversions }, amount, unit).grams)
-  return `${portionText(amount, unit)}${count ? ` · ${count.split(' ')[0]}` : ''}`
+  const portion = portionText(amount, unit)
+  if (!count) return portion
+  // "1 serving (~3 olives)"; by weight, just the number: "1 oz · ~23".
+  return /serving/.test(portion) ? `${portion} (${count})` : `${portion} · ${count.split(' ')[0]}`
 }
 
 const STEPS = [0.5, 1, 1.5, 2]
@@ -109,7 +113,8 @@ export function QuickLogSheet({
   return (
     <Sheet title={food.name} subtitle={food.brand ?? undefined} onClose={onClose}>
       <span className="label">
-        How much{serving.unit !== 'g' ? ` · ${portionText(1, serving.unit)} per serving` : ''}
+        How much
+        {serving.unit !== 'g' && ` · ${portionText(1, serving.unit)}${portionText(1, serving.unit).startsWith('1 serving') ? '' : ' per serving'}`}
       </span>
       <div className="portion-steps" role="group" aria-label="Servings">
         {STEPS.map((s) => (
