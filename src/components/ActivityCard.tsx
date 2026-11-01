@@ -116,7 +116,8 @@ export function useMorningReadiness(): [boolean, () => void] {
   const { activity } = useData()
   const today = localDate()
   const [seen, setSeen] = useState(seenOn)
-  const show = seen !== today && !!readinessFor(today, activity)
+  // Last night's sleep is enough to show it; the score joins once HRV or resting heart rate arrive.
+  const show = seen !== today && (!!readinessFor(today, activity) || !!activity[today]?.sleep_minutes)
   const dismiss = () => {
     try {
       localStorage.setItem(SEEN_KEY, today)
@@ -198,7 +199,13 @@ function ReadinessBlock({ days, isWeek }: { days: string[]; isWeek: boolean }) {
   const { activity } = useData()
   const scores = days.map((d) => ({ day: d, r: readinessFor(d, activity) }))
   const known = scores.filter((x): x is { day: string; r: NonNullable<typeof x.r> } => !!x.r)
-  if (!known.length) return null
+  if (!known.length) {
+    // Today before Fitbit has finished syncing: say what the score is waiting for instead of showing nothing.
+    const a = !isWeek && days[0] === localDate() ? activity[days[0]] : undefined
+    if (!a) return null
+    const waiting = [a.meta?.hrvMs == null && 'HRV', a.resting_hr == null && 'resting heart rate', !a.sleep_minutes && 'sleep'].filter(Boolean)
+    return <p className="muted small" style={{ margin: '0 0 8px' }}>Readiness shows once Fitbit syncs {waiting.length ? waiting.join(' and ') : 'a few more days of history'}.</p>
+  }
   const r = known[known.length - 1].r
   const score = isWeek ? Math.round(known.reduce((a, b) => a + b.r.score, 0) / known.length) : r.score
   const band = bandOf(score)
