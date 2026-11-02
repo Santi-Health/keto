@@ -333,7 +333,7 @@ function EspressoSheet({
             ))}
             {milk === 'fairlife_chocolate' && (
               <button type="button" className={`chip-btn ${oz === FAIRLIFE_BOTTLE_OZ ? 'on' : ''}`} onClick={() => setOzText(String(FAIRLIFE_BOTTLE_OZ))}>
-                Whole bottle ({FAIRLIFE_BOTTLE_OZ} oz)
+                {FAIRLIFE_BOTTLE_OZ} oz
               </button>
             )}
           </div>
