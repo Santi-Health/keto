@@ -403,6 +403,9 @@ export function Today({ profile, targets, onOpenSettings, onToggleRefeed, onNavi
             )}
           </section>
 
+          {/* Checked and tapped most, so right under the macros. */}
+          <DrinksCard days={viewDays} waterTargetOz={profile.waterOz} />
+
           {!isWeek && <SuggestionsCard dayLogs={dayLogs} targets={targets} muscleGoal={profile.muscleGoal} fatBudget={fatBudget} past={!isToday} sex={profile.sex} watch={suggestWatch} />}
 
           <section className="card">
@@ -445,8 +448,6 @@ export function Today({ profile, targets, onOpenSettings, onToggleRefeed, onNavi
           )}
 
           <ActivityCard days={viewDays} onImport={() => void importFitbit()} importing={importing} hideReadiness={isToday && morning} />
-
-          <DrinksCard days={viewDays} waterTargetOz={profile.waterOz} />
 
           {isToday ? (
             <ReadingsCard weightUnit={profile.weightUnit} onAdd={(kind) => setReadingSheet({ kind })} />

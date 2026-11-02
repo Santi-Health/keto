@@ -117,6 +117,19 @@ function FairlifeBottle() {
 const DRAWINGS: Partial<Record<DrinkKey | 'espresso', () => ReactNode>> = {
   water: () => <Glass />,
   sparkling_water: () => <Glass bubbles />,
+  sparkling_rain: () => (
+    <Can
+      body="#cfe8f7"
+      lines={[{ t: 'Rain', fill: '#1f5f8b', size: 6.5, y: 24, w: 14 }]}
+      extra={[
+        [12, 11],
+        [19, 12.5],
+        [15.5, 29],
+      ].map(([x, y]) => (
+        <path key={x} d={`M${x} ${y - 2.6} Q${x + 1.7} ${y} ${x} ${y + 1.2} Q${x - 1.7} ${y} ${x} ${y - 2.6} Z`} fill="#5aa9e6" />
+      ))}
+    />
+  ),
   coke_zero: () => (
     <Can
       body="#1b1b1b"

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useData } from '../lib/data'
-import { ALL_DRINKS, CAFFEINE_FREE_MG, DRINKS, glasses, liters, MILKS, asksForMilk, drinkFood, drinkPortion, hydration, milkFood, type Drink, type DrinkKey, type MilkKey } from '../lib/drinks'
+import { ALL_DRINKS, CAFFEINE_FREE_MG, DRINKS, drinkByKey, glasses, liters, MILKS, asksForMilk, drinkFood, drinkPortion, hydration, milkFood, type Drink, type DrinkKey, type MilkKey } from '../lib/drinks'
 import { buildLogEntry, portionNutrients, type Food, type LogEntry } from '../lib/foods'
 import { mealForTime } from '../lib/foods'
 import { portionText, unshout } from '../lib/quickFoods'
@@ -40,7 +40,7 @@ export function DrinksCard({ days, waterTargetOz }: Props) {
 
   const counts: Partial<Record<DrinkKey, number>> = {}
   for (const r of water) {
-    const key = r.meta.drink === 'sparkling_water' ? 'sparkling_water' : 'water'
+    const key = (drinkByKey(String(r.meta.drink ?? ''))?.key ?? 'water') as DrinkKey
     counts[key] = (counts[key] ?? 0) + 1
   }
   for (const l of drinkLogs) {
@@ -58,7 +58,7 @@ export function DrinksCard({ days, waterTargetOz }: Props) {
     ...water.map((r) => ({
       id: r.id,
       at: r.taken_at,
-      name: `${r.meta.drink === 'sparkling_water' ? 'Sparkling water' : 'Water'} · ${liters(r.value ?? 0)}`,
+      name: `${drinkByKey(String(r.meta.drink ?? ''))?.label ?? 'Water'} · ${liters(r.value ?? 0)}`,
       remove: () => deleteReading(r.id),
     })),
     ...drinkLogs.map((l) => ({
@@ -146,6 +146,12 @@ export function DrinksCard({ days, waterTargetOz }: Props) {
     setEspresso(null)
   }
 
+  const sparkling = [
+    counts.sparkling_water && `${counts.sparkling_water} glass${counts.sparkling_water > 1 ? 'es' : ''} sparkling`,
+    counts.sparkling_rain && `${counts.sparkling_rain} can${counts.sparkling_rain > 1 ? 's' : ''} Sparkling Rain`,
+  ]
+    .filter(Boolean)
+    .join(' and ')
   const tally = ALL_DRINKS.filter((d) => !d.hydration && counts[d.key]).map((d) => `${counts[d.key]} ${label(d)}`)
 
   return (
@@ -166,9 +172,9 @@ export function DrinksCard({ days, waterTargetOz }: Props) {
             : '. Coffee, tea and sodas hydrate like water at your caffeine level.'}
         </p>
       )}
-      {(tally.length > 0 || counts.sparkling_water) && (
+      {(tally.length > 0 || sparkling) && (
         <p className="muted small" style={{ margin: '0 0 8px' }}>
-          {counts.sparkling_water ? `${counts.sparkling_water} glass${counts.sparkling_water > 1 ? 'es' : ''} sparkling in the water total. ` : ''}
+          {sparkling ? `${sparkling} in the water total. ` : ''}
           {tally.length > 0 && `${isToday ? 'Also today' : 'Also'}: ${tally.join(' · ')}${caffeine > 0 ? ` · ${Math.round(caffeine)} mg caffeine` : ''}.`}
         </p>
       )}

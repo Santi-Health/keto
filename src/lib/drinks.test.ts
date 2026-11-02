@@ -22,7 +22,7 @@ describe('drinks', () => {
   })
 
   it('only water counts toward hydration', () => {
-    expect(DRINKS.filter((d) => d.hydration).map((d) => d.key)).toEqual(['water', 'sparkling_water'])
+    expect(DRINKS.filter((d) => d.hydration).map((d) => d.key)).toEqual(['water', 'sparkling_water', 'sparkling_rain'])
   })
 })
 
