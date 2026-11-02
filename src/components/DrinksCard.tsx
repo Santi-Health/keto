@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useData } from '../lib/data'
-import { ALL_DRINKS, CAFFEINE_FREE_MG, DRINKS, drinkByKey, glasses, liters, MILKS, asksForMilk, drinkFood, drinkPortion, hydration, milkFood, type Drink, type DrinkKey, type MilkKey } from '../lib/drinks'
+import { ALL_DRINKS, CAFFEINE_FREE_MG, DRINKS, ML_PER_OZ, drinkByKey, glasses, liters, MILKS, asksForMilk, drinkFood, drinkPortion, hydration, milkFood, type Drink, type DrinkKey, type MilkKey } from '../lib/drinks'
 import { buildLogEntry, portionNutrients, type Food, type LogEntry } from '../lib/foods'
 import { mealForTime } from '../lib/foods'
 import { portionText, unshout } from '../lib/quickFoods'
@@ -28,6 +28,7 @@ export function DrinksCard({ days, waterTargetOz }: Props) {
   const waterOz = water.reduce((s, r) => s + (r.value ?? 0), 0) / days.length
   const isDrinkLog = (l: { food_id: string | null }) => !!l.food_id && !!foodById[l.food_id]?.meta.externalId?.startsWith('drink:')
   const drinkLogs = days.flatMap((d) => logsOn(d)).filter(isDrinkLog)
+  const isMilkLog = (l: { food_id: string | null }) => !!foodById[l.food_id!]?.meta.externalId?.startsWith('drink:milk_')
   // Fluid per day (caffeine is judged per day), averaged over the week.
   const perDay = days.map((d) =>
     hydration(
@@ -52,6 +53,13 @@ export function DrinksCard({ days, waterTargetOz }: Props) {
   const caffeine = drinkLogs.reduce((s, l) => s + (l.nutrients.caffeineMg ?? 0), 0)
   const label = (d: Drink) => (d.key.startsWith('espresso') ? `${d.serving.split(' ')[0]} espresso` : d.label)
 
+  // Milk goes with the coffee or tea logged in the same tap; anything else stands alone.
+  const groups = new Map<string, typeof drinkLogs>()
+  for (const l of drinkLogs) {
+    const key = isMilkLog(l) ? (drinkLogs.find((o) => o.eaten_at === l.eaten_at && !isMilkLog(o))?.id ?? l.id) : l.id
+    groups.set(key, [...(groups.get(key) ?? []), l])
+  }
+  const drinkGroups = [...groups.values()]
   // Every drink logged that day, newest first, so a mistake can be removed later (not only right after the tap).
   const [removing, setRemoving] = useState(false)
   const entries = [
@@ -61,12 +69,16 @@ export function DrinksCard({ days, waterTargetOz }: Props) {
       name: `${drinkByKey(String(r.meta.drink ?? ''))?.label ?? 'Water'} · ${liters(r.value ?? 0)}`,
       remove: () => deleteReading(r.id),
     })),
-    ...drinkLogs.map((l) => ({
-      id: l.id,
-      at: l.eaten_at,
-      name: `${unshout(foodById[l.food_id!]?.name ?? l.food_name)} · ${portionText(l.amount, l.unit)}`,
-      remove: () => deleteLog(l.id),
-    })),
+    // Coffee or tea and the milk poured in it are one drink: logged in the same tap, removed together.
+    ...drinkGroups.map((group) => {
+      const parts = [...group].sort((a, b) => Number(isMilkLog(a)) - Number(isMilkLog(b)))
+      return {
+        id: parts[0].id,
+        at: parts[0].eaten_at,
+        name: parts.map((l) => (isMilkLog(l) ? `${portionText(l.amount, l.unit)} ${unshout(foodById[l.food_id!]?.name ?? l.food_name)}` : `${unshout(foodById[l.food_id!]?.name ?? l.food_name)} · ${portionText(l.amount, l.unit)}`)).join(' + '),
+        remove: () => parts.forEach((l) => deleteLog(l.id)),
+      }
+    }),
   ].sort((a, b) => b.at.localeCompare(a.at))
 
   function add(d: Drink) {
@@ -254,6 +266,9 @@ function Glasses({ fills }: { fills: (0 | 0.5 | 1)[] }) {
   )
 }
 
+/** The 340 ml fairlife chocolate bottle, poured whole into a coffee. */
+const FAIRLIFE_BOTTLE_OZ = Math.round((340 / ML_PER_OZ) * 10) / 10
+
 /** Asks which milk and how much, defaulting to the milk and amount used last time. */
 function EspressoSheet({
   drink,
@@ -316,6 +331,11 @@ function EspressoSheet({
                 {v} oz
               </button>
             ))}
+            {milk === 'fairlife_chocolate' && (
+              <button type="button" className={`chip-btn ${oz === FAIRLIFE_BOTTLE_OZ ? 'on' : ''}`} onClick={() => setOzText(String(FAIRLIFE_BOTTLE_OZ))}>
+                Whole bottle ({FAIRLIFE_BOTTLE_OZ} oz)
+              </button>
+            )}
           </div>
           {n && (
             <div className="hint">
