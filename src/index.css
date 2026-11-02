@@ -2259,3 +2259,30 @@ input[type='time'] {
 .warn-text {
   color: var(--warn);
 }
+
+/* Foods spreadsheet upload preview */
+.sheet-preview {
+  margin-top: 12px;
+}
+.sheet-preview ul.notice {
+  margin: 0 0 10px;
+  padding-left: 22px;
+}
+.sheet-changes {
+  list-style: none;
+  margin: 0 0 12px;
+  padding: 0;
+  max-height: 360px;
+  overflow-y: auto;
+}
+.sheet-changes li {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+  overflow-wrap: anywhere;
+}
+.danger-text {
+  color: var(--danger, #c0392b);
+}

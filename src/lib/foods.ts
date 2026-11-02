@@ -47,6 +47,8 @@ export interface FoodMeta {
   group?: 'fruits_nuts' | 'condiments' | 'other'
   /** Bottom sections on the Add screen the user put it in ([] = none, back with the meals only). */
   sections?: ('fruits_nuts' | 'picada' | 'condiments')[]
+  /** The portion the Add buttons log by default ("6 oz"), when the label serving isn't what the user eats. Amount 0: use the label serving. */
+  portion?: { amount: number; unit: string }
 }
 
 /** Row shape of the `foods` table. */

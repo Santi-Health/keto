@@ -1,4 +1,4 @@
-import type { NewFood } from './foods'
+import type { Food, NewFood } from './foods'
 import type { Nutrients } from './nutrients'
 
 /**
@@ -342,6 +342,12 @@ export const MILKS: Milk[] = [
     per100g: { kcal: 34, protein: 3.37, fat: 0.08, satFat: 0.05, carbs: 4.96, netCarbs: 4.96, sugars: 5.09, cholesterolMg: 2, sodiumMg: 42, potassiumMg: 156, calciumMg: 122, magnesiumMg: 11 },
   },
 ]
+
+/** Names of the drink-button drinks and milks, so a copy saved by hand counts as a drink too. */
+const DRINK_NAMES = new Set([...ALL.map((d) => d.label), ...MILKS.map((m) => `${m.label} milk`)].map((n) => n.toLowerCase()))
+
+/** A saved food that is one of the drink buttons (or a milk), not a food button. */
+export const isDrinkFood = (f: Pick<Food, 'name' | 'meta'>) => !!f.meta.externalId?.startsWith('drink:') || DRINK_NAMES.has(f.name.toLowerCase())
 
 export function milkFood(m: Milk): NewFood {
   return {

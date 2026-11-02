@@ -12,7 +12,7 @@ import { useData } from '../lib/data'
 import { lookupBarcode } from '../lib/foodApi'
 import type { RestaurantDish } from '../lib/foodJson'
 import { MEALS, mealForTime, rankFoods, suggestForMeal, type Food, type Meal, type NewFood } from '../lib/foods'
-import { ALL_DRINKS, MILKS } from '../lib/drinks'
+import { isDrinkFood } from '../lib/drinks'
 import { SECTIONS, brandsToShow, sectionsOf, veryFrequentAt } from '../lib/quickFoods'
 import type { SavedMeal } from '../lib/savedMeals'
 import { localDate } from '../lib/targets'
@@ -40,9 +40,6 @@ interface Props {
   onLogged: () => void
 }
 
-/** Names of the drink-button drinks and milks, so a copy saved by hand doesn't show up as a food button either. */
-const DRINK_NAMES = new Set([...ALL_DRINKS.map((d) => d.label), ...MILKS.map((m) => `${m.label} milk`)].map((n) => n.toLowerCase()))
-
 export function Add({ startScan, startClaude, date, waterTargetOz, onLogged }: Props) {
   const { foods, logs, savedMeals, foodById, logsOn, deleteLog } = useData()
   const [meal, setMeal] = useState<Meal>(() => mealForTime(new Date()))
@@ -53,7 +50,7 @@ export function Add({ startScan, startClaude, date, waterTargetOz, onLogged }: P
   const meals = [...savedMeals].sort((a, b) => b.use_count - a.use_count || a.name.localeCompare(b.name))
   // Buttons, from your own foods only: each meal's usual foods, then fruits & nuts, picada and condiments,
   // and everything folded at the bottom. Drinks have their own buttons on Today, so they're left out.
-  const myFoods = useMemo(() => foods.filter((f) => !f.meta.externalId?.startsWith('drink:') && !DRINK_NAMES.has(f.name.toLowerCase())), [foods])
+  const myFoods = useMemo(() => foods.filter((f) => !isDrinkFood(f)), [foods])
   const brands = useMemo(() => brandsToShow(myFoods), [myFoods])
   const bySection = useMemo(() => SECTIONS.map((sec) => ({ ...sec, list: rankFoods(myFoods.filter((f) => sectionsOf(f).includes(sec.key))) })), [myFoods])
   // A food with its own section shows with a meal too only when it's eaten there very often.

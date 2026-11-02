@@ -2,7 +2,7 @@
 import { useMemo, useState } from 'react'
 import { useData } from '../lib/data'
 import { MEALS, mealForTime, portionNutrients, setUsual, usualMealsFor, type Food, type FoodMeta, type LogEntry, type Meal, type NewFood } from '../lib/foods'
-import { learnedPrefixes, suggestDisplayName, unshout } from '../lib/quickFoods'
+import { learnedPrefixes, setPortionOf, suggestDisplayName, unshout } from '../lib/quickFoods'
 import { toGrams, unitsFor } from '../lib/units'
 import { DeleteFood } from './DeleteFood'
 import { FoodFlags, MacroStrip, foodSubtitle } from './FoodBits'
@@ -51,8 +51,9 @@ export function LogFoodSheet({ food, entry, date, meal: chosenMeal, onClose, onE
   const names = () => ({ name: fullName.trim() || food.name, buttonName: displayName.trim() || undefined })
   const units = unitsFor({ unitConversions: food.unit_conversions })
   const firstUnit = food.unit_conversions[0]?.unit ?? 'g'
-  const [amount, setAmount] = useState(String(entry?.amount ?? saved?.meta.lastAmount ?? (firstUnit === 'g' ? 100 : 1)))
-  const [unit, setUnit] = useState(entry?.unit ?? saved?.meta.lastUnit ?? firstUnit)
+  const usualPortion = setPortionOf(food)
+  const [amount, setAmount] = useState(String(entry?.amount ?? usualPortion?.amount ?? saved?.meta.lastAmount ?? (firstUnit === 'g' ? 100 : 1)))
+  const [unit, setUnit] = useState(entry?.unit ?? usualPortion?.unit ?? saved?.meta.lastUnit ?? firstUnit)
   const start = entry ? new Date(entry.eaten_at) : defaultTime(date)
   const [time, setTime] = useState(toLocalInput(start))
   const [meal, setMeal] = useState<Meal>(entry?.meal ?? chosenMeal ?? mealForTime(start))

@@ -1,9 +1,9 @@
 import { useMemo, useState } from 'react'
 import { useData } from '../lib/data'
 import { MEALS, portionNutrients, type Food, type LogEntry, type Meal } from '../lib/foods'
-import { SECTIONS, frac, nutCount, portionText, sectionsOf, servingOf, shortName, unshout } from '../lib/quickFoods'
+import { SECTIONS, frac, nutCount, portionText, sectionsOf, servingOf, setPortionOf, shortName, unshout } from '../lib/quickFoods'
 import type { SavedMeal } from '../lib/savedMeals'
-import { toGrams } from '../lib/units'
+import { toGrams, unitsFor } from '../lib/units'
 import { DeleteFood } from './DeleteFood'
 import { FoodIcon } from './FoodIcon'
 import { defaultTime } from './LogFoodSheet'
@@ -66,6 +66,8 @@ function portionLabel(food: Food, amount: number, unit: string): string {
 const servingText = (food: Food) => portionLabel(food, servingOf(food).amount, servingOf(food).unit)
 
 const STEPS = [0.5, 1, 1.5, 2]
+/** For a portion you set ("6 oz"), smaller parts of it too. */
+const SET_STEPS = [0.25, 0.5, 0.75, 1, 1.5]
 
 /**
  * Tap a food button: its full name, how much (one serving by default), what that adds, and Log.
@@ -94,6 +96,11 @@ export function QuickLogSheet({
   const [steps, setSteps] = useState(1)
   const [renaming, setRenaming] = useState(false)
   const [name, setName] = useState(shortName(food))
+  const setPortion = setPortionOf(food)
+  const [portioning, setPortioning] = useState(false)
+  const [portionAmount, setPortionAmount] = useState(String(setPortion?.amount ?? serving.amount))
+  const [portionUnit, setPortionUnit] = useState(setPortion?.unit ?? serving.unit)
+  const labelServing = food.unit_conversions[0]
   const amount = serving.amount * steps
   const grams = toGrams({ unitConversions: food.unit_conversions }, amount, serving.unit).grams
   const n = useMemo(() => portionNutrients(food, grams), [food, grams])
@@ -113,16 +120,26 @@ export function QuickLogSheet({
     setRenaming(false)
   }
 
+  function savePortion(clear = false) {
+    const amount = Number(portionAmount)
+    const portion = clear || !(amount > 0) ? { amount: 0, unit: '' } : { amount, unit: portionUnit }
+    updateFood({ ...food, meta: { ...food.meta, portion } })
+    setSteps(1)
+    setPortioning(false)
+  }
+
   return (
     <Sheet title={unshout(food.name)} subtitle={food.brand ?? undefined} onClose={onClose}>
       <span className="label">
         How much
-        {serving.unit !== 'g' && ` · ${portionText(1, serving.unit)}${portionText(1, serving.unit).startsWith('1 serv.') ? '' : ' per serv.'}`}
+        {setPortion
+          ? ` · your portion is ${portionText(setPortion.amount, setPortion.unit)}${labelServing && labelServing.unit !== setPortion.unit ? ` (label: ${portionText(1, labelServing.unit)})` : ''}`
+          : serving.unit !== 'g' && ` · ${portionText(1, serving.unit)}${portionText(1, serving.unit).startsWith('1 serv.') ? '' : ' per serv.'}`}
       </span>
       <div className="portion-steps" role="group" aria-label="Servings">
-        {STEPS.map((s) => (
+        {(setPortion ? SET_STEPS : STEPS).map((s) => (
           <button key={s} type="button" aria-pressed={steps === s} onClick={() => setSteps(s)}>
-            {serving.unit === 'g' ? `${s * 100} g` : frac(s)}
+            {setPortion ? portionText(serving.amount * s, serving.unit) : serving.unit === 'g' ? `${s * 100} g` : frac(s)}
           </button>
         ))}
       </div>
@@ -150,6 +167,28 @@ export function QuickLogSheet({
             Save
           </button>
         </div>
+      ) : portioning ? (
+        <div style={{ marginTop: 10 }}>
+          <span className="label">Usual portion: what one tap logs</span>
+          <div className="row">
+            <input aria-label="Portion amount" type="number" inputMode="decimal" min={0} step="any" value={portionAmount} onChange={(e) => setPortionAmount(e.target.value)} />
+            <select aria-label="Portion unit" value={portionUnit} onChange={(e) => setPortionUnit(e.target.value)}>
+              {unitsFor({ unitConversions: food.unit_conversions }).map((u) => (
+                <option key={u} value={u}>
+                  {u}
+                </option>
+              ))}
+            </select>
+            <button type="button" className="btn secondary small-btn" onClick={() => savePortion()}>
+              Save
+            </button>
+          </div>
+          {setPortion && (
+            <button type="button" className="more-link" onClick={() => savePortion(true)}>
+              Back to the label serving
+            </button>
+          )}
+        </div>
       ) : (
         <div className="quick-links">
           <button type="button" onClick={onMore}>
@@ -160,6 +199,9 @@ export function QuickLogSheet({
           </button>
           <button type="button" onClick={() => setRenaming(true)}>
             Rename button
+          </button>
+          <button type="button" onClick={() => setPortioning(true)}>
+            Usual portion
           </button>
           <DeleteFood food={food} onDeleted={onClose} asLink />
         </div>

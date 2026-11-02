@@ -294,8 +294,22 @@ export function frac(n: number): string {
   return String(Math.round(n * 100) / 100)
 }
 
-/** The food's serving to log by default: its first portion ("1 slice"), else 100 g. */
-export function servingOf(food: Pick<Food, 'unit_conversions'>): { amount: number; unit: string } {
+/** Usual portions for specific foods, when no portion was set on the food itself. */
+const USUAL_PORTIONS: { match: RegExp; brand?: RegExp; amount: number; unit: string }[] = [{ match: /\begg whites?\b/, brand: /kirkland/, amount: 6, unit: 'oz' }]
+
+/** The portion the food's own setting or a usual-portion rule gives, if any. */
+export function setPortionOf(food: Partial<Pick<Food, 'name' | 'brand' | 'meta'>>): { amount: number; unit: string } | null {
+  // A portion of 0 means you chose the label serving, over any rule.
+  if (food.meta?.portion) return food.meta.portion.amount ? food.meta.portion : null
+  const full = `${food.brand ?? ''} ${food.name ?? ''}`.toLowerCase()
+  const rule = USUAL_PORTIONS.find((r) => r.match.test(full) && (!r.brand || r.brand.test(full)))
+  return rule ? { amount: rule.amount, unit: rule.unit } : null
+}
+
+/** The food's serving to log by default: the portion set for it ("6 oz"), its first portion ("1 slice"), else 100 g. */
+export function servingOf(food: Pick<Food, 'unit_conversions'> & Partial<Pick<Food, 'name' | 'brand' | 'meta'>>): { amount: number; unit: string } {
+  const set = setPortionOf(food)
+  if (set) return set
   const first = food.unit_conversions[0]
   return first && first.unit !== 'g' ? { amount: 1, unit: first.unit } : { amount: 100, unit: 'g' }
 }
