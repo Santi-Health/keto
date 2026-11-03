@@ -71,8 +71,8 @@ describe('teas', () => {
 })
 
 describe('button order and Nespresso pods', () => {
-  it('starts with the everyday drinks, with the pods right after espresso', () => {
-    expect(DRINKS.slice(0, 7).map((d) => d.key)).toEqual(['water', 'coke_zero', 'espresso_double', 'kazar', 'volluto_decaf', 'ba_lungo', 'mate_cocido'])
+  it('starts with the morning mate cocido, then the everyday drinks, with the pods right after espresso', () => {
+    expect(DRINKS.slice(0, 7).map((d) => d.key)).toEqual(['mate_cocido', 'water', 'coke_zero', 'espresso_double', 'kazar', 'volluto_decaf', 'ba_lungo'])
     expect(DRINKS.some((d) => d.key === 'espresso_single')).toBe(false)
     expect(drinkByKey('espresso_single')).toBeDefined() // still reachable from the Single/Double switch
   })

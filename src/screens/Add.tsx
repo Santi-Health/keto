@@ -59,7 +59,7 @@ export function Add({ startScan, startClaude, date, waterTargetOz, onLogged }: P
   for (const l of logsOn(date ?? localDate())) if (l.meal === meal && l.food_id) counts[l.food_id] = (counts[l.food_id] ?? 0) + 1
   const [open, setOpen] = useState<Record<string, boolean>>({})
   const toggle = (k: string) => setOpen((o) => ({ ...o, [k]: !o[k] }))
-  const [justLogged, setJustLogged] = useState<{ id: string; text: string } | null>(null)
+  const [justLogged, setJustLogged] = useState<{ ids: string[]; text: string } | null>(null)
   const pick = (it: QuickItem) => {
     if (it.kind === 'meal') return setOverlay({ kind: 'meal', savedMeal: it.meal })
     setOverlay(mode === 'log' ? { kind: 'quick', food: it.food } : { kind: 'log', food: it.food })
@@ -186,7 +186,7 @@ export function Add({ startScan, startClaude, date, waterTargetOz, onLogged }: P
               Logged {justLogged.text}.
             </span>
             <button type="button" className="btn secondary small-btn" onClick={() => {
-                deleteLog(justLogged.id)
+                for (const id of justLogged.ids) deleteLog(id)
                 setJustLogged(null)
               }}>
               Undo
@@ -306,9 +306,9 @@ export function Add({ startScan, startClaude, date, waterTargetOz, onLogged }: P
           meal={meal}
           date={date}
           onClose={close}
-          onLogged={(entry, text) => {
+          onLogged={(entries, text) => {
             setOverlay(null)
-            setJustLogged({ id: entry.id, text: `${text} to ${mealLabel.toLowerCase()}` })
+            setJustLogged({ ids: entries.map((e) => e.id), text: `${text} to ${mealLabel.toLowerCase()}` })
           }}
           onMore={() => setOverlay({ kind: 'log', food: foodById[overlay.food.id] ?? overlay.food })}
           onEdit={() => {

@@ -314,6 +314,62 @@ export function servingOf(food: Pick<Food, 'unit_conversions'> & Partial<Pick<Fo
   return first && first.unit !== 'g' ? { amount: 1, unit: first.unit } : { amount: 100, unit: 'g' }
 }
 
+// --- Pairings ------------------------------------------------------------------------------
+
+const AVOCADO_OIL = /\bavocado oil\b/
+const SALT = /\bsalt\b/
+const PEPPER = /\bpepper\b/
+const NUSALT = /\bnu ?salt\b/
+/** What each pairing finds among your foods; salt and pepper only as condiments, and salt isn't NuSalt. */
+const PAIR_PICK: [RegExp, (f: Pick<Food, 'name' | 'meta' | 'source'>) => boolean][] = [
+  [AVOCADO_OIL, (f) => !/\bmayo/i.test(f.name)],
+  [SALT, (f) => !NUSALT.test(f.name.toLowerCase()) && sectionsOf(f).includes('condiments')],
+  [PEPPER, (f) => sectionsOf(f).includes('condiments')],
+  [NUSALT, () => true],
+]
+
+/** Meat, fish and vegetables you cook and salt; not cured or ready-made foods, which come salted. */
+const COOKED =
+  /\b(steak|skirt|ribeye|sirloin|flank|brisket|beef|ground (beef|turkey|pork)|chicken|turkey|pork|lamb|veal|chops?|salmon|cod|tilapia|halibut|trout|fish|shrimp|scallops?|broccoli|cauliflower|zucchini|asparagus|spinach|kale|mushrooms?|green beans|brussels|cabbage|bok choy|eggplant)\b/
+const SALTED_ALREADY = /\b(bacon|ham|sausages?|brats?|bratwurst|jerky|deli|sliced|smoked|canned|salami|pepperoni|nuggets|tenders|sushi|soup|chips|salad)\b/
+
+/**
+ * Foods that always go in with another: egg whites in avocado oil with salt, pepper and NuSalt; eggs with
+ * salt, pepper and NuSalt; anything cooked with salt or NuSalt.
+ */
+const PAIR_RULES: { match: RegExp; not?: RegExp; with: RegExp[] }[] = [
+  { match: /\begg whites?\b/, with: [AVOCADO_OIL, SALT, PEPPER, NUSALT] },
+  { match: /\beggs?\b/, not: /\bwhites?\b|eggplant|salad|bites?|noodles?|nog\b/, with: [SALT, PEPPER, NUSALT] },
+  { match: COOKED, not: SALTED_ALREADY, with: [SALT, NUSALT] },
+]
+
+/** Salt or NuSalt: you use one at home and the other away, so the app remembers which you used last. */
+export function saltKind(f: Pick<Food, 'name'>): 'salt' | 'nusalt' | null {
+  const n = f.name.toLowerCase()
+  return NUSALT.test(n) ? 'nusalt' : SALT.test(n) ? 'salt' : null
+}
+
+type Pairable = Pick<Food, 'id' | 'name' | 'brand' | 'meta' | 'source' | 'use_count'>
+
+/** The foods logged along with this one: the ones you chose, else the usual pairings found among your foods (most used first). */
+export function pairsFor<F extends Pairable>(food: Pick<Food, 'id' | 'name' | 'brand' | 'meta'> & Partial<Pick<Food, 'source'>>, foods: F[]): F[] {
+  if (food.meta.pairs) return food.meta.pairs.map((id) => foods.find((f) => f.id === id)).filter((f): f is F => !!f)
+  // A recipe has its salt in its ingredients.
+  if (food.source === 'recipe') return []
+  const full = `${food.brand ?? ''} ${food.name}`.toLowerCase()
+  const rule = PAIR_RULES.find((r) => r.match.test(full) && !r.not?.test(full))
+  if (!rule) return []
+  const out: F[] = []
+  for (const re of rule.with) {
+    const ok = PAIR_PICK.find(([r]) => r === re)![1]
+    const hit = foods
+      .filter((f) => f.id !== food.id && re.test(f.name.toLowerCase()) && ok(f) && !out.includes(f))
+      .sort((a, b) => b.use_count - a.use_count)[0]
+    if (hit) out.push(hit)
+  }
+  return out
+}
+
 /** How a portion reads on a button: "2 eggs", "½ slice", "1 serving", "150 g". */
 /** Short words for portions: "serv." and "cont."; slice and can stay whole. */
 const abbreviate = (s: string) => s.replace(/\bservings?\b/g, 'serv.').replace(/\bcontainers?\b/g, 'cont.')
@@ -330,7 +386,12 @@ function portionWords(amount: number, unit: string): string {
   if (!m) return /^[\d½¼¾]/.test(unit) ? (amount === 1 ? unit : `${frac(amount)} × ${unit}`) : `${frac(amount)} ${counted}`
   // Weights inside a serving add clutter: "1 serving (3 slices (56 g))" → "1 serving (3 slices)".
   const serving = m[1].match(/^serving \((.*)\)$/)?.[1]?.replace(/\s*[(,]?\s*[\d.]+\s*(g|grams?|oz|ml)\)?\s*$/i, '').trim()
-  if (serving && !/^1 /.test(serving)) return amount === 1 ? `1 serving (${serving})` : `${frac(amount)} servings`
+  if (serving && !/^1 /.test(serving)) {
+    if (amount === 1) return `1 serving (${serving})`
+    // Counted pieces add up: 2 servings of 3 slices is "6 slices".
+    const pieces = serving.match(/^(\d+(?:\.\d+)?) ([a-z ]+)$/i)
+    return pieces ? `${frac(amount * Number(pieces[1]))} ${pieces[2]}` : `${frac(amount)} servings`
+  }
   // "1 serving (1 bar (40 g))" reads as the inner portion.
   const inner = m[1].match(/^serving \(1 (.*)\)$/)?.[1]
   const base = (inner ?? m[1]).replace(/\s*\([^)]*\)\s*$/, '')

@@ -1480,6 +1480,46 @@ input[type='time'] {
   border-color: var(--text);
 }
 
+/* How many portions: − [1] + × 1 serving (3 slices). */
+.portion-times {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 6px 0 12px;
+}
+
+.portion-times button {
+  width: 44px;
+  height: 44px;
+  flex: none;
+  font: inherit;
+  font-size: 1.3rem;
+  font-weight: 600;
+  color: var(--text);
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+.portion-times input {
+  width: 64px;
+  flex: none;
+  text-align: center;
+  font-weight: 600;
+}
+
+.portion-times span {
+  min-width: 0;
+  margin-left: 4px;
+  overflow-wrap: anywhere;
+}
+
+.pair-chips {
+  justify-content: flex-start;
+  margin: -4px 0 12px;
+}
+
 .portion-macros {
   display: flex;
   justify-content: space-between;

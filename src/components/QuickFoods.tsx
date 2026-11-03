@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useData } from '../lib/data'
 import { MEALS, portionNutrients, type Food, type LogEntry, type Meal } from '../lib/foods'
-import { SECTIONS, frac, nutCount, portionText, sectionsOf, servingOf, setPortionOf, shortName, unshout } from '../lib/quickFoods'
+import { SECTIONS, nutCount, pairsFor, portionText, saltKind, sectionsOf, servingOf, setPortionOf, shortName, unshout } from '../lib/quickFoods'
 import type { SavedMeal } from '../lib/savedMeals'
 import { toGrams, unitsFor } from '../lib/units'
 import { DeleteFood } from './DeleteFood'
@@ -65,13 +65,26 @@ function portionLabel(food: Food, amount: number, unit: string): string {
 /** The serving on a button. */
 const servingText = (food: Food) => portionLabel(food, servingOf(food).amount, servingOf(food).unit)
 
-const STEPS = [0.5, 1, 1.5, 2]
-/** For a portion you set ("6 oz"), smaller parts of it too. */
-const SET_STEPS = [0.25, 0.5, 0.75, 1, 1.5]
+const SALT_KEY = 'keto.lastSalt'
+/** The salt (or NuSalt, or both) used in the last log that had one, on this phone. */
+function lastSalt(): string[] | null {
+  try {
+    return JSON.parse(localStorage.getItem(SALT_KEY) ?? 'null')
+  } catch {
+    return null
+  }
+}
+function rememberSalt(kinds: string[]) {
+  try {
+    localStorage.setItem(SALT_KEY, JSON.stringify(kinds))
+  } catch {
+    // Private mode: every log starts with both.
+  }
+}
 
 /**
- * Tap a food button: its full name, how much (one serving by default), what that adds, and Log.
- * Other amounts, editing, renaming the button and its section are one tap further.
+ * Tap a food button: its full name, how many portions (one by default, any number typed), the foods that
+ * go with it, what that adds, and Log. Other amounts, editing, renaming the button and its section are one tap further.
  */
 export function QuickLogSheet({
   food,
@@ -85,15 +98,24 @@ export function QuickLogSheet({
   food: Food
   meal: Meal
   date?: string
-  onLogged: (entry: LogEntry, text: string) => void
+  /** Everything logged by the tap: the food first, then the foods that go with it. */
+  onLogged: (entries: LogEntry[], text: string) => void
   /** Open the full log sheet (any amount or unit, time, usual meals). */
   onMore: () => void
   onEdit: () => void
   onClose: () => void
 }) {
-  const { logFood, updateFood } = useData()
+  const { foods, logFood, updateFood } = useData()
   const serving = servingOf(food)
-  const [steps, setSteps] = useState(1)
+  const [times, setTimes] = useState('1')
+  const steps = Number(times) > 0 ? Number(times) : 0
+  const pairs = useMemo(() => pairsFor(food, foods), [food, foods])
+  /** Pairings left out of this one log: to start, the salt you didn't use last time (NuSalt at home, salt away). */
+  const [skipped, setSkipped] = useState<string[]>(() => {
+    const last = lastSalt()
+    return last ? pairs.filter((p) => saltKind(p) && !last.includes(saltKind(p)!)).map((p) => p.id) : []
+  })
+  const [pairing, setPairing] = useState(false)
   const [renaming, setRenaming] = useState(false)
   const [name, setName] = useState(shortName(food))
   const setPortion = setPortionOf(food)
@@ -103,16 +125,38 @@ export function QuickLogSheet({
   const labelServing = food.unit_conversions[0]
   const amount = serving.amount * steps
   const grams = toGrams({ unitConversions: food.unit_conversions }, amount, serving.unit).grams
-  const n = useMemo(() => portionNutrients(food, grams), [food, grams])
+  const own = useMemo(() => portionNutrients(food, grams), [food, grams])
   const portion = portionLabel(food, amount, serving.unit)
   const mealLabel = MEALS.find((m) => m.value === meal)!.label.toLowerCase()
   const sections = sectionsOf(food)
   const fmt = (v: number | undefined, d = 0) => (v == null ? '—' : (Math.round(v * 10 ** d) / 10 ** d).toLocaleString())
 
-  function log() {
-    const entry = logFood(food, amount, serving.unit, meal, defaultTime(date))
-    onLogged(entry, `${portion} ${shortName(food)}`)
+  const withIt = pairs.filter((p) => !skipped.includes(p.id))
+  // What the whole tap adds, pairings included.
+  const n = { ...own }
+  for (const p of withIt) {
+    const pn = portionNutrients(p, toGrams({ unitConversions: p.unit_conversions }, servingOf(p).amount, servingOf(p).unit).grams)
+    for (const k of ['kcal', 'netCarbs', 'protein', 'fat'] as const) if (pn[k] != null) n[k] = (n[k] ?? 0) + pn[k]
   }
+  // Same time for all, so they read as one entry.
+  function log() {
+    const at = defaultTime(date)
+    const entries = [logFood(food, amount, serving.unit, meal, at)]
+    for (const p of withIt) entries.push(logFood(p, servingOf(p).amount, servingOf(p).unit, meal, at))
+    const salts = withIt.map(saltKind).filter((k) => k != null)
+    if (salts.length) rememberSalt(salts)
+    onLogged(entries, `${portion} ${shortName(food)}${withIt.length ? ` with ${withIt.map((p) => shortName(p)).join(', ')}` : ''}`)
+  }
+
+  function togglePair(id: string) {
+    const ids = pairs.map((p) => p.id)
+    updateFood({ ...food, meta: { ...food.meta, pairs: ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id] } })
+  }
+  /** Foods to choose pairings from: the current ones, then condiments, most used first. */
+  const pairChoices = useMemo(
+    () => [...pairs, ...foods.filter((f) => f.id !== food.id && !pairs.includes(f) && sectionsOf(f).includes('condiments')).sort((a, b) => b.use_count - a.use_count)],
+    [pairs, foods, food.id],
+  )
 
   function rename() {
     const clean = name.trim()
@@ -124,25 +168,59 @@ export function QuickLogSheet({
     const amount = Number(portionAmount)
     const portion = clear || !(amount > 0) ? { amount: 0, unit: '' } : { amount, unit: portionUnit }
     updateFood({ ...food, meta: { ...food.meta, portion } })
-    setSteps(1)
+    setTimes('1')
     setPortioning(false)
   }
 
   return (
     <Sheet title={unshout(food.name)} subtitle={food.brand ?? undefined} onClose={onClose}>
       <span className="label">
-        How much
-        {setPortion
-          ? ` · your portion is ${portionText(setPortion.amount, setPortion.unit)}${labelServing && labelServing.unit !== setPortion.unit ? ` (label: ${portionText(1, labelServing.unit)})` : ''}`
-          : serving.unit !== 'g' && ` · ${portionText(1, serving.unit)}${portionText(1, serving.unit).startsWith('1 serv.') ? '' : ' per serv.'}`}
+        How many portions
+        {setPortion && labelServing && labelServing.unit !== setPortion.unit && ` · label serving: ${portionText(1, labelServing.unit)}`}
       </span>
-      <div className="portion-steps" role="group" aria-label="Servings">
-        {(setPortion ? SET_STEPS : STEPS).map((s) => (
-          <button key={s} type="button" aria-pressed={steps === s} onClick={() => setSteps(s)}>
-            {setPortion ? portionText(serving.amount * s, serving.unit) : serving.unit === 'g' ? `${s * 100} g` : frac(s)}
-          </button>
-        ))}
+      <div className="portion-times">
+        <button type="button" aria-label="Less" onClick={() => setTimes(String(Math.max(0.5, Math.ceil(steps * 2 - 1) / 2)))}>
+          −
+        </button>
+        <input aria-label="Number of portions" type="number" inputMode="decimal" min={0} step="any" value={times} onChange={(e) => setTimes(e.target.value)} onFocus={(e) => e.target.select()} />
+        <button type="button" aria-label="More" onClick={() => setTimes(String(Math.floor(steps * 2 + 1) / 2))}>
+          +
+        </button>
+        <span>
+          × {portionText(serving.amount, serving.unit)}
+          {steps !== 1 && steps > 0 && <b> = {portion}</b>}
+        </span>
       </div>
+      {pairs.length > 0 && !pairing && (
+        <div className="section-chips pair-chips" role="group" aria-label="Goes with">
+          <span className="muted small">With</span>
+          {pairs.map((p) => {
+            const on = !skipped.includes(p.id)
+            return (
+              <button key={p.id} type="button" className={`chip-btn ${on ? 'on' : ''}`} aria-pressed={on} onClick={() => setSkipped(on ? [...skipped, p.id] : skipped.filter((x) => x !== p.id))}>
+                {on ? '✓ ' : ''}
+                {shortName(p)} · {servingText(p)}
+              </button>
+            )
+          })}
+        </div>
+      )}
+      {pairing && (
+        <div className="section-chips pair-chips" role="group" aria-label="Always log with">
+          <span className="muted small">Always log with</span>
+          {pairChoices.map((p) => {
+            const on = pairs.includes(p)
+            return (
+              <button key={p.id} type="button" className={`chip-btn ${on ? 'on' : ''}`} aria-pressed={on} onClick={() => togglePair(p.id)}>
+                {shortName(p)}
+              </button>
+            )
+          })}
+          <button type="button" className="more-link" onClick={() => setPairing(false)}>
+            Done
+          </button>
+        </div>
+      )}
       <div className="portion-macros">
         <span>
           <b>{fmt(n.kcal)}</b>kcal
@@ -157,8 +235,9 @@ export function QuickLogSheet({
           <b>{fmt(n.fat)} g</b>fat
         </span>
       </div>
-      <button type="button" className="btn" style={{ width: '100%' }} onClick={log}>
-        Log {portion} to {mealLabel}
+      <button type="button" className="btn" style={{ width: '100%' }} onClick={log} disabled={!steps}>
+        Log {portion}
+        {withIt.length ? ` + ${withIt.length}` : ''} to {mealLabel}
       </button>
       {renaming ? (
         <div className="row" style={{ marginTop: 10 }}>
@@ -202,6 +281,9 @@ export function QuickLogSheet({
           </button>
           <button type="button" onClick={() => setPortioning(true)}>
             Usual portion
+          </button>
+          <button type="button" onClick={() => setPairing(true)}>
+            {pairs.length ? 'Change what goes with it' : 'Always log with…'}
           </button>
           <DeleteFood food={food} onDeleted={onClose} asLink />
         </div>

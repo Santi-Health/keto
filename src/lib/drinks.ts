@@ -241,13 +241,13 @@ const ALL: Drink[] = [
 
 /** Button order: the everyday drinks first. */
 const ORDER: DrinkKey[] = [
+  'mate_cocido',
   'water',
   'coke_zero',
   'espresso_double',
   'kazar',
   'volluto_decaf',
   'ba_lungo',
-  'mate_cocido',
   'sparkling_water',
   'sparkling_rain',
   'diet_coke',

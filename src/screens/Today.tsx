@@ -307,6 +307,9 @@ export function Today({ profile, targets, onOpenSettings, onToggleRefeed, onNavi
             </button>
           )}
 
+          {/* The morning's first log is a drink (mate cocido), so drinks come before the macros. */}
+          <DrinksCard days={viewDays} waterTargetOz={profile.waterOz} />
+
           {showDeficit && (
             <DeficitNow
               calorieLimit={targets.calories}
@@ -402,9 +405,6 @@ export function Today({ profile, targets, onOpenSettings, onToggleRefeed, onNavi
               </button>
             )}
           </section>
-
-          {/* Checked and tapped most, so right under the macros. */}
-          <DrinksCard days={viewDays} waterTargetOz={profile.waterOz} />
 
           {!isWeek && <SuggestionsCard dayLogs={dayLogs} targets={targets} muscleGoal={profile.muscleGoal} fatBudget={fatBudget} past={!isToday} sex={profile.sex} watch={suggestWatch} />}
 

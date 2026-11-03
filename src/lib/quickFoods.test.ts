@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { brandsToShow, foodIcon, learnedPrefixes, nutCount, unshout, suggestDisplayName, sectionsOf, veryFrequentAt, portionText, servingOf, shortName } from './quickFoods'
+import { brandsToShow, foodIcon, learnedPrefixes, nutCount, unshout, suggestDisplayName, sectionsOf, veryFrequentAt, pairsFor, portionText, saltKind, servingOf, shortName } from './quickFoods'
 
 const f = (name: string, brand: string | null = null, meta = {}, id = name) => ({ id, name, brand, meta, source: 'manual' as const })
 
@@ -118,7 +118,9 @@ describe('food buttons', () => {
     expect(portionText(1, '1 serving (3 slices (56 g))')).toBe('1 serv. (3 slices)')
     expect(portionText(1, '1 serving (3 slices, 56 g)')).toBe('1 serv. (3 slices)')
     expect(portionText(1, '1 serving (3 slices)')).toBe('1 serv. (3 slices)')
-    expect(portionText(2, '1 serving (3 slices (56 g))')).toBe('2 serv.')
+    expect(portionText(2, '1 serving (3 slices (56 g))')).toBe('6 slices')
+    expect(portionText(1.5, '1 serving (3 slices)')).toBe('4½ slices')
+    expect(portionText(2, '1 serving (2 tbsp (30 ml))')).toBe('4 tbsp')
     expect(portionText(1, '1 serving (56 g)')).toBe('1 serv.')
   })
   it('shortens serving and container, counts already given, and calms capitals', () => {
@@ -132,5 +134,31 @@ describe('food buttons', () => {
     expect(unshout('Keto Bread (SOLA)')).toBe('Keto Bread (Sola)')
     expect(unshout('BF Light Mayo')).toBe('BF Light Mayo')
     expect(unshout('MCT oil')).toBe('MCT oil')
+  })
+})
+
+describe('foods that go with another', () => {
+  const food = (id: string, name: string, use_count = 0, meta = {}) => ({ id, name, brand: null, meta, source: 'manual' as const, use_count })
+  const pantry = [
+    food('oil', 'Avocado oil', 5),
+    food('mayo', 'Avocado oil mayo', 9),
+    food('salt', 'Salt, table', 8),
+    food('nu', 'NuSalt', 3),
+    food('pep', 'Black pepper', 4),
+    food('chk', 'Salt and pepper chicken', 20),
+  ]
+  it('logs egg whites with avocado oil, salt, pepper and NuSalt, and eggs with salt and pepper', () => {
+    expect(pairsFor(food('ew', 'Egg Whites'), pantry).map((f) => f.id)).toEqual(['oil', 'salt', 'pep', 'nu'])
+    expect(pairsFor(food('e', 'Eggs, whole, raw'), pantry).map((f) => f.id)).toEqual(['salt', 'pep', 'nu'])
+  })
+  it('salts anything you cook, but not cured meats or recipes', () => {
+    for (const n of ['Outside Skirt', 'Chicken thighs', 'Salmon fillet', 'Broccoli', 'Eggplant']) expect(pairsFor(food('x', n), pantry).map((f) => f.id)).toEqual(['salt', 'nu'])
+    for (const n of ['Canadian Bacon', 'Johnsonville Brats', 'Smoked salmon', 'Avocado']) expect(pairsFor(food('x', n), pantry)).toEqual([])
+    expect(pairsFor({ ...food('x', 'Chicken curry'), source: 'recipe' as const }, pantry)).toEqual([])
+    expect([saltKind({ name: 'NuSalt' }), saltKind({ name: 'Salt, table' }), saltKind({ name: 'Black pepper' })]).toEqual(['nusalt', 'salt', null])
+  })
+  it('follows the pairings you chose, even none', () => {
+    expect(pairsFor(food('ew', 'Egg Whites', 0, { pairs: ['salt'] }), pantry).map((f) => f.id)).toEqual(['salt'])
+    expect(pairsFor(food('ew', 'Egg Whites', 0, { pairs: [] }), pantry)).toEqual([])
   })
 })
