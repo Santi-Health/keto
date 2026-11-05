@@ -99,6 +99,8 @@ export interface AreaView {
   tips: Suggestion[]
   sex: Sex
   age: number
+  /** Your daily net carb limit, so nothing suggested goes past it. */
+  netCarbLimit: number
 }
 
 export const fmtAmount = (n: number, unit: string) =>
@@ -226,28 +228,28 @@ const omegaIntakes = (sex: Sex, age: number) => ({
 })
 
 /** Omega-3 foods that are easy on keto, for when your own foods don't cover it. NIH amounts. */
-const OMEGA3_IDEAS: { match: RegExp; text: string; effect: string }[] = [
-  { match: /salmon/i, text: 'Try 3 oz salmon', effect: 'About +1.8 g omega-3' },
-  { match: /herring/i, text: 'Try 3 oz herring', effect: 'About +1.7 g omega-3' },
-  { match: /sardine/i, text: 'Try 3 oz sardines in olive oil', effect: 'About +1.2 g omega-3' },
-  { match: /mackerel/i, text: 'Try 3 oz Atlantic mackerel', effect: 'About +1 g omega-3' },
-  { match: /chia/i, text: 'Try 1 tbsp chia seeds', effect: 'About +2.1 g plant omega-3, which counts for less than fish' },
-  { match: /flax/i, text: 'Try 1 tbsp flaxseed', effect: 'About +2.3 g plant omega-3, which counts for less than fish' },
+const OMEGA3_IDEAS: { match: RegExp; text: string; effect: string; netCarbs: number }[] = [
+  { match: /salmon/i, text: 'Try 3 oz salmon', effect: 'About +1.8 g omega-3', netCarbs: 0 },
+  { match: /herring/i, text: 'Try 3 oz herring', effect: 'About +1.7 g omega-3', netCarbs: 0 },
+  { match: /sardine/i, text: 'Try 3 oz sardines in olive oil', effect: 'About +1.2 g omega-3', netCarbs: 0 },
+  { match: /mackerel/i, text: 'Try 3 oz Atlantic mackerel', effect: 'About +1 g omega-3', netCarbs: 0 },
+  { match: /chia/i, text: 'Try 1 tbsp chia seeds', effect: 'About +2.1 g plant omega-3, which counts for less than fish', netCarbs: 0.9 },
+  { match: /flax/i, text: 'Try 1 tbsp flaxseed', effect: 'About +2.3 g plant omega-3, which counts for less than fish', netCarbs: 0.2 },
 ]
 const MAX_IDEAS = 3
 
 const IDEA = {
-  avocado: { match: /avocado/i, text: 'Try 1/2 avocado' },
-  spinach: { match: /spinach/i, text: 'Try 1/2 cup cooked spinach' },
-  broccoli: { match: /broccoli/i, text: 'Try 1/2 cup cooked broccoli' },
-  salmon: { match: /salmon/i, text: 'Try 3 oz salmon' },
-  sardines: { match: /sardine/i, text: 'Try 3 oz sardines' },
-  pumpkinSeeds: { match: /pumpkin seed|pepita/i, text: 'Try 1 oz pumpkin seeds' },
-  chia: { match: /chia/i, text: 'Try 1 tbsp chia seeds' },
-  redPepper: { match: /red (bell )?pepper/i, text: 'Try 1/2 cup red bell pepper' },
-  egg: { match: /\beggs?\b(?! white)/i, text: 'Try 1 egg' },
-  sirloin: { match: /sirloin|steak/i, text: 'Try 3 oz sirloin' },
-  porkChop: { match: /pork/i, text: 'Try a 3 oz pork chop' },
+  avocado: { match: /avocado/i, text: 'Try 1/2 avocado', netCarbs: 1.8 },
+  spinach: { match: /spinach/i, text: 'Try 1/2 cup cooked spinach', netCarbs: 1.2 },
+  broccoli: { match: /broccoli/i, text: 'Try 1/2 cup cooked broccoli', netCarbs: 3 },
+  salmon: { match: /salmon/i, text: 'Try 3 oz salmon', netCarbs: 0 },
+  sardines: { match: /sardine/i, text: 'Try 3 oz sardines', netCarbs: 0 },
+  pumpkinSeeds: { match: /pumpkin seed|pepita/i, text: 'Try 1 oz pumpkin seeds', netCarbs: 1.3 },
+  chia: { match: /chia/i, text: 'Try 1 tbsp chia seeds', netCarbs: 0.9 },
+  redPepper: { match: /red (bell )?pepper/i, text: 'Try 1/2 cup red bell pepper', netCarbs: 3 },
+  egg: { match: /\beggs?\b(?! white)/i, text: 'Try 1 egg', netCarbs: 0.6 },
+  sirloin: { match: /sirloin|steak/i, text: 'Try 3 oz sirloin', netCarbs: 0 },
+  porkChop: { match: /pork/i, text: 'Try a 3 oz pork chop', netCarbs: 0 },
 }
 
 /** Keto-friendly foods for each area and how much that portion gives, mostly USDA amounts. */
@@ -279,7 +281,7 @@ const MIN_VITAMIN_COVERAGE = 70
 
 /** Better picks for foods high in omega-6, for when you don't already eat one. */
 const OMEGA6_SWAPS: [RegExp, string][] = [
-  [/almond|walnut|pecan|peanut|cashew|pistachio|hazelnut|brazil nut|sunflower seed|pumpkin seed|pepita|mixed nuts/i, 'macadamias, about 0.4 g omega-6 in 1 oz'],
+  [/almond|walnut|pecan|peanut|cashew|pistachio|hazelnut|brazil nut|sunflower seed|pumpkin seed|pepita|mixed nuts/i, 'macadamias, about 0.4 g omega-6 and 1.5 g net carbs in 1 oz'],
   [/mayo|aioli|dressing|ranch|vinaigrette/i, 'a version made with olive or avocado oil'],
   [/soybean oil|canola|corn oil|vegetable oil|sunflower oil|safflower|grapeseed/i, 'olive or avocado oil'],
 ]
@@ -310,6 +312,15 @@ const tipsFor = (tips: Suggestion[], goals: string[]) => tips.filter((t) => goal
 
 export const hasTip = (area: Area, view: AreaView) => tipsFor(view.tips, area.goals).length > 0
 
+/** Net carbs still free today (per day on the 7-day view), never below 0, so zero-carb foods can still be suggested. */
+function carbsLeft(view: AreaView): number {
+  const spread = view.isWeek ? Math.max(1, new Set(view.logs.map(dayOf)).size) : 1
+  const eaten = view.logs.reduce((sum, l) => sum + (l.nutrients.netCarbs ?? 0), 0) / spread
+  return Math.max(0, view.netCarbLimit - eaten)
+}
+
+const carbNote = (netCarbs: number) => ` · ${fmtAmount(netCarbs, 'g')} net carbs`
+
 const eatenNames = (view: AreaView) => view.foods.map((f) => f.name).filter((name) => view.history.some((l) => l.food_name === name))
 
 /** Foods you eat, then foods you could try, for an area that's running low. */
@@ -320,14 +331,16 @@ function lowAdvice(area: Area, view: AreaView, current: number, already: Advice[
     return [{ kind: 'note', text: 'Too many of these foods have no vitamin data yet to say this is low.' }]
   const key = area.parts[0].key
   const name = area.micro ? area.label : area.label.toLowerCase()
-  const yours = richestFoods(key, target * WORTHWHILE_SHARE, usualFoods(view.foods, view.history)).filter((f) => !already.some((a) => a.text.includes(f.name)))
+  const left = carbsLeft(view)
+  const yours = richestFoods(key, target * WORTHWHILE_SHARE, usualFoods(view.foods, view.history), (n) => (n.netCarbs ?? 0) <= left).filter((f) => !already.some((a) => a.text.includes(f.name)))
   const out: Advice[] = yours.map((f) => {
     const gain = f.n[key] as number
-    return { kind: 'add', text: f.text, effect: `+${fmtAmount(gain, area.unit)} ${name}, gets you to ${fmtAmount(current + gain, area.unit)} of ${fmtAmount(target, area.unit)}` }
+    return { kind: 'add', text: f.text, effect: `+${fmtAmount(gain, area.unit)} ${name}, gets you to ${fmtAmount(current + gain, area.unit)} of ${fmtAmount(target, area.unit)}${carbNote(f.n.netCarbs ?? 0)}` }
   })
   const eaten = eatenNames(view)
-  const ideas = (FOOD_IDEAS[key] ?? []).filter(([idea]) => !eaten.some((n) => IDEA[idea].match.test(n))).slice(0, Math.max(1, MAX_IDEAS - yours.length))
-  for (const [idea, amount] of ideas) out.push({ kind: 'add', text: IDEA[idea].text, effect: `About +${fmtAmount(amount, area.unit)} ${name}` })
+  const ideas = (FOOD_IDEAS[key] ?? []).filter(([idea]) => IDEA[idea].netCarbs <= left && !eaten.some((n) => IDEA[idea].match.test(n))).slice(0, Math.max(1, MAX_IDEAS - yours.length))
+  for (const [idea, amount] of ideas) out.push({ kind: 'add', text: IDEA[idea].text, effect: `About +${fmtAmount(amount, area.unit)} ${name}${carbNote(IDEA[idea].netCarbs)}` })
+  if (!out.length && !already.length && left < 1) out.push({ kind: 'note', text: 'You’re at your net carb limit, so nothing to add today.' })
   return out
 }
 
@@ -356,14 +369,15 @@ export function areaAdvice(area: Area, view: AreaView, insight: AreaInsight): Ad
     const over = (insight.current ?? Infinity) > limit
     if (!over && three1 >= omegaIntakes(view.sex, view.age).three) return out
     // Foods you eat first, skipping any with so much omega-6 that they'd make the ratio worse.
-    const yours = richestFoods('omega3', 0.2, usual, (n) => (n.omega6 ?? 0) <= limit * (n.omega3 ?? 0))
+    const left = carbsLeft(view)
+    const yours = richestFoods('omega3', 0.2, usual, (n) => (n.omega6 ?? 0) <= limit * (n.omega3 ?? 0) && (n.netCarbs ?? 0) <= left)
     for (const f of yours) {
       const after = (six1 + (f.n.omega6 ?? 0)) / (three1 + (f.n.omega3 ?? 0))
-      out.push({ kind: 'add', text: f.text, effect: `+${fmtAmount(f.n.omega3 ?? 0, 'g')} omega-3, ratio goes to ${fmtAmount(after, ': 1')}` })
+      out.push({ kind: 'add', text: f.text, effect: `+${fmtAmount(f.n.omega3 ?? 0, 'g')} omega-3, ratio goes to ${fmtAmount(after, ': 1')}${carbNote(f.n.netCarbs ?? 0)}` })
     }
     const eaten = eatenNames(view)
-    const ideas = OMEGA3_IDEAS.filter((i) => !eaten.some((name) => i.match.test(name))).slice(0, Math.max(1, MAX_IDEAS - yours.length))
-    for (const i of ideas) out.push({ kind: 'add', text: i.text, effect: i.effect })
+    const ideas = OMEGA3_IDEAS.filter((i) => i.netCarbs <= left && !eaten.some((name) => i.match.test(name))).slice(0, Math.max(1, MAX_IDEAS - yours.length))
+    for (const i of ideas) out.push({ kind: 'add', text: i.text, effect: `${i.effect}${carbNote(i.netCarbs)}` })
     if (!over) return out
     // Then the foods giving the most omega-6.
     let named = false

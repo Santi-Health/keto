@@ -14,7 +14,7 @@ const log = (name: string, nutrients: LogEntry['nutrients'], daysAgo: number, fo
   id: String(id++), eaten_at: dayBefore(daysAgo).toISOString(), meal: 'dinner', food_id, food_name: name, amount: 1, unit: '1 serving', grams: 100, nutrients, meta: {}, updated_at: '', deleted_at: null,
 })
 const view = (logs: LogEntry[], history: LogEntry[], extra: Partial<AreaView> = {}): AreaView => ({
-  logs, weekLogs: logs, history: [...history, ...logs], foods: [], days: [TODAY], isToday: true, isWeek: false, tips: [], sex: 'male', age: 45, ...extra,
+  logs, weekLogs: logs, history: [...history, ...logs], foods: [], days: [TODAY], isToday: true, isWeek: false, tips: [], sex: 'male', age: 45, netCarbLimit: 25, ...extra,
 })
 const usualDays = (n: Record<string, number>, days = 10, name = 'Eggs') => Array.from({ length: days }, (_, i) => log(name, n, i + 1))
 
@@ -98,6 +98,15 @@ describe('areaAdvice', () => {
     expect(advice.find((a) => a.text.includes('Smoked salmon'))!.effect).toContain('ratio goes to 4.6:1')
   })
 
+  it('never swaps to a food with more net carbs than the one it replaces', () => {
+    const chips = food('chips', 'Pork rinds', { omega6: 8, omega3: 0.1, protein: 10, netCarbs: 0 })
+    const bar = food('bar', 'Oat bar', { omega6: 0.5, omega3: 0.1, protein: 10, netCarbs: 20 })
+    const logs = [log('Pork rinds', { fat: 20, omega6: 8, omega3: 0.1, protein: 10, netCarbs: 0 }, 0, 'chips')]
+    const v = view(logs, [log('Oat bar', {}, 1, 'bar')], { foods: [chips, bar] })
+    const area = watchArea(omegaItem(8, 0.1))
+    expect(areaAdvice(area, v, areaInsight(area, v)).some((a) => a.text.includes('Oat bar'))).toBe(false)
+  })
+
   it('offers a swap from your own foods and adds your best omega-3 food', () => {
     const mayo = food('mayo', 'Mayo', { omega6: 10, omega3: 0.1, protein: 0 })
     const oil = food('oil', 'Olive oil', { omega6: 1, omega3: 0.1, protein: 0 })
@@ -134,9 +143,26 @@ describe('areaAdvice', () => {
       const v = view([log('Eggs', { potassiumMg: 1000 }, 0)], eaten, { foods: [avocado] })
       const advice = advise(potassium, v)
       expect(advice[0].text).toContain('Avocado')
-      expect(advice[0].effect).toBe('+485 mg potassium, gets you to 1,485 mg of 4,000 mg')
+      expect(advice[0].effect).toBe('+485 mg potassium, gets you to 1,485 mg of 4,000 mg · 0 g net carbs')
       expect(advice.map((a) => a.text)).toContain('Try 1/2 cup cooked spinach')
       expect(advice.map((a) => a.text)).not.toContain('Try 1/2 avocado')
+    })
+
+    it('skips foods that would pass your net carb limit, and shows the carbs on the rest', () => {
+      const nuts = food('nut', 'Trail mix', { potassiumMg: 700, netCarbs: 30 })
+      const v = view([log('Eggs', { potassiumMg: 1000, netCarbs: 23 }, 0)], [log('Trail mix', {}, 1, 'nut')], { foods: [nuts] })
+      const advice = advise(potassium, v)
+      expect(advice.some((a) => a.text.includes('Trail mix'))).toBe(false)
+      expect(advice.map((a) => a.text)).toEqual(['Try 1/2 avocado', 'Try 1/2 cup cooked spinach', 'Try 3 oz sardines'])
+      expect(advice[0].effect).toBe('About +485 mg potassium · 1.8 g net carbs')
+    })
+
+    it('only suggests zero-carb foods at the limit, and says so when none help', () => {
+      const atLimit = view([log('Eggs', { potassiumMg: 1000, netCarbs: 25 }, 0)], [])
+      expect(advise(potassium, atLimit).map((a) => a.text)).toEqual(['Try 3 oz sardines', 'Try 3 oz salmon'])
+      const fiber = { ...AREAS.fiber, target: 25 }
+      const low = view([log('Eggs', { fiber: 1, netCarbs: 25 }, 0)], [])
+      expect(areaAdvice(fiber, low, areaInsight(fiber, low))[0].text).toContain('net carb limit')
     })
 
     it('stays quiet once you are close to the target', () => {

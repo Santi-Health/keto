@@ -221,7 +221,7 @@ export function Today({ profile, targets, onOpenSettings, onToggleRefeed, onNavi
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [view, logs, foods, targets, profile.muscleGoal, fatBudget, profile.sex, suggestWatch],
   )
-  const areaView: AreaView = { logs: dayLogs, weekLogs, history: logs, foods, days: viewDays, isToday, isWeek, tips, sex: profile.sex, age: targets.age }
+  const areaView: AreaView = { logs: dayLogs, weekLogs, history: logs, foods, days: viewDays, isToday, isWeek, tips, sex: profile.sex, age: targets.age, netCarbLimit: targets.netCarbsG }
   const [openArea, setOpenArea] = useState<string | null>(null)
   const potassiumArea = { ...AREAS.potassium, target: targets.potassiumMg }
   const magnesiumArea = { ...AREAS.magnesium, target: targets.magnesiumMg }

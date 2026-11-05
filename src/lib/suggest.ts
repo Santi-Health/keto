@@ -158,13 +158,13 @@ export function swapFor(entry: Pick<LogEntry, 'food_id' | 'food_name' | 'meal' |
   const pick = usual
     .filter((u) => u.food.id !== entry.food_id && u.meals.has(entry.meal))
     .map((u) => ({ u, n: per(u, u.usualSteps) }))
-    .filter((x) => x.n[key] != null && (x.n[key] as number) <= was / 2 && (x.n.protein ?? 0) >= protein * 0.6)
+    .filter((x) => x.n[key] != null && (x.n[key] as number) <= was / 2 && (x.n.protein ?? 0) >= protein * 0.6 && (x.n.netCarbs ?? 0) <= (entry.nutrients.netCarbs ?? 0))
     .sort((a, b) => (a.n[key] as number) - (b.n[key] as number))[0]
   if (!pick) return null
   const saved = was - (pick.n[key] as number)
   return {
     text: `Next time, swap ${entry.food_name} for ${amountText(pick.u, pick.u.usualSteps)} ${pick.u.food.name} at ${mealLabel(entry.meal)}`,
-    effect: `−${fmtN(saved)} ${unit} ${label}, protein ${Math.round(protein)} → ${Math.round(pick.n.protein ?? 0)} g`,
+    effect: `−${fmtN(saved)} ${unit} ${label}, protein ${Math.round(protein)} → ${Math.round(pick.n.protein ?? 0)} g · ${fmtN(pick.n.netCarbs ?? 0)} g net carbs`,
   }
 }
 
@@ -326,7 +326,7 @@ export function suggestFixes({ dayLogs, history, foods, targets, muscleGoal, fat
       text: p.meal
         ? `${add} ${amountText(p.u, p.steps)}${p.already ? ' more' : ''} ${p.u.food.name} ${p.already ? 'at' : 'to'} ${mealLabel(p.meal)}${would}`
         : `${add} ${amountText(p.u, p.steps)} ${p.u.food.name}${would}`,
-      effect: `${parts.join(' · ')} · +${kcal} kcal`,
+      effect: `${parts.join(' · ')} · +${kcal} kcal · ${fmtN(n.netCarbs ?? 0)} g net carbs`,
       warning: over.length ? `${past ? 'Would have put' : 'Puts'} you over ${over.map((c) => c.text).join(', ')}` : undefined,
     })
   }
@@ -362,14 +362,14 @@ export function suggestFixes({ dayLogs, history, foods, targets, muscleGoal, fat
     const swap = usual
       .filter((u) => u.food.id !== biggest.food_id && u.meals.has(meal))
       .map((u) => ({ u, n: per(u, u.usualSteps) }))
-      .filter((x) => (x.n[lim.key] ?? 0) < (old[lim.key] ?? 0) - over && (x.n.protein ?? 0) >= (old.protein ?? 0) * 0.6)
+      .filter((x) => (x.n[lim.key] ?? 0) < (old[lim.key] ?? 0) - over && (x.n.protein ?? 0) >= (old.protein ?? 0) * 0.6 && (x.n.netCarbs ?? 0) <= (old.netCarbs ?? 0))
       .sort((a, b) => (a.n[lim.key] ?? 0) - (b.n[lim.key] ?? 0))[0]
     if (swap) {
       out.push({
         kind: 'swap',
         goal: lim.goal,
         text: `${past ? 'Swapping' : 'Swap'} ${biggest.food_name} for ${amountText(swap.u, swap.u.usualSteps)} ${swap.u.food.name} at ${mealLabel(meal)}${would}`,
-        effect: `−${amt((old[lim.key] ?? 0) - (swap.n[lim.key] ?? 0))}, protein ${Math.round(old.protein ?? 0)} → ${Math.round(swap.n.protein ?? 0)} g`,
+        effect: `−${amt((old[lim.key] ?? 0) - (swap.n[lim.key] ?? 0))}, protein ${Math.round(old.protein ?? 0)} → ${Math.round(swap.n.protein ?? 0)} g · ${fmtN(swap.n.netCarbs ?? 0)} g net carbs`,
       })
     } else {
       out.push({
