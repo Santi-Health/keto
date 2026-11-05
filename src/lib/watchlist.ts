@@ -1,4 +1,4 @@
-import { addNutrients, type Nutrients } from './nutrients'
+import { addNutrients, type NutrientKey, type Nutrients } from './nutrients'
 
 /** FDA average mercury in fish and shellfish (ppm = µg per g), 1990–2012 monitoring. */
 export const MERCURY_PPM = {
@@ -299,4 +299,59 @@ export function computeWatchList(
       else if (limit == null && value) status = key === 'heavyMetal' ? 'near' : key === 'sweeteners' || key === 'ultraProcessed' ? 'caution' : 'info'
       return { key, label: def.label, unit: def.unit, period: def.period, value, limit, status, guidance: def.guidance }
     })
+}
+
+// --- What's behind each item ---------------------------------------------------------------
+
+/** The nutrients behind each item; the omega ratio has two. */
+const WATCH_PARTS: Record<WatchKey, { key: NutrientKey; label: string; unit: string }[]> = {
+  satFat: [{ key: 'satFat', label: 'Saturated fat', unit: 'g' }],
+  transFat: [{ key: 'transFat', label: 'Trans fat', unit: 'g' }],
+  addedSugars: [{ key: 'addedSugars', label: 'Added sugar', unit: 'g' }],
+  cholesterol: [{ key: 'cholesterolMg', label: 'Cholesterol', unit: 'mg' }],
+  omegaRatio: [
+    { key: 'omega6', label: 'Omega-6', unit: 'g' },
+    { key: 'omega3', label: 'Omega-3', unit: 'g' },
+  ],
+  mercury: [{ key: 'mercuryUg', label: 'Mercury', unit: 'µg' }],
+  retinol: [{ key: 'retinolUg', label: 'Vitamin A (retinol)', unit: 'µg' }],
+  heavyMetal: [{ key: 'heavyMetalServings', label: 'Lead/cadmium risk foods', unit: 'servings' }],
+  alcohol: [{ key: 'alcohol', label: 'Alcohol', unit: 'g' }],
+  caffeine: [{ key: 'caffeineMg', label: 'Caffeine', unit: 'mg' }],
+  sweeteners: [{ key: 'sweetenerServings', label: 'Artificial sweeteners', unit: 'servings' }],
+  ultraProcessed: [{ key: 'ultraProcessedServings', label: 'Ultra-processed foods', unit: 'servings' }],
+  sodiumHigh: [{ key: 'sodiumMg', label: 'Sodium', unit: 'mg' }],
+}
+
+/** Fats labels and databases often leave out, so a fatty food without them can hide part of the total. */
+const OFTEN_MISSING = new Set<WatchKey>(['omegaRatio', 'satFat', 'transFat'])
+const FATTY_G = 1
+
+export interface WatchPart {
+  label: string
+  unit: string
+  total: number
+  /** Each food once (repeat logs added up), biggest first. */
+  foods: { name: string; amount: number; pct: number }[]
+  /** Fatty foods logged with no value for this, so they count as 0. */
+  missing: string[]
+}
+
+type WatchLog = { food_name: string; nutrients: Nutrients }
+
+export function watchBreakdown(key: WatchKey, logs: WatchLog[]): WatchPart[] {
+  return WATCH_PARTS[key].map((part) => {
+    const byFood = new Map<string, number>()
+    const missing = new Set<string>()
+    for (const l of logs) {
+      const v = l.nutrients[part.key]
+      if (v) byFood.set(l.food_name, (byFood.get(l.food_name) ?? 0) + v)
+      else if (v == null && OFTEN_MISSING.has(key) && (l.nutrients.fat ?? 0) >= FATTY_G) missing.add(l.food_name)
+    }
+    const total = [...byFood.values()].reduce((a, b) => a + b, 0)
+    const foods = [...byFood]
+      .map(([name, amount]) => ({ name, amount, pct: Math.round((amount / total) * 100) }))
+      .sort((a, b) => b.amount - a.amount)
+    return { label: part.label, unit: part.unit, total, foods, missing: [...missing].filter((n) => !byFood.has(n)) }
+  })
 }

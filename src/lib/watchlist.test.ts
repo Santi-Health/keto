@@ -4,6 +4,7 @@ import {
   detectFishSpecies,
   detectHeavyMetalRisk,
   detectSweeteners,
+  watchBreakdown,
 } from './watchlist'
 
 describe('detectFishSpecies', () => {
@@ -69,5 +70,41 @@ describe('computeWatchList', () => {
     expect(w.find((i) => i.key === 'sweeteners')!.status).toBe('caution')
     expect(w.find((i) => i.key === 'ultraProcessed')!.status).toBe('caution')
     expect(computeWatchList([{}], [], { calorieTarget: 2000, weightKg: 68 }).find((i) => i.key === 'sweeteners')!.status).toBe('info')
+  })
+})
+
+describe('watchBreakdown', () => {
+  const log = (food_name: string, nutrients: Record<string, number>) => ({ food_name, nutrients })
+
+  it('splits the omega ratio into each side, biggest food first', () => {
+    const [six, three] = watchBreakdown('omegaRatio', [
+      log('Almonds', { fat: 14, omega6: 3, omega3: 0 }),
+      log('Mayo', { fat: 10, omega6: 5, omega3: 0.5 }),
+      log('Salmon', { fat: 12, omega6: 0.2, omega3: 2 }),
+    ])
+    expect(six.label).toBe('Omega-6')
+    expect(six.foods.map((f) => f.name)).toEqual(['Mayo', 'Almonds', 'Salmon'])
+    expect(six.total).toBeCloseTo(8.2, 1)
+    expect(three.foods.map((f) => f.name)).toEqual(['Salmon', 'Mayo'])
+    expect(three.foods[0].pct).toBe(80)
+  })
+
+  it('adds up repeat logs of a food', () => {
+    const [part] = watchBreakdown('caffeine', [log('Coke Zero', { caffeineMg: 34 }), log('Coke Zero', { caffeineMg: 34 })])
+    expect(part.foods).toEqual([{ name: 'Coke Zero', amount: 68, pct: 100 }])
+  })
+
+  it('names fatty foods with no omega data, but not lean ones or ones that have it', () => {
+    const [six] = watchBreakdown('omegaRatio', [
+      log('Label bar', { fat: 12 }),
+      log('Mate cocido', { fat: 0.2 }),
+      log('Eggs', { fat: 10, omega6: 1 }),
+      log('Butter', { fat: 11, omega6: 0 }),
+    ])
+    expect(six.missing).toEqual(['Label bar'])
+  })
+
+  it('does not call a food missing for items where blank means none', () => {
+    expect(watchBreakdown('mercury', [log('Steak', { fat: 20 })])[0].missing).toEqual([])
   })
 })

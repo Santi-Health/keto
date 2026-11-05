@@ -474,7 +474,7 @@ export function Today({ profile, targets, onOpenSettings, onToggleRefeed, onNavi
 
           {!isWeek && <AminoCard logs={dayLogs} weightKg={profile.weightKg} goal={profile.muscleGoal} />}
 
-          <WatchListCard items={watch} period={isToday ? 'today' : isWeek ? 'on an average day' : 'yesterday'} />
+          <WatchListCard items={watch} logs={dayLogs} weekLogs={weekLogs} isWeek={isWeek} period={isToday ? 'today' : isWeek ? 'on an average day' : 'yesterday'} />
 
           <section className="card">
             <div className="ketosis-head">
