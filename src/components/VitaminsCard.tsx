@@ -35,7 +35,7 @@ export function VitaminsCard({ total, items, sex, age, week, view }: Props) {
         </p>
       )}
       {shown.map((s) => {
-        const area = microArea(s.micro)
+        const area = microArea(s.micro, s.target)
         return (
           <div key={s.micro.key}>
             <Tap area={area} view={view} open={open === area.id} onToggle={() => setOpen(open === area.id ? null : area.id)}>

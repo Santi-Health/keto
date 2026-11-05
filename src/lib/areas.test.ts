@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { AREAS, areaAdvice, areaInsight, omegaVerdict, watchArea, type AreaView } from './areas'
+import { AREAS, areaAdvice, areaInsight, microArea, omegaVerdict, watchArea, type AreaView } from './areas'
 import type { Food, LogEntry } from './foods'
+import { MICROS } from './micros'
 import { computeWatchList } from './watchlist'
 
 const TODAY = '2026-11-05'
@@ -121,6 +122,34 @@ describe('areaAdvice', () => {
     const item = computeWatchList([{ caffeineMg: 100 }], [], ctx).find((i) => i.key === 'caffeine')!
     const v = view(logs, usualDays({ caffeineMg: 100 }))
     expect(areaAdvice(watchArea(item), v, areaInsight(watchArea(item), v))).toEqual([])
+  })
+
+  describe('when an area runs low', () => {
+    const potassium = { ...AREAS.potassium, target: 4000 }
+    const advise = (area: typeof potassium, v: AreaView) => areaAdvice(area, v, areaInsight(area, v))
+    const avocado = food('avo', 'Avocado', { potassiumMg: 485, kcal: 160 })
+    const eaten = [log('Avocado', {}, 1, 'avo')]
+
+    it('names your own food with what it gets you to, then foods to try', () => {
+      const v = view([log('Eggs', { potassiumMg: 1000 }, 0)], eaten, { foods: [avocado] })
+      const advice = advise(potassium, v)
+      expect(advice[0].text).toContain('Avocado')
+      expect(advice[0].effect).toBe('+485 mg potassium, gets you to 1,485 mg of 4,000 mg')
+      expect(advice.map((a) => a.text)).toContain('Try 1/2 cup cooked spinach')
+      expect(advice.map((a) => a.text)).not.toContain('Try 1/2 avocado')
+    })
+
+    it('stays quiet once you are close to the target', () => {
+      expect(advise(potassium, view([log('Eggs', { potassiumMg: 3800 }, 0)], []))).toEqual([])
+    })
+
+    it('does not call a vitamin low when the foods just have no vitamin data', () => {
+      const micro = microArea(MICROS.find((m) => m.key === 'vitCMg')!, 90)
+      const noData = view([log('Label bar', { kcal: 200 }, 0)], [])
+      expect(areaAdvice(micro, noData, areaInsight(micro, noData))[0].kind).toBe('note')
+      const withData = view([log('Eggs', { kcal: 200, vitCMg: 5 }, 0)], [])
+      expect(areaAdvice(micro, withData, areaInsight(micro, withData)).map((a) => a.text)).toContain('Try 1/2 cup red bell pepper')
+    })
   })
 
   it('files a suggestion under every area it helps', () => {

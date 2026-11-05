@@ -1,5 +1,5 @@
 import type { Food, LogEntry } from './foods'
-import type { Micro } from './micros'
+import { vitaminCoverage, type Micro } from './micros'
 import { addNutrients, type NutrientKey, type Nutrients } from './nutrients'
 import { richestFoods, swapFor, usualFoods, type Suggestion } from './suggest'
 import { entryDay } from './time'
@@ -39,6 +39,10 @@ export interface Area {
   /** Near or over its limit, so it's worth advice. */
   flagged?: boolean
   limit?: number | null
+  /** The daily amount to reach, for areas where low is the problem. */
+  target?: number
+  /** A vitamin or trace mineral, where low can just mean missing data. */
+  micro?: boolean
 }
 
 const nutrientArea = (key: NutrientKey, label: string, unit: string, better: Area['better'], goals: string[], why: string): Area => ({
@@ -63,7 +67,7 @@ export const AREAS = {
   fiber: nutrientArea('fiber', 'Fiber', 'g', 'higher', ['fiber'], 'Keeps digestion regular on low carb.'),
 }
 
-export const microArea = (m: Micro): Area => nutrientArea(m.key, m.label, m.unit, 'higher', [m.key], m.why)
+export const microArea = (m: Micro, target: number): Area => ({ ...nutrientArea(m.key, m.label, m.unit, 'higher', [m.key], m.why), target, micro: true })
 
 export const watchArea = (item: WatchItem): Area => ({
   id: item.key,
@@ -232,6 +236,47 @@ const OMEGA3_IDEAS: { match: RegExp; text: string; effect: string }[] = [
 ]
 const MAX_IDEAS = 3
 
+const IDEA = {
+  avocado: { match: /avocado/i, text: 'Try 1/2 avocado' },
+  spinach: { match: /spinach/i, text: 'Try 1/2 cup cooked spinach' },
+  broccoli: { match: /broccoli/i, text: 'Try 1/2 cup cooked broccoli' },
+  salmon: { match: /salmon/i, text: 'Try 3 oz salmon' },
+  sardines: { match: /sardine/i, text: 'Try 3 oz sardines' },
+  pumpkinSeeds: { match: /pumpkin seed|pepita/i, text: 'Try 1 oz pumpkin seeds' },
+  chia: { match: /chia/i, text: 'Try 1 tbsp chia seeds' },
+  redPepper: { match: /red (bell )?pepper/i, text: 'Try 1/2 cup red bell pepper' },
+  egg: { match: /\beggs?\b(?! white)/i, text: 'Try 1 egg' },
+  sirloin: { match: /sirloin|steak/i, text: 'Try 3 oz sirloin' },
+  porkChop: { match: /pork/i, text: 'Try a 3 oz pork chop' },
+}
+
+/** Keto-friendly foods for each area and how much that portion gives, mostly USDA amounts. */
+const FOOD_IDEAS: Partial<Record<NutrientKey, [keyof typeof IDEA, number][]>> = {
+  potassiumMg: [['avocado', 485], ['spinach', 419], ['sardines', 337], ['salmon', 326]],
+  magnesiumMg: [['pumpkinSeeds', 166], ['spinach', 78], ['sardines', 33]],
+  fiber: [['avocado', 6.7], ['chia', 4.1], ['broccoli', 2.6]],
+  vitDUg: [['salmon', 11], ['sardines', 4]],
+  b12Ug: [['sardines', 7.6], ['salmon', 2.4]],
+  folateUg: [['spinach', 131], ['broccoli', 84], ['avocado', 81]],
+  vitCMg: [['redPepper', 95], ['broccoli', 51]],
+  vitKUg: [['spinach', 445], ['broccoli', 110]],
+  vitAUg: [['spinach', 472], ['broccoli', 60]],
+  vitEMg: [['avocado', 2.1], ['spinach', 1.9]],
+  thiaminMg: [['porkChop', 0.5], ['salmon', 0.3]],
+  b6Mg: [['salmon', 0.55], ['avocado', 0.26]],
+  zincMg: [['sirloin', 5], ['pumpkinSeeds', 2.2]],
+  seleniumUg: [['sardines', 45], ['salmon', 35], ['egg', 15]],
+  cholineMg: [['egg', 147], ['salmon', 77]],
+  calciumMg: [['sardines', 325], ['spinach', 122]],
+  ironMg: [['spinach', 3.2], ['sirloin', 2.9], ['pumpkinSeeds', 2.5]],
+}
+/** Under this share of the target counts as low. */
+const LOW_SHARE = 0.9
+/** A food has to cover this much of the target to be worth naming. */
+const WORTHWHILE_SHARE = 0.05
+/** Vitamins are only called low once most of the day's calories have vitamin data. */
+const MIN_VITAMIN_COVERAGE = 70
+
 /** Better picks for foods high in omega-6, for when you don't already eat one. */
 const OMEGA6_SWAPS: [RegExp, string][] = [
   [/almond|walnut|pecan|peanut|cashew|pistachio|hazelnut|brazil nut|sunflower seed|pumpkin seed|pepita|mixed nuts/i, 'macadamias, about 0.4 g omega-6 in 1 oz'],
@@ -265,8 +310,30 @@ const tipsFor = (tips: Suggestion[], goals: string[]) => tips.filter((t) => goal
 
 export const hasTip = (area: Area, view: AreaView) => tipsFor(view.tips, area.goals).length > 0
 
+const eatenNames = (view: AreaView) => view.foods.map((f) => f.name).filter((name) => view.history.some((l) => l.food_name === name))
+
+/** Foods you eat, then foods you could try, for an area that's running low. */
+function lowAdvice(area: Area, view: AreaView, current: number, already: Advice[]): Advice[] {
+  const target = area.target!
+  if (current >= target * LOW_SHARE) return []
+  if (area.micro && vitaminCoverage(view.logs.map((l) => l.nutrients)) < MIN_VITAMIN_COVERAGE)
+    return [{ kind: 'note', text: 'Too many of these foods have no vitamin data yet to say this is low.' }]
+  const key = area.parts[0].key
+  const name = area.micro ? area.label : area.label.toLowerCase()
+  const yours = richestFoods(key, target * WORTHWHILE_SHARE, usualFoods(view.foods, view.history)).filter((f) => !already.some((a) => a.text.includes(f.name)))
+  const out: Advice[] = yours.map((f) => {
+    const gain = f.n[key] as number
+    return { kind: 'add', text: f.text, effect: `+${fmtAmount(gain, area.unit)} ${name}, gets you to ${fmtAmount(current + gain, area.unit)} of ${fmtAmount(target, area.unit)}` }
+  })
+  const eaten = eatenNames(view)
+  const ideas = (FOOD_IDEAS[key] ?? []).filter(([idea]) => !eaten.some((n) => IDEA[idea].match.test(n))).slice(0, Math.max(1, MAX_IDEAS - yours.length))
+  for (const [idea, amount] of ideas) out.push({ kind: 'add', text: IDEA[idea].text, effect: `About +${fmtAmount(amount, area.unit)} ${name}` })
+  return out
+}
+
 export function areaAdvice(area: Area, view: AreaView, insight: AreaInsight): Advice[] {
   const out: Advice[] = [...tipsFor(view.tips, area.goals)]
+  if (area.target != null) out.push(...lowAdvice(area, view, insight.current ?? 0, out))
   const key = area.watchKey
   // No omega-3 logged means no ratio to flag, but it's the case that most needs help.
   const noOmega3 = key === 'omegaRatio' && insight.current == null && insight.parts[0].total > 0
@@ -294,7 +361,7 @@ export function areaAdvice(area: Area, view: AreaView, insight: AreaInsight): Ad
       const after = (six1 + (f.n.omega6 ?? 0)) / (three1 + (f.n.omega3 ?? 0))
       out.push({ kind: 'add', text: f.text, effect: `+${fmtAmount(f.n.omega3 ?? 0, 'g')} omega-3, ratio goes to ${fmtAmount(after, ': 1')}` })
     }
-    const eaten = view.foods.map((f) => f.name).filter((name) => view.history.some((l) => l.food_name === name))
+    const eaten = eatenNames(view)
     const ideas = OMEGA3_IDEAS.filter((i) => !eaten.some((name) => i.match.test(name))).slice(0, Math.max(1, MAX_IDEAS - yours.length))
     for (const i of ideas) out.push({ kind: 'add', text: i.text, effect: i.effect })
     if (!over) return out

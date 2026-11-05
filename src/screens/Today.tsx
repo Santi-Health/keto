@@ -223,6 +223,9 @@ export function Today({ profile, targets, onOpenSettings, onToggleRefeed, onNavi
   )
   const areaView: AreaView = { logs: dayLogs, weekLogs, history: logs, foods, days: viewDays, isToday, isWeek, tips, sex: profile.sex, age: targets.age }
   const [openArea, setOpenArea] = useState<string | null>(null)
+  const potassiumArea = { ...AREAS.potassium, target: targets.potassiumMg }
+  const magnesiumArea = { ...AREAS.magnesium, target: targets.magnesiumMg }
+  const fiberArea = { ...AREAS.fiber, target: targets.fiberG }
   const tap = (area: Area, child: ReactNode) => (
     <Tap area={area} view={areaView} open={openArea === area.id} onToggle={() => setOpenArea(openArea === area.id ? null : area.id)}>
       {child}
@@ -347,7 +350,7 @@ export function Today({ profile, targets, onOpenSettings, onToggleRefeed, onNavi
             </div>
             {dayLogs.length > 0 && (
               <p className="muted small" style={{ margin: '4px 0 0' }}>
-                Tap anything to see the foods behind it, your usual and what to change. A green dot means there’s a suggestion.
+                Tap anything to see the foods behind it, your usual and what to change. A green dot marks the top suggestions for today.
                 {showDeficit && (
                   <>
                     {' '}
@@ -443,12 +446,12 @@ export function Today({ profile, targets, onOpenSettings, onToggleRefeed, onNavi
             <h2>Electrolytes &amp; fiber</h2>
             {tap(AREAS.sodium, <Bar label="Sodium" value={totals.sodium} target={targets.sodiumMg * mult} unit="mg" molecule="sodium" color="var(--atom-na)" />)}
             {detail(AREAS.sodium)}
-            {tap(AREAS.potassium, <Bar label="Potassium" value={totals.potassium} target={targets.potassiumMg * mult} unit="mg" molecule="potassium" color="var(--atom-k)" />)}
-            {detail(AREAS.potassium)}
-            {tap(AREAS.magnesium, <Bar label="Magnesium" value={totals.magnesium} target={targets.magnesiumMg * mult} unit="mg" molecule="magnesium" color="var(--atom-mg)" />)}
-            {detail(AREAS.magnesium)}
-            {tap(AREAS.fiber, <Bar label="Fiber" value={totals.fiber} target={targets.fiberG * mult} unit="g" molecule="fiber" color="var(--fiber)" />)}
-            {detail(AREAS.fiber)}
+            {tap(potassiumArea, <Bar label="Potassium" value={totals.potassium} target={targets.potassiumMg * mult} unit="mg" molecule="potassium" color="var(--atom-k)" />)}
+            {detail(potassiumArea)}
+            {tap(magnesiumArea, <Bar label="Magnesium" value={totals.magnesium} target={targets.magnesiumMg * mult} unit="mg" molecule="magnesium" color="var(--atom-mg)" />)}
+            {detail(magnesiumArea)}
+            {tap(fiberArea, <Bar label="Fiber" value={totals.fiber} target={targets.fiberG * mult} unit="g" molecule="fiber" color="var(--fiber)" />)}
+            {detail(fiberArea)}
           </section>
 
           <VitaminsCard total={n as Nutrients} items={dayLogs.map((l) => l.nutrients)} sex={profile.sex} age={targets.age} week={isWeek} view={areaView} />
