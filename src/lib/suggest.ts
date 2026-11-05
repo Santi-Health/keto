@@ -41,6 +41,8 @@ export interface Suggestion {
   effect: string
   /** What it fixes, for grouping: leucine, protein, fiber, potassium, magnesium, netCarbs, calories, fat. */
   goal: string
+  /** Other goals an addition also closes a real part of. */
+  helps?: string[]
   /** A limit it would push you past, when no food could close the gap without that. */
   warning?: string
 }
@@ -147,6 +149,32 @@ function bestAddition(usual: UsualFood[], key: keyof Nutrients, need: number, me
   return best ?? bestPartial
   }
   return pick(true) ?? pick(false)
+}
+
+/** A food you eat at that meal with at most half as much of `key`, known for sure, and similar protein. */
+export function swapFor(entry: Pick<LogEntry, 'food_id' | 'food_name' | 'meal' | 'nutrients'>, key: keyof Nutrients, unit: string, label: string, usual: UsualFood[]): Pick<Suggestion, 'text' | 'effect'> | null {
+  const was = (entry.nutrients[key] as number) ?? 0
+  const protein = entry.nutrients.protein ?? 0
+  const pick = usual
+    .filter((u) => u.food.id !== entry.food_id && u.meals.has(entry.meal))
+    .map((u) => ({ u, n: per(u, u.usualSteps) }))
+    .filter((x) => x.n[key] != null && (x.n[key] as number) <= was / 2 && (x.n.protein ?? 0) >= protein * 0.6)
+    .sort((a, b) => (a.n[key] as number) - (b.n[key] as number))[0]
+  if (!pick) return null
+  const saved = was - (pick.n[key] as number)
+  return {
+    text: `Next time, swap ${entry.food_name} for ${amountText(pick.u, pick.u.usualSteps)} ${pick.u.food.name} at ${mealLabel(entry.meal)}`,
+    effect: `−${fmtN(saved)} ${unit} ${label}, protein ${Math.round(protein)} → ${Math.round(pick.n.protein ?? 0)} g`,
+  }
+}
+
+/** The food you already eat with the most of `key` in your usual portion, when that's at least `min`. */
+export function richestFood(key: keyof Nutrients, unit: string, label: string, min: number, usual: UsualFood[]): Pick<Suggestion, 'text' | 'effect'> | null {
+  const best = usual
+    .map((u) => ({ u, v: (per(u, u.usualSteps)[key] as number) ?? 0 }))
+    .filter((x) => x.v >= min)
+    .sort((a, b) => b.v - a.v)[0]
+  return best ? { text: `Add ${amountText(best.u, best.u.usualSteps)} ${best.u.food.name}`, effect: `+${fmtN(best.v)} ${unit} ${label}` } : null
 }
 
 export interface SuggestInput {
@@ -293,6 +321,7 @@ export function suggestFixes({ dayLogs, history, foods, targets, muscleGoal, fat
     out.push({
       kind: 'add',
       goal: p.goals[0].goal,
+      helps: [...new Set([...p.goals, ...helps].map((g) => g.goal))],
       text: p.meal
         ? `${add} ${amountText(p.u, p.steps)}${p.already ? ' more' : ''} ${p.u.food.name} ${p.already ? 'at' : 'to'} ${mealLabel(p.meal)}${would}`
         : `${add} ${amountText(p.u, p.steps)} ${p.u.food.name}${would}`,

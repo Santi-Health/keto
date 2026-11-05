@@ -894,6 +894,29 @@ input[type='range'] {
   font-weight: 600;
 }
 
+.tap {
+  position: relative;
+  display: block;
+  width: 100%;
+  padding: 0;
+  background: none;
+  border: 0;
+  color: inherit;
+  text-align: inherit;
+  cursor: pointer;
+}
+
+.tap.has-tip::before {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: -2px;
+  width: 8px;
+  height: 8px;
+  border-radius: 99px;
+  background: var(--accent);
+}
+
 .watch-food {
   display: flex;
   justify-content: space-between;

@@ -1,54 +1,9 @@
 import { useState } from 'react'
-import { unshout } from '../lib/quickFoods'
-import { watchBreakdown, type WatchItem } from '../lib/watchlist'
-import type { LogEntry } from '../lib/foods'
+import { watchArea, type AreaView } from '../lib/areas'
+import type { WatchItem } from '../lib/watchlist'
+import { AreaDetail } from './AreaDetail'
 
 const fmt = (n: number) => n.toLocaleString(undefined, { maximumFractionDigits: n < 10 ? 1 : 0 })
-
-/** Longer lists (mostly the 7-day view) stop here and add up the rest. */
-const MAX_FOODS = 8
-
-/** Grams keep a decimal, so the two sides of the omega ratio can be checked against it. */
-const fmtAmount = (n: number, unit: string) => `${n.toLocaleString(undefined, { maximumFractionDigits: unit === 'g' || n < 10 ? 1 : 0 })} ${unit}`
-
-function WatchDetail({ item, logs, scope }: { item: WatchItem; logs: LogEntry[]; scope: string }) {
-  const parts = watchBreakdown(item.key, logs)
-  const missing = [...new Set(parts.flatMap((p) => p.missing))]
-  return (
-    <div className="watch-detail">
-      <div className="muted">{item.guidance}</div>
-      {parts.map((p) => {
-        const rest = p.foods.slice(MAX_FOODS)
-        return (
-          <div key={p.label}>
-            <h3>
-              <span>
-                {p.label} {scope}
-              </span>
-              <span>{fmtAmount(p.total, p.unit)}</span>
-            </h3>
-            {p.foods.length === 0 && <div className="muted">Nothing logged has any.</div>}
-            {p.foods.slice(0, MAX_FOODS).map((f) => (
-              <div key={f.name} className="watch-food">
-                <span>{unshout(f.name)}</span>
-                <span className="muted">
-                  {fmtAmount(f.amount, p.unit)} · {f.pct}%
-                </span>
-              </div>
-            ))}
-            {rest.length > 0 && (
-              <div className="watch-food muted">
-                <span>{rest.length} more</span>
-                <span>{fmtAmount(rest.reduce((a, f) => a + f.amount, 0), p.unit)}</span>
-              </div>
-            )}
-          </div>
-        )
-      })}
-      {missing.length > 0 && <p className="muted small" style={{ margin: '8px 0 0' }}>No data, so counted as 0: {missing.map(unshout).join(', ')}.</p>}
-    </div>
-  )
-}
 
 function WatchRow({ item, open, onToggle }: { item: WatchItem; open: boolean; onToggle: () => void }) {
   const value = item.value == null ? '—' : fmt(item.value)
@@ -75,16 +30,12 @@ function WatchRow({ item, open, onToggle }: { item: WatchItem; open: boolean; on
 
 interface Props {
   items: WatchItem[]
-  /** Logs of the day or days on screen. */
-  logs: LogEntry[]
-  /** The last 7 days, for items counted by the week. */
-  weekLogs: LogEntry[]
-  isWeek: boolean
+  view: AreaView
   period?: string
 }
 
-/** Quiet when everything is fine; lists anything near or over its limit. Tap an item to see the foods behind it. */
-export function WatchListCard({ items, logs, weekLogs, isWeek, period = 'today' }: Props) {
+/** Quiet when everything is fine; lists anything near or over its limit. Tap an item to see the foods behind it and what to change. */
+export function WatchListCard({ items, view, period = 'today' }: Props) {
   const [showAll, setShowAll] = useState(false)
   const [openKey, setOpenKey] = useState<string | null>(null)
   const flagged = items.filter((i) => i.status === 'near' || i.status === 'over' || i.status === 'caution')
@@ -101,9 +52,7 @@ export function WatchListCard({ items, logs, weekLogs, isWeek, period = 'today' 
         shown.map((i) => (
           <div key={i.key} className="watch-item">
             <WatchRow item={i} open={openKey === i.key} onToggle={() => setOpenKey(openKey === i.key ? null : i.key)} />
-            {openKey === i.key && (
-              <WatchDetail item={i} logs={i.period === 'week' ? weekLogs : logs} scope={i.period === 'week' || isWeek ? 'over 7 days' : period} />
-            )}
+            {openKey === i.key && <AreaDetail area={watchArea(i)} view={view} />}
           </div>
         ))
       ) : (

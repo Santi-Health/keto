@@ -304,7 +304,13 @@ export function computeWatchList(
 // --- What's behind each item ---------------------------------------------------------------
 
 /** The nutrients behind each item; the omega ratio has two. */
-const WATCH_PARTS: Record<WatchKey, { key: NutrientKey; label: string; unit: string }[]> = {
+export interface WatchPartSpec {
+  key: NutrientKey
+  label: string
+  unit: string
+}
+
+export const WATCH_PARTS: Record<WatchKey, WatchPartSpec[]> = {
   satFat: [{ key: 'satFat', label: 'Saturated fat', unit: 'g' }],
   transFat: [{ key: 'transFat', label: 'Trans fat', unit: 'g' }],
   addedSugars: [{ key: 'addedSugars', label: 'Added sugar', unit: 'g' }],
@@ -324,7 +330,7 @@ const WATCH_PARTS: Record<WatchKey, { key: NutrientKey; label: string; unit: str
 }
 
 /** Fats labels and databases often leave out, so a fatty food without them can hide part of the total. */
-const OFTEN_MISSING = new Set<WatchKey>(['omegaRatio', 'satFat', 'transFat'])
+export const OFTEN_MISSING = new Set<WatchKey>(['omegaRatio', 'satFat', 'transFat'])
 const FATTY_G = 1
 
 export interface WatchPart {
@@ -339,19 +345,22 @@ export interface WatchPart {
 
 type WatchLog = { food_name: string; nutrients: Nutrients }
 
+/** Which foods gave this nutrient. flagMissing: also name fatty foods with no value for it. */
+export function foodBreakdown(part: WatchPartSpec, logs: WatchLog[], flagMissing = false): WatchPart {
+  const byFood = new Map<string, number>()
+  const missing = new Set<string>()
+  for (const l of logs) {
+    const v = l.nutrients[part.key]
+    if (v) byFood.set(l.food_name, (byFood.get(l.food_name) ?? 0) + v)
+    else if (v == null && flagMissing && (l.nutrients.fat ?? 0) >= FATTY_G) missing.add(l.food_name)
+  }
+  const total = [...byFood.values()].reduce((a, b) => a + b, 0)
+  const foods = [...byFood]
+    .map(([name, amount]) => ({ name, amount, pct: Math.round((amount / total) * 100) }))
+    .sort((a, b) => b.amount - a.amount)
+  return { label: part.label, unit: part.unit, total, foods, missing: [...missing].filter((n) => !byFood.has(n)) }
+}
+
 export function watchBreakdown(key: WatchKey, logs: WatchLog[]): WatchPart[] {
-  return WATCH_PARTS[key].map((part) => {
-    const byFood = new Map<string, number>()
-    const missing = new Set<string>()
-    for (const l of logs) {
-      const v = l.nutrients[part.key]
-      if (v) byFood.set(l.food_name, (byFood.get(l.food_name) ?? 0) + v)
-      else if (v == null && OFTEN_MISSING.has(key) && (l.nutrients.fat ?? 0) >= FATTY_G) missing.add(l.food_name)
-    }
-    const total = [...byFood.values()].reduce((a, b) => a + b, 0)
-    const foods = [...byFood]
-      .map(([name, amount]) => ({ name, amount, pct: Math.round((amount / total) * 100) }))
-      .sort((a, b) => b.amount - a.amount)
-    return { label: part.label, unit: part.unit, total, foods, missing: [...missing].filter((n) => !byFood.has(n)) }
-  })
+  return WATCH_PARTS[key].map((part) => foodBreakdown(part, logs, OFTEN_MISSING.has(key)))
 }

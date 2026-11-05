@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, type ReactNode } from 'react'
 import { daysSinceStrength, routineDue, routineSession, sessionLabel, trainingWarnings } from '../lib/exercise'
 import { catchUpDays, mergeActivity, weightReadings } from '../lib/activity'
 import { DRIVE_SCOPE, cachedToken, fetchActivity, getGoogleToken, heartRateCalories, learnTypes, listExercises, mergeImported, toAppExercise } from '../lib/googleHealth'
@@ -7,7 +7,7 @@ import { STATUS_TEXT, estimateKetosis, tomorrowMorning } from '../lib/ketosis'
 import { AminoCard } from '../components/AminoCard'
 import { ActivityCard, MorningReadiness, useMorningReadiness } from '../components/ActivityCard'
 import { RelinkBanner } from '../components/BackgroundSyncCard'
-import { SuggestionsCard } from '../components/SuggestionsCard'
+import { AreaDetail, Tap } from '../components/AreaDetail'
 import { VitaminsCard } from '../components/VitaminsCard'
 import { useOpenSyncState } from '../lib/backgroundSync'
 import { deviceTz, travelDay, zoneLabel } from '../lib/time'
@@ -25,6 +25,8 @@ import { useData } from '../lib/data'
 import { addNutrients, type NutrientKey, type Nutrients } from '../lib/nutrients'
 import { liveFatBudget, localDate, type Targets } from '../lib/targets'
 import type { Profile } from '../lib/types'
+import { AREAS, type Area, type AreaView } from '../lib/areas'
+import { suggestFixes } from '../lib/suggest'
 import { computeWatchList } from '../lib/watchlist'
 import { KG_PER_LB, ketoneBand, latest, type ReadingKind } from '../lib/readings'
 import { useKetoModel } from '../lib/useKetoModel'
@@ -56,7 +58,7 @@ function useInstallOffer() {
 }
 
 export function Today({ profile, targets, onOpenSettings, onToggleRefeed, onNavigate, onUpdateProfile }: Props) {
-  const { logsOn, logsWeekEnding, pending, syncError, exercises, exercisesOn, saveExercise, logs, readings, activity, saveActivity, saveReading, cgmDays } = useData()
+  const { logsOn, logsWeekEnding, pending, syncError, exercises, exercisesOn, saveExercise, logs, foods, readings, activity, saveActivity, saveReading, cgmDays } = useData()
   const [view, setView] = useState<View>('today')
   const openSync = useOpenSyncState()
   const backup = useBackup(profile, onUpdateProfile)
@@ -214,6 +216,19 @@ export function Today({ profile, targets, onOpenSettings, onToggleRefeed, onNavi
     () => ({ ctx: { calorieTarget: targets.calories, weightKg: profile.weightKg }, settings: profile.watchList, weekItems: weekLogs.filter((l) => !dayLogs.includes(l)).map((l) => l.nutrients) }),
     [targets.calories, profile.weightKg, profile.watchList, weekLogs, dayLogs],
   )
+  const tips = useMemo(
+    () => (isWeek ? [] : suggestFixes({ dayLogs, history: logs, foods, targets, muscleGoal: profile.muscleGoal, fatBudget, past: !isToday, sex: profile.sex, watch: suggestWatch })),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [view, logs, foods, targets, profile.muscleGoal, fatBudget, profile.sex, suggestWatch],
+  )
+  const areaView: AreaView = { logs: dayLogs, weekLogs, history: logs, foods, days: viewDays, isToday, isWeek, tips, sex: profile.sex, age: targets.age }
+  const [openArea, setOpenArea] = useState<string | null>(null)
+  const tap = (area: Area, child: ReactNode) => (
+    <Tap area={area} view={areaView} open={openArea === area.id} onToggle={() => setOpenArea(openArea === area.id ? null : area.id)}>
+      {child}
+    </Tap>
+  )
+  const detail = (...areas: Area[]) => areas.map((a) => openArea === a.id && <AreaDetail key={a.id} area={a} view={areaView} />)
   const trainWarnings = !isToday ? [] : [...(readiness?.band === 'low' ? [{ level: 'yellow' as const, text: `Readiness is ${readiness.score}: ${READINESS_TEXT.low}` }] : []), ...trainingWarnings({
     exercisesToday: sessionsToday,
     daysSinceStrength: sinceStrength,
@@ -324,12 +339,26 @@ export function Today({ profile, targets, onOpenSettings, onToggleRefeed, onNavi
           <section className="card">
             <h2>Macros</h2>
             <div className="rings" style={showDeficit ? { gridTemplateColumns: 'repeat(3, minmax(0, 1fr))' } : undefined}>
-              <Ring label="Net carbs" value={totals.netCarbs} target={targets.netCarbsG * mult} unit="g" color="var(--carbs)" isLimit molecule="glucose" />
-              <Ring label="Protein" value={totals.protein} target={targets.proteinG * mult} unit="g" color="var(--protein)" molecule="protein" />
-              <Ring label="Fat" value={totals.fat} target={fatBudget} unit="g" color="var(--fat)" isLimit caption="Fat budget" molecule="fat" />
+              {tap(AREAS.netCarbs, <Ring label="Net carbs" value={totals.netCarbs} target={targets.netCarbsG * mult} unit="g" color="var(--carbs)" isLimit molecule="glucose" />)}
+              {tap(AREAS.protein, <Ring label="Protein" value={totals.protein} target={targets.proteinG * mult} unit="g" color="var(--protein)" molecule="protein" />)}
+              {tap(AREAS.fat, <Ring label="Fat" value={totals.fat} target={fatBudget} unit="g" color="var(--fat)" isLimit caption="Fat budget" molecule="fat" />)}
               {/* Today's calories live in the summary card above. */}
-              {!showDeficit && <Ring label="Calories" value={totals.calories} target={t(targets.calories)} unit="" color="var(--calories)" isLimit molecule="energy" />}
+              {!showDeficit && tap(AREAS.kcal, <Ring label="Calories" value={totals.calories} target={t(targets.calories)} unit="" color="var(--calories)" isLimit molecule="energy" />)}
             </div>
+            {dayLogs.length > 0 && (
+              <p className="muted small" style={{ margin: '4px 0 0' }}>
+                Tap anything to see the foods behind it, your usual and what to change. A green dot means there’s a suggestion.
+                {showDeficit && (
+                  <>
+                    {' '}
+                    <button type="button" className="link" style={{ margin: 0 }} aria-expanded={openArea === AREAS.kcal.id} onClick={() => setOpenArea(openArea === AREAS.kcal.id ? null : AREAS.kcal.id)}>
+                      Calories ›
+                    </button>
+                  </>
+                )}
+              </p>
+            )}
+            {detail(AREAS.netCarbs, AREAS.protein, AREAS.fat, AREAS.kcal)}
             {!isToday && (
               <p className="small" style={{ marginBottom: 0 }}>
                 {dayLogs.length === 0 ? (
@@ -410,17 +439,19 @@ export function Today({ profile, targets, onOpenSettings, onToggleRefeed, onNavi
           </div>
           </div>
 
-          {!isWeek && <SuggestionsCard dayLogs={dayLogs} targets={targets} muscleGoal={profile.muscleGoal} fatBudget={fatBudget} past={!isToday} sex={profile.sex} watch={suggestWatch} />}
-
           <section className="card">
             <h2>Electrolytes &amp; fiber</h2>
-            <Bar label="Sodium" value={totals.sodium} target={targets.sodiumMg * mult} unit="mg" molecule="sodium" color="var(--atom-na)" />
-            <Bar label="Potassium" value={totals.potassium} target={targets.potassiumMg * mult} unit="mg" molecule="potassium" color="var(--atom-k)" />
-            <Bar label="Magnesium" value={totals.magnesium} target={targets.magnesiumMg * mult} unit="mg" molecule="magnesium" color="var(--atom-mg)" />
-            <Bar label="Fiber" value={totals.fiber} target={targets.fiberG * mult} unit="g" molecule="fiber" color="var(--fiber)" />
+            {tap(AREAS.sodium, <Bar label="Sodium" value={totals.sodium} target={targets.sodiumMg * mult} unit="mg" molecule="sodium" color="var(--atom-na)" />)}
+            {detail(AREAS.sodium)}
+            {tap(AREAS.potassium, <Bar label="Potassium" value={totals.potassium} target={targets.potassiumMg * mult} unit="mg" molecule="potassium" color="var(--atom-k)" />)}
+            {detail(AREAS.potassium)}
+            {tap(AREAS.magnesium, <Bar label="Magnesium" value={totals.magnesium} target={targets.magnesiumMg * mult} unit="mg" molecule="magnesium" color="var(--atom-mg)" />)}
+            {detail(AREAS.magnesium)}
+            {tap(AREAS.fiber, <Bar label="Fiber" value={totals.fiber} target={targets.fiberG * mult} unit="g" molecule="fiber" color="var(--fiber)" />)}
+            {detail(AREAS.fiber)}
           </section>
 
-          <VitaminsCard total={n as Nutrients} items={dayLogs.map((l) => l.nutrients)} sex={profile.sex} age={targets.age} week={isWeek} />
+          <VitaminsCard total={n as Nutrients} items={dayLogs.map((l) => l.nutrients)} sex={profile.sex} age={targets.age} week={isWeek} view={areaView} />
         </div>
 
         <div className="grid">
@@ -474,7 +505,7 @@ export function Today({ profile, targets, onOpenSettings, onToggleRefeed, onNavi
 
           {!isWeek && <AminoCard logs={dayLogs} weightKg={profile.weightKg} goal={profile.muscleGoal} />}
 
-          <WatchListCard items={watch} logs={dayLogs} weekLogs={weekLogs} isWeek={isWeek} period={isToday ? 'today' : isWeek ? 'on an average day' : 'yesterday'} />
+          <WatchListCard items={watch} view={areaView} period={isToday ? 'today' : isWeek ? 'on an average day' : 'yesterday'} />
 
           <section className="card">
             <div className="ketosis-head">
