@@ -47,6 +47,8 @@ export function useSyncedTable<T extends SyncedRow>(table: string, session: Sess
   const stateRef = useRef(state)
   const [error, setError] = useState<string | null>(null)
   const pushing = useRef(false)
+  /** True once this session has caught up with the server. */
+  const [pulled, setPulled] = useState(false)
 
   const commit = useCallback(
     (next: Stored<T>) => {
@@ -99,7 +101,7 @@ export function useSyncedTable<T extends SyncedRow>(table: string, session: Sess
         setError(navigator.onLine ? err.message : null)
         return
       }
-      if (!data?.length) return
+      if (!data?.length) return setPulled(true)
       const now = stateRef.current
       const dirty = new Set(now.dirty)
       const rows = { ...now.rows }
@@ -107,7 +109,7 @@ export function useSyncedTable<T extends SyncedRow>(table: string, session: Sess
         if (!dirty.has(r.id)) rows[r.id] = r // local unsynced edits win; they're pushed next
       }
       commit({ ...now, rows, lastPull: (data[data.length - 1] as T).updated_at })
-      if (data.length < 1000) return
+      if (data.length < 1000) return setPulled(true)
     }
   }, [commit, session, table])
 
@@ -152,5 +154,5 @@ export function useSyncedTable<T extends SyncedRow>(table: string, session: Sess
   )
 
   const rows = Object.values(state.rows).filter((r) => !r.deleted_at)
-  return { rows, byId: state.rows, upsert, remove, pending: state.dirty.length, error }
+  return { rows, byId: state.rows, upsert, remove, pending: state.dirty.length, error, pulled }
 }

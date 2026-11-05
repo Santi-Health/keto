@@ -7,6 +7,7 @@ import type { ActivityDay } from './activity'
 import type { ReadingRow } from './readings'
 import type { SavedMeal } from './savedMeals'
 import { buildLogEntry, type Food, type LogEntry, type Meal, type NewFood } from './foods'
+import { STARTER_FOODS } from './starterFoods'
 import { supabase } from './supabase'
 import { localDate } from './targets'
 import { entryDay } from './time'
@@ -82,6 +83,12 @@ export function DataProvider({ session, children }: { session: Session | null; c
     },
     [foodsTable],
   )
+
+  // After the first pull, so one already synced from another device (or deleted) isn't overwritten.
+  useEffect(() => {
+    if (!foodsTable.pulled) return
+    for (const f of STARTER_FOODS) if (!foodsTable.byId[f.id]) foodsTable.upsert(f)
+  }, [foodsTable.pulled]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const logFood = useCallback(
     (food: Food, amount: number, unit: string, meal: Meal, eatenAt: Date) => {
