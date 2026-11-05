@@ -62,8 +62,8 @@ describe('areaInsight', () => {
 describe('omegaVerdict', () => {
   it('tells which side to work on, and by how much', () => {
     expect(omegaVerdict(20, 1, 4, 'male', 45)).toMatch(/^Both/)
-    expect(omegaVerdict(10, 1, 4, 'male', 45)).toMatch(/^Mainly more omega-3/)
-    expect(omegaVerdict(20, 2, 4, 'male', 45)).toMatch(/^Mainly less omega-6/)
+    expect(omegaVerdict(10, 1, 4, 'male', 45)).toMatch(/^Omega-3 is the low side/)
+    expect(omegaVerdict(20, 2, 4, 'male', 45)).toMatch(/^Omega-6 is the high side/)
     expect(omegaVerdict(12, 2, 4, 'male', 45)).toMatch(/^Either one/)
     expect(omegaVerdict(10, 1, 4, 'male', 45)).toContain('About 1.5 g more omega-3 reaches 4:1, or 6.0 g less omega-6')
   })
@@ -79,6 +79,23 @@ describe('areaAdvice', () => {
     source: 'manual', confidence: 'high', fields_estimated: [], favorite: false, use_count: 0, last_used_at: null, meta: {}, updated_at: '', deleted_at: null,
   })
   const omegaItem = (o6: number, o3: number) => computeWatchList([{ omega6: o6, omega3: o3 }], [], ctx).find((i) => i.key === 'omegaRatio')!
+
+  it('names foods to try, skipping ones you already eat and ones that would worsen the ratio', () => {
+    const salmon = food('sal', 'Smoked salmon', { omega6: 0.2, omega3: 2, protein: 20 })
+    const walnuts = food('wal', 'Walnuts', { omega6: 38, omega3: 9, protein: 15 })
+    const history = [log('Smoked salmon', {}, 1, 'sal'), log('Walnuts', {}, 2, 'wal')]
+    const logs = [log('Almonds', { fat: 14, omega6: 9, omega3: 0, protein: 6 }, 0)]
+    const v = view(logs, history, { foods: [salmon, walnuts] })
+    const area = watchArea(omegaItem(9, 0))
+    const advice = areaAdvice(area, v, areaInsight(area, v))
+    const texts = advice.map((a) => a.text)
+    expect(texts.some((t) => t.includes('Smoked salmon'))).toBe(true)
+    expect(texts.some((t) => t.includes('Walnuts'))).toBe(false)
+    expect(texts).toContain('Try 3 oz herring')
+    expect(texts).not.toContain('Try 3 oz salmon')
+    expect(texts.find((t) => t.startsWith('Next time'))).toContain('swap Almonds for macadamias')
+    expect(advice.find((a) => a.text.includes('Smoked salmon'))!.effect).toContain('ratio goes to 4.6:1')
+  })
 
   it('offers a swap from your own foods and adds your best omega-3 food', () => {
     const mayo = food('mayo', 'Mayo', { omega6: 10, omega3: 0.1, protein: 0 })

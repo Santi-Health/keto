@@ -168,13 +168,14 @@ export function swapFor(entry: Pick<LogEntry, 'food_id' | 'food_name' | 'meal' |
   }
 }
 
-/** The food you already eat with the most of `key` in your usual portion, when that's at least `min`. */
-export function richestFood(key: keyof Nutrients, unit: string, label: string, min: number, usual: UsualFood[]): Pick<Suggestion, 'text' | 'effect'> | null {
-  const best = usual
-    .map((u) => ({ u, v: (per(u, u.usualSteps)[key] as number) ?? 0 }))
-    .filter((x) => x.v >= min)
-    .sort((a, b) => b.v - a.v)[0]
-  return best ? { text: `Add ${amountText(best.u, best.u.usualSteps)} ${best.u.food.name}`, effect: `+${fmtN(best.v)} ${unit} ${label}` } : null
+/** The foods you already eat with the most of `key` in your usual portion, at least `min` each. */
+export function richestFoods(key: keyof Nutrients, min: number, usual: UsualFood[], keep: (n: Nutrients) => boolean = () => true, limit = 3): { name: string; text: string; n: Nutrients }[] {
+  return usual
+    .map((u) => ({ u, n: per(u, u.usualSteps) }))
+    .filter((x) => ((x.n[key] as number) ?? 0) >= min && keep(x.n))
+    .sort((a, b) => (b.n[key] as number) - (a.n[key] as number))
+    .slice(0, limit)
+    .map(({ u, n }) => ({ name: u.food.name, text: `Add ${amountText(u, u.usualSteps)} ${u.food.name}`, n }))
 }
 
 export interface SuggestInput {

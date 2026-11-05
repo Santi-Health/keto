@@ -1,7 +1,7 @@
 import type { Food, LogEntry } from './foods'
 import type { Micro } from './micros'
 import { addNutrients, type NutrientKey, type Nutrients } from './nutrients'
-import { richestFood, swapFor, usualFoods, type Suggestion } from './suggest'
+import { richestFoods, swapFor, usualFoods, type Suggestion } from './suggest'
 import { entryDay } from './time'
 import { lastDays } from './trends'
 import type { Sex } from './types'
@@ -204,7 +204,7 @@ const WATCH_TIPS: Record<WatchKey, string> = {
   transFat: 'Check labels for partially hydrogenated oils and skip those products.',
   addedSugars: 'Look for a version with no added sugar.',
   cholesterol: 'No need to cut this on its own. Compare it with your lipid labs.',
-  omegaRatio: 'Cook with olive or avocado oil, pick macadamias over almonds or walnuts, and check mayo and dressings for soybean or canola oil.',
+  omegaRatio: 'Cook with olive or avocado oil, and check mayo and dressings for soybean or canola oil.',
   mercury: 'Next time pick a lower-mercury fish, like salmon, sardines or shrimp.',
   retinol: 'Space out liver and other organ meats.',
   heavyMetal: 'Rotate brands of protein powder and dark chocolate, and look for third-party testing.',
@@ -221,6 +221,24 @@ const omegaIntakes = (sex: Sex, age: number) => ({
   six: sex === 'female' ? (age > 50 ? 11 : 12) : age > 50 ? 14 : 17,
 })
 
+/** Omega-3 foods that are easy on keto, for when your own foods don't cover it. NIH amounts. */
+const OMEGA3_IDEAS: { match: RegExp; text: string; effect: string }[] = [
+  { match: /salmon/i, text: 'Try 3 oz salmon', effect: 'About +1.8 g omega-3' },
+  { match: /herring/i, text: 'Try 3 oz herring', effect: 'About +1.7 g omega-3' },
+  { match: /sardine/i, text: 'Try 3 oz sardines in olive oil', effect: 'About +1.2 g omega-3' },
+  { match: /mackerel/i, text: 'Try 3 oz Atlantic mackerel', effect: 'About +1 g omega-3' },
+  { match: /chia/i, text: 'Try 1 tbsp chia seeds', effect: 'About +2.1 g plant omega-3, which counts for less than fish' },
+  { match: /flax/i, text: 'Try 1 tbsp flaxseed', effect: 'About +2.3 g plant omega-3, which counts for less than fish' },
+]
+const MAX_IDEAS = 3
+
+/** Better picks for foods high in omega-6, for when you don't already eat one. */
+const OMEGA6_SWAPS: [RegExp, string][] = [
+  [/almond|walnut|pecan|peanut|cashew|pistachio|hazelnut|brazil nut|sunflower seed|pumpkin seed|pepita|mixed nuts/i, 'macadamias, about 0.4 g omega-6 in 1 oz'],
+  [/mayo|aioli|dressing|ranch|vinaigrette/i, 'a version made with olive or avocado oil'],
+  [/soybean oil|canola|corn oil|vegetable oil|sunflower oil|safflower|grapeseed/i, 'olive or avocado oil'],
+]
+
 /** Whether the ratio needs more omega-3, less omega-6, or both, and by how much. */
 export function omegaVerdict(six: number, three: number, limit: number, sex: Sex, age: number): string {
   const ai = omegaIntakes(sex, age)
@@ -231,8 +249,8 @@ export function omegaVerdict(six: number, three: number, limit: number, sex: Sex
   if (more3 <= 0) return low3 ? `The ratio is fine, though omega-3 is under the ${ai.three} g a day to aim for.` : 'The ratio is fine, and omega-3 and omega-6 are both at good amounts.'
   const reach = `About ${more3.toFixed(1)} g more omega-3 reaches ${limit}:1${three > 0 ? `, or ${less6.toFixed(1)} g less omega-6` : ''}.`
   if (low3 && high6) return `Both: omega-3 is under ${ai.three} g and omega-6 is over ${ai.six} g. ${reach}`
-  if (low3) return `Mainly more omega-3: it’s under ${ai.three} g, while omega-6 is a normal amount. ${reach}`
-  if (high6) return `Mainly less omega-6: it’s over ${ai.six} g, while omega-3 is a good amount. ${reach}`
+  if (low3) return `Omega-3 is the low side: it’s under ${ai.three} g, while omega-6 is a normal amount. ${reach}`
+  if (high6) return `Omega-6 is the high side: it’s over ${ai.six} g, while omega-3 is a good amount. ${reach}`
   return `Either one works: both are normal amounts, but the balance is off. ${reach}`
 }
 
@@ -250,7 +268,9 @@ export const hasTip = (area: Area, view: AreaView) => tipsFor(view.tips, area.go
 export function areaAdvice(area: Area, view: AreaView, insight: AreaInsight): Advice[] {
   const out: Advice[] = [...tipsFor(view.tips, area.goals)]
   const key = area.watchKey
-  if (!key || !(area.flagged || insight.change === 'higher')) return out
+  // No omega-3 logged means no ratio to flag, but it's the case that most needs help.
+  const noOmega3 = key === 'omegaRatio' && insight.current == null && insight.parts[0].total > 0
+  if (!key || !(area.flagged || insight.change === 'higher' || noOmega3)) return out
   const logs = area.weekly ? view.weekLogs : view.logs
   const usual = usualFoods(view.foods, view.history)
   const spread = view.isWeek ? Math.max(1, new Set(logs.map(dayOf)).size) : 1
@@ -263,13 +283,32 @@ export function areaAdvice(area: Area, view: AreaView, insight: AreaInsight): Ad
   if (key === 'omegaRatio') {
     const [six, three] = insight.parts
     const limit = area.limit ?? 4
-    out.push({ kind: 'note', text: omegaVerdict(six.total / spread, three.total / spread, limit, view.sex, view.age) })
-    if ((insight.current ?? Infinity) <= limit) return out
-    const swap = swapTop(six, area.parts[0])
-    if (swap) out.push({ kind: 'swap', ...swap })
-    const add = richestFood('omega3', 'g', 'omega-3', 0.3, usual)
-    out.push(add ? { kind: 'add', ...add } : { kind: 'note', text: 'Sardines or salmon are the easiest omega-3: about 1 to 2 g in 3 oz.' })
-    if (!swap) out.push({ kind: 'note', text: WATCH_TIPS.omegaRatio })
+    const six1 = six.total / spread
+    const three1 = three.total / spread
+    out.push({ kind: 'note', text: omegaVerdict(six1, three1, limit, view.sex, view.age) })
+    const over = (insight.current ?? Infinity) > limit
+    if (!over && three1 >= omegaIntakes(view.sex, view.age).three) return out
+    // Foods you eat first, skipping any with so much omega-6 that they'd make the ratio worse.
+    const yours = richestFoods('omega3', 0.2, usual, (n) => (n.omega6 ?? 0) <= limit * (n.omega3 ?? 0))
+    for (const f of yours) {
+      const after = (six1 + (f.n.omega6 ?? 0)) / (three1 + (f.n.omega3 ?? 0))
+      out.push({ kind: 'add', text: f.text, effect: `+${fmtAmount(f.n.omega3 ?? 0, 'g')} omega-3, ratio goes to ${fmtAmount(after, ': 1')}` })
+    }
+    const eaten = view.foods.map((f) => f.name).filter((name) => view.history.some((l) => l.food_name === name))
+    const ideas = OMEGA3_IDEAS.filter((i) => !eaten.some((name) => i.match.test(name))).slice(0, Math.max(1, MAX_IDEAS - yours.length))
+    for (const i of ideas) out.push({ kind: 'add', text: i.text, effect: i.effect })
+    if (!over) return out
+    // Then the foods giving the most omega-6.
+    let named = false
+    for (const [i, food] of six.foods.slice(0, 2).entries()) {
+      if (food.pct < 20) continue
+      const swap = i === 0 ? swapTop(six, area.parts[0]) : null
+      const better = OMEGA6_SWAPS.find(([re]) => re.test(food.name))?.[1]
+      if (better) out.push({ kind: 'swap', text: `Next time, swap ${food.name} for ${better}`, effect: `${food.name} gave ${fmtAmount(food.amount, 'g')} omega-6` })
+      else if (swap) out.push({ kind: 'swap', ...swap })
+      named ||= !!(better || swap)
+    }
+    if (!named) out.push({ kind: 'note', text: WATCH_TIPS.omegaRatio })
     return out
   }
   const swap = swapTop(insight.parts[0], area.parts[0])
