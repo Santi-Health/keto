@@ -171,7 +171,11 @@ describe('foods that go with another', () => {
     const entry = (food_name: string, grams: number, food_id: string | null = null) => ({ food_id, food_name, grams, amount: grams, unit: 'g', nutrients: { kcal: 251, netCarbs: 39, sweetenerServings: 1 } })
     const logs = [entry('Black pepper', 100), entry('Black pepper', 1), entry('Salt, table', 5), entry('Red pepper', 100), entry('Salt and pepper mix', 100, 'r')]
     expect(oversizedSeasonings(logs, { r: { source: 'recipe' } })).toEqual([logs[0]])
-    expect(asPinch(logs[0])).toMatchObject({ amount: 1, unit: 'g', grams: 1, nutrients: { kcal: 2.51, netCarbs: 0.39, sweetenerServings: 1 } })
+    const pinch = asPinch(logs[0])
+    expect(pinch).toMatchObject({ amount: 1, unit: 'g', grams: 1 })
+    expect(pinch.nutrients.kcal).toBeCloseTo(2.51)
+    expect(pinch.nutrients.netCarbs).toBeCloseTo(0.39)
+    expect(pinch.nutrients.sweetenerServings).toBe(1)
   })
   it('does not treat vegetables or dishes as seasoning', () => {
     for (const n of ['Red pepper', 'Red bell pepper', 'Pepper jack cheese', 'Salt and pepper chicken']) expect(servingOf({ name: n, unit_conversions: [], meta: {} })).toEqual({ amount: 100, unit: 'g' })

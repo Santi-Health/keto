@@ -88,8 +88,8 @@ export interface LogEntry {
   unit: string
   grams: number
   nutrients: Nutrients
-  /** tz: the time zone it was logged in (the day it counts on, wherever it's viewed later). */
-  meta: { approximate?: boolean; estimated?: boolean; tz?: string }
+  /** tz: the time zone it was logged in (the day it counts on, wherever it's viewed later). looksRight: you said a flagged amount is correct. */
+  meta: { approximate?: boolean; estimated?: boolean; tz?: string; looksRight?: boolean }
   updated_at: string
   deleted_at: string | null
 }

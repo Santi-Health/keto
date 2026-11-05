@@ -3,11 +3,11 @@ import { useEffect, useMemo, useState } from 'react'
 import { MacroStrip } from '../components/FoodBits'
 import { FoodForm } from '../components/FoodForm'
 import { ExerciseSheet } from '../components/ExerciseSheet'
+import { LogCheck } from '../components/LogCheck'
 import { LogFoodSheet } from '../components/LogFoodSheet'
 import { ReadingSheet } from '../components/ReadingSheet'
 import { RecipeBuilder } from '../components/RecipeBuilder'
 import { SaveMealSheet } from '../components/SavedMealSheets'
-import { SeasoningCheck } from '../components/SeasoningCheck'
 import { BodyScanSheet } from '../components/BodyScan'
 import { useData } from '../lib/data'
 import type { HrProfile } from '../lib/googleHealth'
@@ -157,7 +157,7 @@ export function Log({ weightKg, hr, weightUnit, netCarbLimit, proteinTarget, dat
         </div>
       </header>
 
-      <SeasoningCheck onOpenDay={onDateChange} />
+      <LogCheck onOpenDay={onDateChange} />
 
       <div className="card">
         <h2>{label}</h2>

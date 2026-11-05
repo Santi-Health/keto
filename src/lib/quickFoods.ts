@@ -329,12 +329,16 @@ export function oversizedSeasonings<L extends Pick<LogEntry, 'food_id' | 'food_n
   return logs.filter((l) => l.grams > MAX_SEASONING_G && isSeasoning({ name: l.food_name, source: l.food_id ? foodById[l.food_id]?.source : undefined }))
 }
 
-/** The entry as a 1 g pinch, with its nutrients scaled down to match. */
-export function asPinch<L extends Pick<LogEntry, 'amount' | 'unit' | 'grams' | 'nutrients'>>(entry: L): L {
+/** The entry at another weight, in the same unit, with its nutrients scaled to match. */
+export function resized<L extends Pick<LogEntry, 'amount' | 'unit' | 'grams' | 'nutrients'>>(entry: L, grams: number): L {
+  const ratio = grams / entry.grams
   const nutrients: Nutrients = {}
-  for (const [k, v] of Object.entries(entry.nutrients) as [NutrientKey, number][]) nutrients[k] = k.endsWith('Servings') ? v : v / entry.grams
-  return { ...entry, amount: 1, unit: 'g', grams: 1, nutrients }
+  for (const [k, v] of Object.entries(entry.nutrients) as [NutrientKey, number][]) nutrients[k] = k.endsWith('Servings') ? v : v * ratio
+  return { ...entry, amount: Math.round(entry.amount * ratio * 100) / 100, grams, nutrients }
 }
+
+/** The entry as a 1 g pinch. */
+export const asPinch = <L extends Pick<LogEntry, 'amount' | 'unit' | 'grams' | 'nutrients'>>(entry: L): L => ({ ...resized(entry, 1), amount: 1, unit: 'g' })
 
 /** The food's serving to log by default: the portion set for it ("6 oz"), its first portion ("1 slice"), else 100 g. Salt and pepper are 1 g. */
 export function servingOf(food: Pick<Food, 'unit_conversions'> & Partial<Pick<Food, 'name' | 'brand' | 'meta' | 'source'>>): { amount: number; unit: string } {
