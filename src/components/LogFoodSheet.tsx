@@ -29,7 +29,7 @@ interface Props {
 export type AddMode = 'log' | 'save' | 'look'
 
 /** "YYYY-MM-DDTHH:mm" in local time, for datetime-local inputs. */
-const toLocalInput = (d: Date) => {
+export const toLocalInput = (d: Date) => {
   const off = d.getTimezoneOffset() * 60_000
   return new Date(d.getTime() - off).toISOString().slice(0, 16)
 }

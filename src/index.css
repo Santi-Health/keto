@@ -1587,6 +1587,32 @@ input[type='time'] {
   border-top: 1px solid var(--border);
 }
 
+input.drink-time {
+  width: auto;
+  flex: none;
+  padding: 4px 6px;
+  font-size: 0.85rem;
+}
+
+.drink-when {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+}
+
+.quick-when {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 12px;
+}
+
+.quick-when input {
+  flex: 1;
+  min-width: 0;
+}
+
 .drink-entry-name {
   flex: 1;
   min-width: 0;

@@ -6,7 +6,7 @@ import type { SavedMeal } from '../lib/savedMeals'
 import { toGrams, unitsFor } from '../lib/units'
 import { DeleteFood } from './DeleteFood'
 import { FoodIcon } from './FoodIcon'
-import { defaultTime } from './LogFoodSheet'
+import { defaultTime, toLocalInput } from './LogFoodSheet'
 import { Sheet } from './Sheet'
 
 export type QuickItem = { kind: 'food'; food: Food } | { kind: 'meal'; meal: SavedMeal }
@@ -108,6 +108,7 @@ export function QuickLogSheet({
   const { foods, logFood, updateFood } = useData()
   const serving = servingOf(food)
   const [times, setTimes] = useState('1')
+  const [when, setWhen] = useState(() => toLocalInput(defaultTime(date)))
   const steps = Number(times) > 0 ? Number(times) : 0
   const pairs = useMemo(() => pairsFor(food, foods), [food, foods])
   /** Pairings left out of this one log: to start, the salt you didn't use last time (NuSalt at home, salt away). */
@@ -140,7 +141,7 @@ export function QuickLogSheet({
   }
   // Same time for all, so they read as one entry.
   function log() {
-    const at = defaultTime(date)
+    const at = new Date(when)
     const entries = [logFood(food, amount, serving.unit, meal, at)]
     for (const p of withIt) entries.push(logFood(p, servingOf(p).amount, servingOf(p).unit, meal, at))
     const salts = withIt.map(saltKind).filter((k) => k != null)
@@ -221,6 +222,10 @@ export function QuickLogSheet({
           </button>
         </div>
       )}
+      <div className="quick-when">
+        <label htmlFor="quick-when">When</label>
+        <input id="quick-when" type="datetime-local" value={when} onChange={(e) => setWhen(e.target.value)} />
+      </div>
       <div className="portion-macros">
         <span>
           <b>{fmt(n.kcal)}</b>kcal
@@ -235,7 +240,7 @@ export function QuickLogSheet({
           <b>{fmt(n.fat)} g</b>fat
         </span>
       </div>
-      <button type="button" className="btn" style={{ width: '100%' }} onClick={log} disabled={!steps}>
+      <button type="button" className="btn" style={{ width: '100%' }} onClick={log} disabled={!steps || !when}>
         Log {portion}
         {withIt.length ? ` + ${withIt.length}` : ''} to {mealLabel}
       </button>
@@ -271,7 +276,7 @@ export function QuickLogSheet({
       ) : (
         <div className="quick-links">
           <button type="button" onClick={onMore}>
-            Other amount or time
+            Other amount
           </button>
           <button type="button" onClick={onEdit}>
             Edit food

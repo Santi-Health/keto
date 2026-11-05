@@ -8,6 +8,7 @@ import { localDate } from '../lib/targets'
 import { deviceTz } from '../lib/time'
 import { DrinkIcon } from './DrinkIcon'
 import { Segmented } from './Fields'
+import { toLocalInput } from './LogFoodSheet'
 import { Sheet } from './Sheet'
 
 interface Props {
@@ -17,6 +18,19 @@ interface Props {
 }
 
 type Undo = { kind: 'reading' | 'log'; ids: string[]; label: string; can?: { entry: LogEntry; food: Food } }
+
+/** The same moment at another clock time that day. Seconds stay, so two drinks moved to one minute stay apart. */
+function atClock(iso: string, hhmm: string): Date {
+  const [h, m] = hhmm.split(':').map(Number)
+  const d = new Date(iso)
+  d.setHours(h, m)
+  return d
+}
+
+/** Clock time of a logged drink; a phone's picker saves when it closes. */
+function DrinkTime({ at, label, onChange }: { at: string; label: string; onChange: (hhmm: string) => void }) {
+  return <input className="drink-time" type="time" aria-label={label} value={toLocalInput(new Date(at)).slice(11)} onChange={(e) => e.target.value && onChange(e.target.value)} />
+}
 
 /** One tap per drink. Every drink fills the water goal by volume; sodas, coffee and tea also log caffeine, sodium and sweeteners. */
 export function DrinksCard({ days, waterTargetOz }: Props) {
@@ -68,6 +82,7 @@ export function DrinksCard({ days, waterTargetOz }: Props) {
       at: r.taken_at,
       name: `${drinkByKey(String(r.meta.drink ?? ''))?.label ?? 'Water'} · ${liters(r.value ?? 0)}`,
       remove: () => deleteReading(r.id),
+      retime: (hhmm: string) => saveReading({ ...r, taken_at: atClock(r.taken_at, hhmm).toISOString() }),
     })),
     // Coffee or tea and the milk poured in it are one drink: logged in the same tap, removed together.
     ...drinkGroups.map((group) => {
@@ -77,6 +92,11 @@ export function DrinksCard({ days, waterTargetOz }: Props) {
         at: parts[0].eaten_at,
         name: parts.map((l) => (isMilkLog(l) ? `${portionText(l.amount, l.unit)} ${unshout(foodById[l.food_id!]?.name ?? l.food_name)}` : `${unshout(foodById[l.food_id!]?.name ?? l.food_name)} · ${portionText(l.amount, l.unit)}`)).join(' + '),
         remove: () => parts.forEach((l) => deleteLog(l.id)),
+        // The milk moves with its drink, so they stay one entry.
+        retime: (hhmm: string) => {
+          const at = atClock(parts[0].eaten_at, hhmm)
+          for (const l of parts) updateLog({ ...l, eaten_at: at.toISOString(), meal: mealForTime(at) })
+        },
       }
     }),
   ].sort((a, b) => b.at.localeCompare(a.at))
@@ -144,8 +164,10 @@ export function DrinksCard({ days, waterTargetOz }: Props) {
 
   /** You only had half the can or bottle: same entry, half the amount (and half the caffeine, sodium and fluid). */
   function halfCan(u: NonNullable<Undo['can']>) {
-    const half = buildLogEntry(u.food, 0.5, u.entry.unit, u.entry.meal, new Date(u.entry.eaten_at))
-    updateLog({ ...u.entry, ...half, id: u.entry.id })
+    // As it is now: its time may have changed since the tap.
+    const entry = drinkLogs.find((l) => l.id === u.entry.id) ?? u.entry
+    const half = buildLogEntry(u.food, 0.5, entry.unit, entry.meal, new Date(entry.eaten_at))
+    updateLog({ ...entry, ...half, id: entry.id })
     setUndo((x) => (x ? { ...x, label: `½ ${x.label}`, can: undefined } : x))
   }
 
@@ -165,6 +187,7 @@ export function DrinksCard({ days, waterTargetOz }: Props) {
     .filter(Boolean)
     .join(' and ')
   const tally = ALL_DRINKS.filter((d) => !d.hydration && counts[d.key]).map((d) => `${counts[d.key]} ${label(d)}`)
+  const justLogged = undo && entries.find((e) => e.id === undo.ids[0])
 
   return (
     <section className="card">
@@ -202,7 +225,12 @@ export function DrinksCard({ days, waterTargetOz }: Props) {
         ))}
       </div>}
       {undo && isToday && (
-        <div className="row-btns" style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 8 }}>
+        <div className="row-btns" style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginTop: 8 }}>
+        {justLogged && (
+          <label className="muted small drink-when">
+            {undo.label} at <DrinkTime at={justLogged.at} label={`Time of ${undo.label}`} onChange={justLogged.retime} />
+          </label>
+        )}
         {undo.can && (
           <button type="button" className="btn secondary small-btn" onClick={() => halfCan(undo.can!)}>
             Make it ½ {undo.can.entry.unit}
@@ -226,13 +254,13 @@ export function DrinksCard({ days, waterTargetOz }: Props) {
       {days.length === 1 && entries.length > 0 && (
         <>
           <button type="button" className="more-link" aria-expanded={removing} onClick={() => setRemoving(!removing)}>
-            {removing ? 'Done removing' : 'Remove a drink ›'}
+            {removing ? 'Done' : 'Change time or remove a drink ›'}
           </button>
           {removing && (
             <ul className="drink-entries">
               {entries.map((e) => (
                 <li key={e.id}>
-                  <span className="muted small">{new Date(e.at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}</span>
+                  <DrinkTime at={e.at} label={`Time of ${e.name}`} onChange={e.retime} />
                   <span className="drink-entry-name">{e.name}</span>
                   <button type="button" className="icon-btn" aria-label={`Remove ${e.name}`} onClick={e.remove}>
                     ×
