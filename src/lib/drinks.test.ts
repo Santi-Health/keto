@@ -21,6 +21,15 @@ describe('drinks', () => {
     expect(portionNutrients(asFood(double), 60).caffeineMg).toBeCloseTo(128, 0)
   })
 
+  it('logs a Spindrift can as a food, so its carbs count, right after Sparkling Rain', () => {
+    const d = drinkByKey('spindrift')!
+    expect(DRINKS[DRINKS.indexOf(d) - 1].key).toBe('sparkling_rain')
+    expect(drinkPortion(d)).toEqual({ amount: 1, unit: 'can' })
+    const n = portionNutrients(asFood(drinkFood(d)), 355)
+    expect(n.kcal).toBeCloseTo(3, 1)
+    expect(n.netCarbs).toBeCloseTo(1, 1)
+  })
+
   it('only water counts toward hydration', () => {
     expect(DRINKS.filter((d) => d.hydration).map((d) => d.key)).toEqual(['water', 'sparkling_water', 'sparkling_rain'])
   })

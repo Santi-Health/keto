@@ -130,6 +130,13 @@ const DRAWINGS: Partial<Record<DrinkKey | 'espresso', () => ReactNode>> = {
       ))}
     />
   ),
+  spindrift: () => (
+    <Can
+      body="#fbf7ea"
+      lines={[{ t: 'Spindrift', fill: '#22384f', size: 5, y: 17, w: 15 }]}
+      extra={<circle cx="16" cy="26" r="5" fill="#f2d64b" stroke={OUTLINE} strokeWidth="0.6" />}
+    />
+  ),
   coke_zero: () => (
     <Can
       body="#1b1b1b"

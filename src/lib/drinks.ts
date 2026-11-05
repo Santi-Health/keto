@@ -11,6 +11,7 @@ export type DrinkKey =
   | 'water'
   | 'sparkling_water'
   | 'sparkling_rain'
+  | 'spindrift'
   | 'diet_coke'
   | 'coke_zero'
   | 'diet_pepsi'
@@ -144,6 +145,8 @@ const ALL: Drink[] = [
   { key: 'water', label: 'Water', serving: '1 glass (250 ml)', oz: GLASS_ML / ML_PER_OZ, hydration: true, color: 'var(--water)', perServing: null },
   { key: 'sparkling_water', label: 'Sparkling water', serving: '1 glass (250 ml)', oz: GLASS_ML / ML_PER_OZ, hydration: true, color: 'var(--water)', perServing: null },
   { key: 'sparkling_rain', label: 'Sparkling Rain', serving: '355 ml can', oz: 12, hydration: true, color: 'var(--water)', perServing: null },
+  // Lemon, from Spindrift's label: real juice, so it has a few calories and is logged as a food, not as water.
+  { key: 'spindrift', label: 'Spindrift', serving: '355 ml can', oz: 12, hydration: false, color: '#f2d64b', perServing: tea({ kcal: 3, carbs: 1, netCarbs: 1, sodiumMg: 0, caffeineMg: 0 }) },
   { key: 'diet_coke', label: 'Diet Coke', serving: '355 ml can', oz: 12, hydration: false, color: '#b8b8b8', perServing: soda(46, 40), sweeteners: ['aspartame'] },
   { key: 'coke_zero', label: 'Coke Zero', serving: '355 ml can', oz: 12, hydration: false, color: '#e4002b', perServing: soda(34, 40, 60), sweeteners: ['aspartame', 'acesulfame K'] },
   { key: 'diet_pepsi', label: 'Diet Pepsi', serving: '355 ml can', oz: 12, hydration: false, color: '#1f4fa0', perServing: soda(35, 35), sweeteners: ['aspartame', 'acesulfame K'] },
@@ -250,6 +253,7 @@ const ORDER: DrinkKey[] = [
   'ba_lungo',
   'sparkling_water',
   'sparkling_rain',
+  'spindrift',
   'diet_coke',
   'diet_pepsi',
   'squirt_zero',
