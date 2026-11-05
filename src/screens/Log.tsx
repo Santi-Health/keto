@@ -7,6 +7,7 @@ import { LogFoodSheet } from '../components/LogFoodSheet'
 import { ReadingSheet } from '../components/ReadingSheet'
 import { RecipeBuilder } from '../components/RecipeBuilder'
 import { SaveMealSheet } from '../components/SavedMealSheets'
+import { SeasoningCheck } from '../components/SeasoningCheck'
 import { BodyScanSheet } from '../components/BodyScan'
 import { useData } from '../lib/data'
 import type { HrProfile } from '../lib/googleHealth'
@@ -155,6 +156,8 @@ export function Log({ weightKg, hr, weightUnit, netCarbLimit, proteinTarget, dat
           </button>
         </div>
       </header>
+
+      <SeasoningCheck onOpenDay={onDateChange} />
 
       <div className="card">
         <h2>{label}</h2>

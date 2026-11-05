@@ -1,5 +1,6 @@
 import { toGrams } from './units'
-import type { Food } from './foods'
+import type { Food, LogEntry } from './foods'
+import type { NutrientKey, Nutrients } from './nutrients'
 
 // --- Short names for food buttons -----------------------------------------------------------
 
@@ -321,6 +322,18 @@ const MAX_SEASONING_G = 5
 export function isSeasoning(food: { name?: string; source?: Food['source'] }): boolean {
   const n = (food.name ?? '').toLowerCase()
   return food.source !== 'recipe' && (SALT.test(n) || PEPPER.test(n) || NUSALT.test(n)) && !NOT_CONDIMENT.test(n) && !NOT_SEASONING.test(n)
+}
+
+/** Salt or pepper logged by the handful, which only happens by mistake (the old 100 g default). */
+export function oversizedSeasonings<L extends Pick<LogEntry, 'food_id' | 'food_name' | 'grams'>>(logs: L[], foodById: Record<string, Pick<Food, 'source'>>): L[] {
+  return logs.filter((l) => l.grams > MAX_SEASONING_G && isSeasoning({ name: l.food_name, source: l.food_id ? foodById[l.food_id]?.source : undefined }))
+}
+
+/** The entry as a 1 g pinch, with its nutrients scaled down to match. */
+export function asPinch<L extends Pick<LogEntry, 'amount' | 'unit' | 'grams' | 'nutrients'>>(entry: L): L {
+  const nutrients: Nutrients = {}
+  for (const [k, v] of Object.entries(entry.nutrients) as [NutrientKey, number][]) nutrients[k] = k.endsWith('Servings') ? v : v / entry.grams
+  return { ...entry, amount: 1, unit: 'g', grams: 1, nutrients }
 }
 
 /** The food's serving to log by default: the portion set for it ("6 oz"), its first portion ("1 slice"), else 100 g. Salt and pepper are 1 g. */

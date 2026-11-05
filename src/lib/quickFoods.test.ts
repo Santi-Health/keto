@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { brandsToShow, foodIcon, learnedPrefixes, nutCount, unshout, suggestDisplayName, sectionsOf, veryFrequentAt, pairsFor, portionText, saltKind, servingOf, shortName } from './quickFoods'
+import { asPinch, brandsToShow, foodIcon, oversizedSeasonings, learnedPrefixes, nutCount, unshout, suggestDisplayName, sectionsOf, veryFrequentAt, pairsFor, portionText, saltKind, servingOf, shortName } from './quickFoods'
 
 const f = (name: string, brand: string | null = null, meta = {}, id = name) => ({ id, name, brand, meta, source: 'manual' as const })
 
@@ -166,6 +166,12 @@ describe('foods that go with another', () => {
     expect(servingOf(seasoning('Pepper', { meta: { portion: { amount: 100, unit: 'g' } } }))).toEqual({ amount: 1, unit: 'g' })
     expect(servingOf(seasoning('Pepper', { meta: { portion: { amount: 2, unit: 'g' } } }))).toEqual({ amount: 2, unit: 'g' })
     expect(servingOf(seasoning('Nu-Salt', { unit_conversions: [{ unit: '1 serving', grams: 1 }] }))).toEqual({ amount: 1, unit: 'g' })
+  })
+  it('finds salt and pepper logged by mistake, and shrinks them to a pinch', () => {
+    const entry = (food_name: string, grams: number, food_id: string | null = null) => ({ food_id, food_name, grams, amount: grams, unit: 'g', nutrients: { kcal: 251, netCarbs: 39, sweetenerServings: 1 } })
+    const logs = [entry('Black pepper', 100), entry('Black pepper', 1), entry('Salt, table', 5), entry('Red pepper', 100), entry('Salt and pepper mix', 100, 'r')]
+    expect(oversizedSeasonings(logs, { r: { source: 'recipe' } })).toEqual([logs[0]])
+    expect(asPinch(logs[0])).toMatchObject({ amount: 1, unit: 'g', grams: 1, nutrients: { kcal: 2.51, netCarbs: 0.39, sweetenerServings: 1 } })
   })
   it('does not treat vegetables or dishes as seasoning', () => {
     for (const n of ['Red pepper', 'Red bell pepper', 'Pepper jack cheese', 'Salt and pepper chicken']) expect(servingOf({ name: n, unit_conversions: [], meta: {} })).toEqual({ amount: 100, unit: 'g' })
