@@ -2,6 +2,7 @@ import { LEUCINE_PER_MEAL_G, estimateAminos, type MuscleGoal } from './aminoAcid
 import { MEALS, portionNutrients, type Food, type LogEntry, type Meal } from './foods'
 import { addNutrients, type Nutrients } from './nutrients'
 import { MICROS, microStatus, vitaminCoverage } from './micros'
+import { isSeasoning, servingOf } from './quickFoods'
 import type { Targets } from './targets'
 import type { Sex } from './types'
 import { formatAmount, toGrams } from './units'
@@ -94,14 +95,17 @@ export function usualFoods(foods: Food[], history: LogEntry[]): UsualFood[] {
     for (const l of logs) units.set(l.unit, [...(units.get(l.unit) ?? []), l.amount])
     const [unit, amounts] = [...units.entries()].sort((a, b) => b[1].length - a[1].length)[0]
     const usual = [...amounts].sort((a, b) => a - b)[Math.floor(amounts.length / 2)]
-    const u = usualFood(food, unit, usual, new Set(logs.map((l) => l.meal)), logs.length)
+    // Salt and pepper go by the pinch, whatever got logged by mistake.
+    const pinch = isSeasoning(food) ? servingOf(food) : null
+    const u = usualFood(food, pinch?.unit ?? unit, pinch?.amount ?? usual, new Set(logs.map((l) => l.meal)), logs.length)
     if (u) out.push(u)
   }
   // Starred favorites you haven't logged yet, in their first portion size.
   for (const food of foods) {
     if (!food.favorite || food.deleted_at || groups.has(food.id) || food.source === 'recipe' || isRestaurant(food) || isDrink(food)) continue
-    const unit = food.meta.lastUnit ?? food.unit_conversions[0]?.unit ?? 'g'
-    const u = usualFood(food, unit, food.meta.lastAmount ?? (unit === 'g' ? 30 : 1), new Set(food.meta.meals ?? []), 0)
+    const pinch = isSeasoning(food) ? servingOf(food) : null
+    const unit = pinch?.unit ?? food.meta.lastUnit ?? food.unit_conversions[0]?.unit ?? 'g'
+    const u = usualFood(food, unit, pinch?.amount ?? food.meta.lastAmount ?? (unit === 'g' ? 30 : 1), new Set(food.meta.meals ?? []), 0)
     if (u) out.push(u)
   }
   return out

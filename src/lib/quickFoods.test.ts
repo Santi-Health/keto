@@ -147,18 +147,37 @@ describe('foods that go with another', () => {
     food('pep', 'Black pepper', 4),
     food('chk', 'Salt and pepper chicken', 20),
   ]
-  it('logs egg whites with avocado oil, salt, pepper and NuSalt, and eggs with salt and pepper', () => {
-    expect(pairsFor(food('ew', 'Egg Whites'), pantry).map((f) => f.id)).toEqual(['oil', 'salt', 'pep', 'nu'])
-    expect(pairsFor(food('e', 'Eggs, whole, raw'), pantry).map((f) => f.id)).toEqual(['salt', 'pep', 'nu'])
+  it('logs eggs and egg whites with NuSalt, salt, avocado oil and pepper', () => {
+    expect(pairsFor(food('ew', 'Egg Whites'), pantry).map((f) => f.id)).toEqual(['nu', 'salt', 'oil', 'pep'])
+    expect(pairsFor(food('e', 'Eggs, whole, raw'), pantry).map((f) => f.id)).toEqual(['nu', 'salt', 'oil', 'pep'])
+  })
+  it('finds salt and pepper even if they were moved out of Condiments', () => {
+    const moved = pantry.map((f) => ({ ...f, meta: { ...f.meta, sections: [] } }))
+    expect(pairsFor(food('e', 'Eggs'), moved).map((f) => f.id)).toEqual(['nu', 'salt', 'oil', 'pep'])
+  })
+  it('replaces a list saved on eggs before all four, but keeps one chosen since', () => {
+    expect(pairsFor(food('e', 'Eggs', 0, { pairs: ['nu'] }), pantry).map((f) => f.id)).toEqual(['nu', 'salt', 'oil', 'pep'])
+    expect(pairsFor(food('e', 'Eggs', 0, { pairs: ['nu'], pairsChosen: true }), pantry).map((f) => f.id)).toEqual(['nu'])
+  })
+  it('keeps salt and pepper to a 1 g pinch, whatever was set by mistake', () => {
+    const seasoning = (name: string, extra = {}) => ({ name, unit_conversions: [], meta: {}, ...extra })
+    expect(servingOf(seasoning('Black pepper'))).toEqual({ amount: 1, unit: 'g' })
+    expect(servingOf(seasoning('Salt, table'))).toEqual({ amount: 1, unit: 'g' })
+    expect(servingOf(seasoning('Pepper', { meta: { portion: { amount: 100, unit: 'g' } } }))).toEqual({ amount: 1, unit: 'g' })
+    expect(servingOf(seasoning('Pepper', { meta: { portion: { amount: 2, unit: 'g' } } }))).toEqual({ amount: 2, unit: 'g' })
+    expect(servingOf(seasoning('Nu-Salt', { unit_conversions: [{ unit: '1 serving', grams: 1 }] }))).toEqual({ amount: 1, unit: 'g' })
+  })
+  it('does not treat vegetables or dishes as seasoning', () => {
+    for (const n of ['Red pepper', 'Red bell pepper', 'Pepper jack cheese', 'Salt and pepper chicken']) expect(servingOf({ name: n, unit_conversions: [], meta: {} })).toEqual({ amount: 100, unit: 'g' })
   })
   it('salts anything you cook, but not cured meats or recipes', () => {
-    for (const n of ['Outside Skirt', 'Chicken thighs', 'Salmon fillet', 'Broccoli', 'Eggplant']) expect(pairsFor(food('x', n), pantry).map((f) => f.id)).toEqual(['salt', 'nu'])
+    for (const n of ['Outside Skirt', 'Chicken thighs', 'Salmon fillet', 'Broccoli', 'Eggplant']) expect(pairsFor(food('x', n), pantry).map((f) => f.id)).toEqual(['nu', 'salt'])
     for (const n of ['Canadian Bacon', 'Johnsonville Brats', 'Smoked salmon', 'Avocado']) expect(pairsFor(food('x', n), pantry)).toEqual([])
     expect(pairsFor({ ...food('x', 'Chicken curry'), source: 'recipe' as const }, pantry)).toEqual([])
     expect([saltKind({ name: 'NuSalt' }), saltKind({ name: 'Salt, table' }), saltKind({ name: 'Black pepper' })]).toEqual(['nusalt', 'salt', null])
   })
   it('follows the pairings you chose, even none', () => {
-    expect(pairsFor(food('ew', 'Egg Whites', 0, { pairs: ['salt'] }), pantry).map((f) => f.id)).toEqual(['salt'])
-    expect(pairsFor(food('ew', 'Egg Whites', 0, { pairs: [] }), pantry)).toEqual([])
+    expect(pairsFor(food('ew', 'Egg Whites', 0, { pairs: ['salt'], pairsChosen: true }), pantry).map((f) => f.id)).toEqual(['salt'])
+    expect(pairsFor(food('ew', 'Egg Whites', 0, { pairs: [], pairsChosen: true }), pantry)).toEqual([])
   })
 })

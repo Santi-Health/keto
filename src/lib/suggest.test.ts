@@ -20,6 +20,12 @@ describe('suggestions from your usual foods', () => {
   const history = [log(eggs, 2, '1 egg', 'breakfast', 7), log(eggs, 2, '1 egg', 'dinner', 19), log(salmon, 1, '2 oz', 'lunch', 12), log(salmon, 1, '2 oz', 'dinner', 19), log(bread, 2, '1 slice', 'breakfast', 7), log(bread, 1, '1 slice', 'lunch', 12), log(roll, 1, '1 serving', 'lunch'), log(roll, 1, '1 serving', 'lunch')]
   const foods = [eggs, salmon, bread, roll]
 
+  it('treats salt and pepper as a pinch even if 100 g got logged', () => {
+    const pepper = food('pep', 'Black pepper', { kcal: 251, potassiumMg: 1329 }, '1 serving', 1)
+    const u = usualFoods([pepper], [log(pepper, 100, '1 serving', 'lunch')])[0]
+    expect(u).toMatchObject({ unit: 'g', usualGrams: 1, seasoning: true })
+  })
+
   it('learns usual foods and portions, skipping recipes', () => {
     const u = usualFoods(foods, history)
     expect(u.map((x) => x.food.id).sort()).toEqual(['br', 'egg', 'sal'])

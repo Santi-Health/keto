@@ -1,5 +1,6 @@
 import { completeNutrients, type Food, type NewFood } from './foods'
 import type { Nutrients } from './nutrients'
+import { isAvocadoOil, isPepper, isPlainSalt } from './quickFoods'
 import { recipeToFood, type RecipeIngredient } from './recipes'
 
 /**
@@ -53,4 +54,33 @@ export const STARTER_FOODS: Food[] = [
     keto_notes: 'Avocado is 14 oz of flesh. The vinegar’s 6 g of sugar comes from one listing for Kosterina Crushed Tangerine.',
     meta: { ...guacamole.meta, externalId: 'starter:guacamole', meals: ['dinner'], portion: { amount: 4, unit: 'oz' }, lastAmount: 4, lastUnit: 'oz' },
   }),
+]
+
+const staple = (id: string, name: string, per100g: Nutrients, meta: NewFood['meta'], unitConversions: NewFood['unit_conversions'] = []): Food =>
+  asStarter(id, {
+    name,
+    brand: null,
+    barcode: null,
+    per_100g: completeNutrients(per100g, false),
+    unit_conversions: unitConversions,
+    ingredients_text: null,
+    keto_notes: null,
+    carbs_exclude_fiber: false,
+    source: 'database',
+    confidence: 'high',
+    fields_estimated: [],
+    meta,
+  })
+
+/** What eggs get logged with, added only when you have no food of that kind yet. USDA values. */
+export const STAPLES: { food: Food; have: (f: Food) => boolean }[] = [
+  { food: staple('2c8e4a10-5d3f-4b7e-9a16-7e2f0c9b4d11', 'Salt', { sodiumMg: 38758, calciumMg: 24 }, { portion: { amount: 1, unit: 'g' } }), have: isPlainSalt },
+  {
+    food: staple('7b1f9e24-3a6c-4d58-8f02-1c4e6a8d2f33', 'Black pepper', { kcal: 251, protein: 10.4, fat: 3.3, carbs: 64, fiber: 25.3, potassiumMg: 1329, magnesiumMg: 171, calciumMg: 443 }, { portion: { amount: 1, unit: 'g' } }),
+    have: isPepper,
+  },
+  {
+    food: staple('c94d3b57-8e21-4f6a-b0d7-3f5a1e7c9b55', 'Avocado oil', { kcal: 884, fat: 100, satFat: 11.6, omega6: 12.5, omega3: 1 }, { portion: { amount: 1, unit: '1 tsp' } }, [{ unit: '1 tsp', grams: 4.5 }]),
+    have: isAvocadoOil,
+  },
 ]

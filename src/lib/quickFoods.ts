@@ -1,3 +1,4 @@
+import { toGrams } from './units'
 import type { Food } from './foods'
 
 // --- Short names for food buttons -----------------------------------------------------------
@@ -306,9 +307,26 @@ export function setPortionOf(food: Partial<Pick<Food, 'name' | 'brand' | 'meta'>
   return rule ? { amount: rule.amount, unit: rule.unit } : null
 }
 
-/** The food's serving to log by default: the portion set for it ("6 oz"), its first portion ("1 slice"), else 100 g. */
-export function servingOf(food: Pick<Food, 'unit_conversions'> & Partial<Pick<Food, 'name' | 'brand' | 'meta'>>): { amount: number; unit: string } {
+const SALT = /\bsalt\b/
+const PEPPER = /\b(pepper|peppercorns?)\b/
+const NUSALT = /\bnu[ -]?salt\b/
+/** Vegetables and dishes that have the word in their name. */
+const NOT_SEASONING = /\b(red|green|yellow|orange) peppers?\b(?! flakes)|\b(jack|cheese|sauce|turkey|crackers|butter|pizza)\b/i
+/** Flavored salts, which aren't what goes on eggs. */
+const FLAVORED_SALT = /\b(garlic|onion|celery|seasoned|lemon|herb)\b/i
+/** The most a pinch of seasoning can weigh; anything more is a mistake, like the 100 g default. */
+const MAX_SEASONING_G = 5
+
+/** Salt, pepper or NuSalt, used by the pinch. */
+export function isSeasoning(food: { name?: string; source?: Food['source'] }): boolean {
+  const n = (food.name ?? '').toLowerCase()
+  return food.source !== 'recipe' && (SALT.test(n) || PEPPER.test(n) || NUSALT.test(n)) && !NOT_CONDIMENT.test(n) && !NOT_SEASONING.test(n)
+}
+
+/** The food's serving to log by default: the portion set for it ("6 oz"), its first portion ("1 slice"), else 100 g. Salt and pepper are 1 g. */
+export function servingOf(food: Pick<Food, 'unit_conversions'> & Partial<Pick<Food, 'name' | 'brand' | 'meta' | 'source'>>): { amount: number; unit: string } {
   const set = setPortionOf(food)
+  if (isSeasoning(food)) return set && toGrams({ unitConversions: food.unit_conversions }, set.amount, set.unit).grams <= MAX_SEASONING_G ? set : { amount: 1, unit: 'g' }
   if (set) return set
   const first = food.unit_conversions[0]
   return first && first.unit !== 'g' ? { amount: 1, unit: first.unit } : { amount: 100, unit: 'g' }
@@ -317,14 +335,14 @@ export function servingOf(food: Pick<Food, 'unit_conversions'> & Partial<Pick<Fo
 // --- Pairings ------------------------------------------------------------------------------
 
 const AVOCADO_OIL = /\bavocado oil\b/
-const SALT = /\bsalt\b/
-const PEPPER = /\bpepper\b/
-const NUSALT = /\bnu ?salt\b/
-/** What each pairing finds among your foods; salt and pepper only as condiments, and salt isn't NuSalt. */
+export const isAvocadoOil = (f: Pick<Food, 'name'>) => AVOCADO_OIL.test(f.name.toLowerCase()) && !/\bmayo/i.test(f.name)
+export const isPlainSalt = (f: Pick<Food, 'name'> & Partial<Pick<Food, 'source'>>) => saltKind(f) === 'salt' && isSeasoning(f) && !FLAVORED_SALT.test(f.name)
+export const isPepper = (f: Pick<Food, 'name'> & Partial<Pick<Food, 'source'>>) => PEPPER.test(f.name.toLowerCase()) && !SALT.test(f.name.toLowerCase()) && isSeasoning(f)
+/** What each pairing finds among your foods, by name, so a food moved out of Condiments still counts. */
 const PAIR_PICK: [RegExp, (f: Pick<Food, 'name' | 'meta' | 'source'>) => boolean][] = [
-  [AVOCADO_OIL, (f) => !/\bmayo/i.test(f.name)],
-  [SALT, (f) => !NUSALT.test(f.name.toLowerCase()) && sectionsOf(f).includes('condiments')],
-  [PEPPER, (f) => sectionsOf(f).includes('condiments')],
+  [AVOCADO_OIL, isAvocadoOil],
+  [SALT, isPlainSalt],
+  [PEPPER, isPepper],
   [NUSALT, () => true],
 ]
 
@@ -334,16 +352,16 @@ const COOKED =
 const SALTED_ALREADY = /\b(bacon|ham|sausages?|brats?|bratwurst|jerky|deli|sliced|smoked|canned|salami|pepperoni|nuggets|tenders|sushi|soup|chips|salad)\b/
 
 /**
- * Foods that always go in with another: egg whites in avocado oil with salt, pepper and NuSalt; eggs with
- * salt, pepper and NuSalt; anything cooked with salt or NuSalt.
+ * Foods that always go in with another: eggs and egg whites in avocado oil with NuSalt, salt and pepper;
+ * anything cooked with NuSalt and salt.
  */
 const PAIR_RULES: { match: RegExp; not?: RegExp; with: RegExp[] }[] = [
-  { match: /\begg whites?\b/, with: [AVOCADO_OIL, SALT, PEPPER, NUSALT] },
-  { match: /\beggs?\b/, not: /\bwhites?\b|eggplant|salad|bites?|noodles?|nog\b/, with: [SALT, PEPPER, NUSALT] },
-  { match: COOKED, not: SALTED_ALREADY, with: [SALT, NUSALT] },
+  { match: /\begg whites?\b/, with: [NUSALT, SALT, AVOCADO_OIL, PEPPER] },
+  { match: /\beggs?\b/, not: /\bwhites?\b|eggplant|salad|bites?|noodles?|nog\b/, with: [NUSALT, SALT, AVOCADO_OIL, PEPPER] },
+  { match: COOKED, not: SALTED_ALREADY, with: [NUSALT, SALT] },
 ]
 
-/** Salt or NuSalt: you use one at home and the other away, so the app remembers which you used last. */
+/** Salt or NuSalt, or neither. */
 export function saltKind(f: Pick<Food, 'name'>): 'salt' | 'nusalt' | null {
   const n = f.name.toLowerCase()
   return NUSALT.test(n) ? 'nusalt' : SALT.test(n) ? 'salt' : null
@@ -353,11 +371,13 @@ type Pairable = Pick<Food, 'id' | 'name' | 'brand' | 'meta' | 'source' | 'use_co
 
 /** The foods logged along with this one: the ones you chose, else the usual pairings found among your foods (most used first). */
 export function pairsFor<F extends Pairable>(food: Pick<Food, 'id' | 'name' | 'brand' | 'meta'> & Partial<Pick<Food, 'source'>>, foods: F[]): F[] {
-  if (food.meta.pairs) return food.meta.pairs.map((id) => foods.find((f) => f.id === id)).filter((f): f is F => !!f)
-  // A recipe has its salt in its ingredients.
-  if (food.source === 'recipe') return []
   const full = `${food.brand ?? ''} ${food.name}`.toLowerCase()
   const rule = PAIR_RULES.find((r) => r.match.test(full) && !r.not?.test(full))
+  // Lists saved on eggs before they got all four pairings don't count; ones chosen since do.
+  const stale = rule === PAIR_RULES[0] || rule === PAIR_RULES[1] ? !food.meta.pairsChosen : false
+  if (food.meta.pairs && !stale) return food.meta.pairs.map((id) => foods.find((f) => f.id === id)).filter((f): f is F => !!f)
+  // A recipe has its salt in its ingredients.
+  if (food.source === 'recipe') return []
   if (!rule) return []
   const out: F[] = []
   for (const re of rule.with) {

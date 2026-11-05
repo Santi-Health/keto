@@ -7,7 +7,7 @@ import type { ActivityDay } from './activity'
 import type { ReadingRow } from './readings'
 import type { SavedMeal } from './savedMeals'
 import { buildLogEntry, type Food, type LogEntry, type Meal, type NewFood } from './foods'
-import { STARTER_FOODS } from './starterFoods'
+import { STAPLES, STARTER_FOODS } from './starterFoods'
 import { supabase } from './supabase'
 import { localDate } from './targets'
 import { entryDay } from './time'
@@ -88,6 +88,7 @@ export function DataProvider({ session, children }: { session: Session | null; c
   useEffect(() => {
     if (!foodsTable.pulled) return
     for (const f of STARTER_FOODS) if (!foodsTable.byId[f.id]) foodsTable.upsert(f)
+    for (const s of STAPLES) if (!foodsTable.byId[s.food.id] && !foodsTable.rows.some(s.have)) foodsTable.upsert(s.food)
   }, [foodsTable.pulled]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const logFood = useCallback(

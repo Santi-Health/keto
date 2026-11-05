@@ -51,6 +51,8 @@ export interface FoodMeta {
   portion?: { amount: number; unit: string }
   /** Foods logged along with this one from its button (oil, salt, pepper with egg whites), when the user chose them. */
   pairs?: string[]
+  /** `pairs` was chosen after eggs got their full set of pairings. */
+  pairsChosen?: boolean
 }
 
 /** Row shape of the `foods` table. */

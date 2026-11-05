@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useData } from '../lib/data'
 import { MEALS, portionNutrients, type Food, type LogEntry, type Meal } from '../lib/foods'
-import { SECTIONS, nutCount, pairsFor, portionText, saltKind, sectionsOf, servingOf, setPortionOf, shortName, unshout } from '../lib/quickFoods'
+import { SECTIONS, nutCount, pairsFor, portionText, sectionsOf, servingOf, setPortionOf, shortName, unshout } from '../lib/quickFoods'
 import type { SavedMeal } from '../lib/savedMeals'
 import { toGrams, unitsFor } from '../lib/units'
 import { DeleteFood } from './DeleteFood'
@@ -65,23 +65,6 @@ function portionLabel(food: Food, amount: number, unit: string): string {
 /** The serving on a button. */
 const servingText = (food: Food) => portionLabel(food, servingOf(food).amount, servingOf(food).unit)
 
-const SALT_KEY = 'keto.lastSalt'
-/** The salt (or NuSalt, or both) used in the last log that had one, on this phone. */
-function lastSalt(): string[] | null {
-  try {
-    return JSON.parse(localStorage.getItem(SALT_KEY) ?? 'null')
-  } catch {
-    return null
-  }
-}
-function rememberSalt(kinds: string[]) {
-  try {
-    localStorage.setItem(SALT_KEY, JSON.stringify(kinds))
-  } catch {
-    // Private mode: every log starts with both.
-  }
-}
-
 /**
  * Tap a food button: its full name, how many portions (one by default, any number typed), the foods that
  * go with it, what that adds, and Log. Other amounts, editing, renaming the button and its section are one tap further.
@@ -111,11 +94,8 @@ export function QuickLogSheet({
   const [when, setWhen] = useState(() => toLocalInput(defaultTime(date)))
   const steps = Number(times) > 0 ? Number(times) : 0
   const pairs = useMemo(() => pairsFor(food, foods), [food, foods])
-  /** Pairings left out of this one log: to start, the salt you didn't use last time (NuSalt at home, salt away). */
-  const [skipped, setSkipped] = useState<string[]>(() => {
-    const last = lastSalt()
-    return last ? pairs.filter((p) => saltKind(p) && !last.includes(saltKind(p)!)).map((p) => p.id) : []
-  })
+  /** Pairings left out of this one log. */
+  const [skipped, setSkipped] = useState<string[]>([])
   const [pairing, setPairing] = useState(false)
   const [renaming, setRenaming] = useState(false)
   const [name, setName] = useState(shortName(food))
@@ -144,14 +124,12 @@ export function QuickLogSheet({
     const at = new Date(when)
     const entries = [logFood(food, amount, serving.unit, meal, at)]
     for (const p of withIt) entries.push(logFood(p, servingOf(p).amount, servingOf(p).unit, meal, at))
-    const salts = withIt.map(saltKind).filter((k) => k != null)
-    if (salts.length) rememberSalt(salts)
     onLogged(entries, `${portion} ${shortName(food)}${withIt.length ? ` with ${withIt.map((p) => shortName(p)).join(', ')}` : ''}`)
   }
 
   function togglePair(id: string) {
     const ids = pairs.map((p) => p.id)
-    updateFood({ ...food, meta: { ...food.meta, pairs: ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id] } })
+    updateFood({ ...food, meta: { ...food.meta, pairs: ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id], pairsChosen: true } })
   }
   /** Foods to choose pairings from: the current ones, then condiments, most used first. */
   const pairChoices = useMemo(
