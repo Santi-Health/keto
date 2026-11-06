@@ -121,6 +121,8 @@ describe('food buttons', () => {
     expect(fruitNutPortion(f('Capers'), 9, 'g', 9)).toBe('0.3 oz (25)')
     expect(fruitNutPortion(f('Capers'), 1, 'g', 1)).toBe(null)
     expect(fruitNutPortion(f('Chia seeds'), 1, '1 tbsp', 12)).toBe('0.4 oz')
+    expect(fruitNutPortion(f('Raw pine nuts'), 8.4, 'g', 8.4)).toBe('0.3 oz (1 tbsp)')
+    expect(fruitNutPortion(f('Raw pine nuts'), 1, 'oz', 28.35)).toBe('1 oz (3½ tbsp)')
     expect(fruitNutPortion(f('Salmon'), 1, 'oz', 28.35)).toBe(null)
   })
   it('starts nuts, olives and berries at an ounce, but keeps a portion you chose', () => {
@@ -132,6 +134,8 @@ describe('food buttons', () => {
     expect(servingOf(food('Apple', {}, [{ unit: '1 medium', grams: 182 }]))).toEqual({ amount: 1, unit: '1 medium' })
     expect(servingOf(food('Almond yogurt'))).toEqual({ amount: 1, unit: '1 serving (30 g)' })
     expect(servingOf(food('Capers'))).toEqual({ amount: 9, unit: 'g' })
+    expect(servingOf(food('Raw pine nuts'))).toEqual({ amount: 8.4, unit: 'g' })
+    expect(servingOf(food('Raw pine nuts', { portion: { amount: 1, unit: 'oz' } }))).toEqual({ amount: 1, unit: 'oz' })
     expect(servingOf(food('Capers', { portion: { amount: 2, unit: '1 tbsp' } }))).toEqual({ amount: 2, unit: '1 tbsp' })
     expect(servingOf(food('Chicken with capers'))).toEqual({ amount: 1, unit: '1 serving (30 g)' })
   })

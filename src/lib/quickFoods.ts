@@ -301,6 +301,10 @@ const SMALL_PIECES = 2
 /** Foods made from nuts or fruit, and dishes with them, that aren't counted by the piece. */
 const NOT_WHOLE_NUT = /\b(butter|flour|milk|meal|oil|bar|paste|tapenade|sliced|slivered|chopped|ground|crust|cookie|dried|freeze|jam|jelly|puree|powder|chips|tomato(es)?|chicken|salmon|fish|beef|pork|salad)\b/i
 
+/** Too small to count (about 167 to the ounce), so they go by the tablespoon, USDA's 135 g cup. */
+const PINE_NUTS = /\bpine ?nuts?\b/i
+const PINE_NUT_TBSP_G = 8.4
+
 type Countable = Pick<Food, 'name'> & Partial<Pick<Food, 'meta' | 'source'>>
 const inFruitsNuts = (food: Countable) => !!food.meta && sectionsOf({ name: food.name, meta: food.meta, source: food.source ?? 'manual' }).includes('fruits_nuts')
 
@@ -333,6 +337,7 @@ export function nutCountWords(food: Countable, grams: number, unit = ''): string
 export function fruitNutPortion(food: Countable, amount: number, unit: string, grams: number): string | null {
   const ounces = round1(grams / GRAMS_PER_OZ)
   if (!inFruitsNuts(food) || !ounces) return null
+  if (PINE_NUTS.test(food.name) && !NOT_WHOLE_NUT.test(food.name)) return `${ounces} oz (${frac(Math.max(0.5, Math.round((grams / PINE_NUT_TBSP_G) * 2) / 2))} tbsp)`
   const hit = countEntry(food)
   const stated = hit && unit.toLowerCase().match(new RegExp(`(\\d+) ${pieceWord(hit)}`))
   const count = stated ? Number(stated[1]) * amount : nutCount(food, grams, unit)?.slice(1)
@@ -353,6 +358,7 @@ export function frac(n: number): string {
 /** Usual portions for specific foods, when no portion was set on the food itself. */
 const USUAL_PORTIONS: { match: RegExp; brand?: RegExp; amount: number; unit: string }[] = [
   { match: /\begg whites?\b/, brand: /kirkland/, amount: 6, unit: 'oz' },
+  { match: /^(?!.*\b(with|and|sauce|pesto|chicken|salmon|fish)\b).*\bpine ?nuts?\b/, amount: PINE_NUT_TBSP_G, unit: 'g' },
   // A tablespoon: an ounce of capers is far saltier than anyone eats. Not dishes made with them.
   { match: /^(?!.*\b(with|and|sauce|chicken|salmon|fish)\b).*\bcapers?\b/, amount: 9, unit: 'g' },
 ]
