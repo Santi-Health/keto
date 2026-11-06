@@ -123,7 +123,7 @@ export function brandsToShow(foods: Pick<Food, 'id' | 'name' | 'brand' | 'meta'>
 // --- Fruits & nuts -------------------------------------------------------------------------
 
 const FRUIT_NUT =
-  /\b(berr(y|ies)|strawberr|blueberr|raspberr|blackberr|cranberr|apples?|bananas?|oranges?|clementines?|mandarins?|lemons?|limes?|grapes?|melon|watermelon|cantaloupe|cherr(y|ies)|peach(es)?|pears?|plums?|kiwi|mango(es)?|pineapple|papaya|figs?|dates|coconut|almonds?|walnuts?|pecans?|macadamias?|cashews?|pistachios?|hazelnuts?|brazil nuts?|peanuts?|pine nuts?|nuts|chia|flax(seed)?|pumpkin seeds?|pepitas|sunflower seeds?|hemp seeds?|olives?)/i
+  /\b(berr(y|ies)|strawberr|blueberr|raspberr|blackberr|cranberr|apples?|bananas?|oranges?|clementines?|mandarins?|lemons?|limes?|grapes?|melon|watermelon|cantaloupe|cherr(y|ies)|peach(es)?|pears?|plums?|kiwi|mango(es)?|pineapple|papaya|figs?|dates|coconut|almonds?|walnuts?|pecans?|macadamias?|cashews?|pistachios?|hazelnuts?|brazil nuts?|peanuts?|pine nuts?|nuts|chia|flax(seed)?|pumpkin seeds?|pepitas|sunflower seeds?|hemp seeds?|olives?|capers?)/i
 /** Foods made from fruit or nuts that aren't eaten as fruit or nuts. */
 const NOT_FRUIT_NUT = /\b(milk|flour|bread|crust|cake|cookie|muffin|bar|oil|juice|yogurt|yoghurt|oikos|skyr|kefir|ice cream|chocolate|cereal|granola|sauce|dressing)\b/i
 
@@ -136,11 +136,14 @@ const CONDIMENT =
   /\b(mayo(nnaise)?|aioli|ketchup|catsup|mustard|hot sauce|sriracha|tabasco|cholula|buffalo sauce|bbq sauce|barbecue sauce|soy sauce|tamari|coconut aminos|fish sauce|worcestershire|teriyaki|salsa|pico de gallo|chimichurri|pesto|tahini|relish|horseradish|wasabi|ranch|dressing|vinaigrette|vinegar|lemon juice|lime juice|salt|nusalt|pepper(corns)?|seasoning|spices?|everything bagel|garlic powder|onion powder|paprika|cumin|oregano|cinnamon|chili flakes|red pepper flakes|sweetener|stevia|monk fruit|allulose|erythritol|(olive|avocado|coconut|mct|sesame|canola|sunflower|cooking|vegetable) oil)\b/i
 /** "Pepper" the seasoning, not bell or jalapeño peppers; olive oil, not tuna in olive oil. */
 const NOT_CONDIMENT = /\bin (\w+ )?oil\b|\b(bell|jalape[nñ]o|poblano|sweet|stuffed|roasted|chicken|steak|beef|salmon|pork|bread|chips|nuts|almonds)\b/i
+/** Butter and spreads that go on or in things; "sweet cream butter" counts, nut butters and baked goods don't. */
+const SPREAD = /\b(butter|ghee|cream cheese|cheese, cream|philadelphia|sour cream)\b/i
+const NOT_SPREAD = /\b(peanut|almond|cashew|sunflower|nut|seed|apple|cookies?|bread|cake|crackers?|popcorn|chicken|sauce)\b/i
 
 // --- Picada: cheese, cold meats and olives ------------------------------------------------
 
 const PICADA =
-  /\b(cheeses?|brie|camembert|manchego|gouda|cheddar|parmesan|parmigiano|pecorino|gruy[eè]re|comt[eé]|mozzarella|burrata|feta|provolone|havarti|emmental|swiss|roquefort|gorgonzola|stilton|halloumi|queso|salami|prosciutto|jam[oó]n|serrano|chorizo|mortadella|pepperoni|soppressata|sopressata|bresaola|coppa|capicola|pastrami|lomo|salchich[oó]n|deli (ham|turkey)|sliced (ham|turkey)|ham|olives?)\b/i
+  /\b(cheeses?|brie|camembert|manchego|gouda|cheddar|parmesan|parmigiano|pecorino|gruy[eè]re|comt[eé]|mozzarella|burrata|feta|provolone|havarti|emmental|swiss|roquefort|gorgonzola|stilton|halloumi|queso|salami|prosciutto|jam[oó]n|serrano|chorizo|mortadella|pepperoni|soppressata|sopressata|bresaola|coppa|capicola|pastrami|lomo|salchich[oó]n|deli (ham|turkey)|sliced (ham|turkey)|ham|olives?|capers?)\b/i
 /** Cheese and meats that aren't for a picada: spreads, cheese in dishes, cooked ham steaks. */
 const NOT_PICADA = /\b(cream cheese|cottage|ricotta|mascarpone|sauce|dressing|crackers|chips|crisps|bites|puffs|curls|whisps|pizza|burger|omelet|quesadilla|soup|bread|oil|steak|hamburger|powder|grated)\b/i
 
@@ -163,7 +166,7 @@ export function sectionsOf(food: Pick<Food, 'name' | 'meta' | 'source'>): FoodSe
   if (food.source === 'recipe') return []
   const n = food.name
   const out: FoodSection[] = []
-  const condiment = CONDIMENT.test(n) && !NOT_CONDIMENT.test(n)
+  const condiment = (CONDIMENT.test(n) && !NOT_CONDIMENT.test(n)) || (SPREAD.test(n) && !NOT_SPREAD.test(n))
   if (!condiment && FRUIT_NUT.test(n) && !NOT_FRUIT_NUT.test(n)) out.push('fruits_nuts')
   // The short name too, for USDA order: "Cheese, cream" is cream cheese.
   if (PICADA.test(n) && !NOT_PICADA.test(n) && !NOT_PICADA.test(shortName({ name: n, brand: null, meta: {} }))) out.push('picada')

@@ -38,6 +38,17 @@ describe('food buttons', () => {
     expect(sectionsOf(f('Salt and pepper chicken'))).toEqual([])
     expect(sectionsOf(f('Pecans', null, { group: 'condiments' }))).toEqual(['condiments'])
   })
+  it('keeps butter and cream cheese with the condiments, but not nut butters', () => {
+    for (const n of ['Butter', 'Salted Butter', 'Sweet Cream Butter', 'Ghee', 'Philadelphia Cream Cheese', 'Philadelphia Original', 'Cheese, cream', 'Sour cream'])
+      expect(sectionsOf(f(n))).toEqual(['condiments'])
+    expect(sectionsOf(f('Almond butter'))).not.toContain('condiments')
+    expect(sectionsOf(f('Peanut butter'))).not.toContain('condiments')
+    expect(sectionsOf(f('Butter cookies'))).toEqual([])
+  })
+  it('keeps capers with the olives', () => {
+    expect(sectionsOf(f('Capers'))).toEqual(sectionsOf(f('Olives')))
+    expect(sectionsOf(f('Capers'))).toEqual(['fruits_nuts', 'picada'])
+  })
   it('picks an icon and reads portions', () => {
     expect(foodIcon(f('Keto bread'))).toBe('🍞')
     expect(foodIcon(f('Avocado oil mayo'))).toBe('🫙')
@@ -56,8 +67,9 @@ describe('food buttons', () => {
   it('puts cheese and cold meats in Picada, not cream cheese or ham steaks', () => {
     for (const n of ['Manchego cheese', 'Brie', 'Genoa salami', 'Prosciutto di Parma', 'Jamón serrano', 'Sliced ham', 'Chorizo', 'Cheddar cheese, sharp'])
       expect(sectionsOf(f(n))).toEqual(['picada'])
-    for (const n of ['Cream cheese', 'Cheese, cream', 'Cottage cheese', 'Ham steak', 'Grated parmesan', 'Cheese Bites Onion', 'Cheddar cheese crisps'])
+    for (const n of ['Cottage cheese', 'Ham steak', 'Grated parmesan', 'Cheese Bites Onion', 'Cheddar cheese crisps'])
       expect(sectionsOf(f(n))).toEqual([])
+    for (const n of ['Cream cheese', 'Cheese, cream']) expect(sectionsOf(f(n))).not.toContain('picada')
     expect(sectionsOf(f('Olives', null, { sections: ['picada'] }))).toEqual(['picada'])
     expect(sectionsOf(f('Olives', null, { group: 'other' }))).toEqual([])
   })
