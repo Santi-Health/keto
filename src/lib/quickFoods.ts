@@ -498,13 +498,32 @@ const MAX_PINCH_G = 2
 const SPOON = /(\d+(?:\.\d+)?|\d\/\d|[½¼¾])?\s*(tbsp|tablespoons?|tsp|teaspoons?|cups?)\b/i
 const spoonCount = (n: string | undefined) => (!n ? 1 : n.includes('/') ? Number(n[0]) / Number(n[2]) : ({ '½': 0.5, '¼': 0.25, '¾': 0.75 }[n] ?? Number(n)))
 
+/** What a tablespoon weighs, USDA, to catch a saved measure that can't match its grams. Whipped spreads are lighter. */
+const TBSP_G: [RegExp, number][] = [
+  [/cream cheese|cheese, cream|philadelphia/, 14.5],
+  [/sour cream/, 12],
+  [/mayo/, 14],
+  [/butter|ghee/, 14],
+  [/\boil\b/, 13.6],
+]
+const SPOONS_PER_TBSP: Record<string, number> = { tbsp: 1, tsp: 3, cup: 1 / 16 }
+
+/** The spoons a weight really is when the saved measure is off by over a quarter ("1 tbsp" of cream cheese at 31 g is 2). The grams are what's logged, so they win. */
+function spoonsFor(name: string, count: number, word: string, grams: number): number {
+  const n = name.toLowerCase()
+  const tbsp = /whipped/.test(n) ? undefined : TBSP_G.find(([re]) => re.test(n))?.[1]
+  if (!tbsp) return count
+  const each = tbsp / SPOONS_PER_TBSP[word]
+  return Math.abs(grams / count - each) / each > 0.25 ? Math.max(0.5, Math.round((grams / each) * 2) / 2) : count
+}
+
 /** A condiment by what you'd measure it in, never "serving": "2 tbsp (31 g)", "1 pinch (1 g)", else its weight. */
-function condimentPortion(amount: number, unit: string, grams: number, times: number, seasoning: boolean): string {
+function condimentPortion(name: string, amount: number, unit: string, grams: number, times: number, seasoning: boolean): string {
   const spoon = unit.match(SPOON)
   if (spoon) {
-    const count = spoonCount(spoon[1]) * amount
-    const word = spoon[2].toLowerCase().replace(/^tablespoons?$/, 'tbsp').replace(/^teaspoons?$/, 'tsp').replace(/^cups?$/, count > 1 ? 'cups' : 'cup')
-    return `${frac(count)} ${word} (${fmtGrams(grams)})`
+    const word = spoon[2].toLowerCase().replace(/^tablespoons?$/, 'tbsp').replace(/^teaspoons?$/, 'tsp').replace(/^cups?$/, 'cup')
+    const count = spoonsFor(name, spoonCount(spoon[1]) * amount, word, grams)
+    return `${frac(count)} ${word === 'cup' && count > 1 ? 'cups' : word} (${fmtGrams(grams)})`
   }
   if (seasoning || grams <= MAX_PINCH_G) return `${frac(times)} ${times > 1 ? 'pinches' : 'pinch'} (${fmtGrams(grams)})`
   return unit === 'g' || /serving|portion/i.test(unit) ? fmtGrams(grams) : sizeText(amount, unit, grams)
@@ -518,7 +537,7 @@ export function sectionPortion(food: Pick<Food, 'name' | 'brand' | 'meta' | 'sou
   const sections = sectionsOf(food)
   const serving = servingOf(food)
   const times = serving.unit === unit && serving.amount ? amount / serving.amount : 1
-  if (sections.includes('condiments')) return condimentPortion(amount, unit, grams, times, isSeasoning(food))
+  if (sections.includes('condiments')) return condimentPortion(food.name, amount, unit, grams, times, isSeasoning(food))
   // Olives are in both of these, and keep their count.
   if (sections.includes('fruits_nuts')) return fruitNutPortion(food, amount, unit, grams)
   if (sections.includes('picada')) return `${frac(times)} ${times > 1 ? 'servings' : 'serving'} (${fmtGrams(grams)})`
