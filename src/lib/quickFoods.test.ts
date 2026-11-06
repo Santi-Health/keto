@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { asPinch, brandsToShow, foodIcon, oversizedSeasonings, learnedPrefixes, nutCount, unshout, suggestDisplayName, sectionsOf, veryFrequentAt, pairsFor, portionText, saltKind, servingOf, shortName } from './quickFoods'
+import { asPinch, brandsToShow, foodIcon, nutCountWords, oversizedSeasonings, sizeText, learnedPrefixes, nutCount, unshout, suggestDisplayName, sectionsOf, veryFrequentAt, pairsFor, portionText, saltKind, servingOf, shortName } from './quickFoods'
 
 const f = (name: string, brand: string | null = null, meta = {}, id = name) => ({ id, name, brand, meta, source: 'manual' as const })
 
@@ -155,9 +155,10 @@ describe('foods that go with another', () => {
     const moved = pantry.map((f) => ({ ...f, meta: { ...f.meta, sections: [] } }))
     expect(pairsFor(food('e', 'Eggs'), moved).map((f) => f.id)).toEqual(['nu', 'salt', 'oil', 'pep'])
   })
-  it('replaces a list saved on eggs before all four, but keeps one chosen since', () => {
+  it('always gives eggs all four, and keeps anything else you added', () => {
     expect(pairsFor(food('e', 'Eggs', 0, { pairs: ['nu'] }), pantry).map((f) => f.id)).toEqual(['nu', 'salt', 'oil', 'pep'])
-    expect(pairsFor(food('e', 'Eggs', 0, { pairs: ['nu'], pairsChosen: true }), pantry).map((f) => f.id)).toEqual(['nu'])
+    expect(pairsFor(food('e', 'Eggs', 0, { pairs: [] }), pantry).map((f) => f.id)).toEqual(['nu', 'salt', 'oil', 'pep'])
+    expect(pairsFor(food('e', 'Eggs', 0, { pairs: ['mayo'] }), pantry).map((f) => f.id)).toEqual(['nu', 'salt', 'oil', 'pep', 'mayo'])
   })
   it('keeps salt and pepper to a 1 g pinch, whatever was set by mistake', () => {
     const seasoning = (name: string, extra = {}) => ({ name, unit_conversions: [], meta: {}, ...extra })
@@ -177,6 +178,21 @@ describe('foods that go with another', () => {
     expect(pinch.nutrients.netCarbs).toBeCloseTo(0.39)
     expect(pinch.nutrients.sweetenerServings).toBe(1)
   })
+  it('says how much every portion is', () => {
+    expect(sizeText(1, '1 serving', 85)).toBe('1 serv. (85 g)')
+    expect(sizeText(3, 'oz', 85)).toBe('3 oz (85 g)')
+    expect(sizeText(150, 'g', 150)).toBe('150 g (5.3 oz)')
+    expect(sizeText(1, 'g', 1)).toBe('1 g')
+    expect(sizeText(2, '1 egg', 100)).toBe('2 eggs (100 g)')
+    expect(sizeText(1, '1 serving (3 slices (56 g))', 56)).toBe('1 serv. (3 slices, 56 g)')
+    expect(sizeText(1, '1 serving (1 portion (0.5 g))', 0.5)).toBe('1 portion (0.5 g)')
+    expect(sizeText(10, 'fl oz', 296)).toBe('10 fl oz')
+    expect(sizeText(1, 'can', 355)).toBe('1 can')
+  })
+  it('counts nuts in words', () => {
+    expect(nutCountWords({ name: 'Almonds' }, 28.35)).toBe('~23 almonds')
+    expect(nutCountWords({ name: 'Eggs' }, 28.35)).toBeNull()
+  })
   it('does not treat vegetables or dishes as seasoning', () => {
     for (const n of ['Red pepper', 'Red bell pepper', 'Pepper jack cheese', 'Salt and pepper chicken']) expect(servingOf({ name: n, unit_conversions: [], meta: {} })).toEqual({ amount: 100, unit: 'g' })
   })
@@ -187,7 +203,7 @@ describe('foods that go with another', () => {
     expect([saltKind({ name: 'NuSalt' }), saltKind({ name: 'Salt, table' }), saltKind({ name: 'Black pepper' })]).toEqual(['nusalt', 'salt', null])
   })
   it('follows the pairings you chose, even none', () => {
-    expect(pairsFor(food('ew', 'Egg Whites', 0, { pairs: ['salt'], pairsChosen: true }), pantry).map((f) => f.id)).toEqual(['salt'])
-    expect(pairsFor(food('ew', 'Egg Whites', 0, { pairs: [], pairsChosen: true }), pantry)).toEqual([])
+    expect(pairsFor(food('c', 'Chicken thighs', 0, { pairs: ['salt'] }), pantry).map((f) => f.id)).toEqual(['salt'])
+    expect(pairsFor(food('c', 'Chicken thighs', 0, { pairs: [] }), pantry)).toEqual([])
   })
 })

@@ -6,7 +6,7 @@ export interface UnitConversion {
 
 export const BASE_UNITS = ['g', 'oz', 'ml', 'fl oz', 'cup', 'tbsp', 'tsp'] as const
 
-const GRAMS_PER_OZ = 28.3495
+export const GRAMS_PER_OZ = 28.3495
 const ML_PER = { ml: 1, 'fl oz': 29.5735, cup: 236.588, tbsp: 14.7868, tsp: 4.92892 } as const
 
 export interface FoodPortions {

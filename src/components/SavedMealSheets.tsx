@@ -3,7 +3,8 @@ import { useData } from '../lib/data'
 import { MEALS, type Food, type LogEntry, type Meal } from '../lib/foods'
 import { addNutrients } from '../lib/nutrients'
 import { defaultMealName, itemFood, itemNutrients, mealFromEntries, type SavedMeal, type SavedMealItem } from '../lib/savedMeals'
-import { formatAmount } from '../lib/units'
+import { sizeText } from '../lib/quickFoods'
+import { toGrams } from '../lib/units'
 import { MacroStrip } from './FoodBits'
 import { Sheet } from './Sheet'
 
@@ -43,7 +44,7 @@ export function SaveMealSheet({ entries, meal, onClose }: { entries: LogEntry[];
                 {i.food.name}
               </span>
               <span className="sub" style={{ display: 'block' }}>
-                {formatAmount(i.amount, i.unit)}
+                {sizeText(i.amount, i.unit, toGrams({ unitConversions: i.food.unit_conversions }, i.amount, i.unit).grams)}
               </span>
             </span>
           </div>

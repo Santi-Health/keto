@@ -1,9 +1,10 @@
 import { useMemo, useState } from 'react'
 import { useData } from '../lib/data'
 import { MEALS, portionNutrients, type Food, type LogEntry, type Meal } from '../lib/foods'
-import { SECTIONS, nutCount, pairsFor, portionText, sectionsOf, servingOf, setPortionOf, shortName, unshout } from '../lib/quickFoods'
+import { SECTIONS, nutCount, nutCountWords, pairsFor, portionText, sectionsOf, servingOf, setPortionOf, shortName, sizeText, unshout, withNote } from '../lib/quickFoods'
 import type { SavedMeal } from '../lib/savedMeals'
-import { toGrams, unitsFor } from '../lib/units'
+import { STAPLES } from '../lib/starterFoods'
+import { GRAMS_PER_OZ, toGrams, unitsFor } from '../lib/units'
 import { DeleteFood } from './DeleteFood'
 import { FoodIcon } from './FoodIcon'
 import { defaultTime, toLocalInput } from './LogFoodSheet'
@@ -51,15 +52,18 @@ export function FoodButtons({
   )
 }
 
-/**
- * What one portion reads as: "1 slice", "1 oz (~23)" for whole nuts, "1 serv. (~3)" for olives,
- * and recipes with their weight, "1 serv. (300 g)".
- */
+/** What one portion reads as: "1 slice (28 g)", "1 oz (~23)" for whole nuts, "1 serv. (300 g)". */
 function portionLabel(food: Food, amount: number, unit: string): string {
   const grams = toGrams({ unitConversions: food.unit_conversions }, amount, unit).grams
-  const extra = food.source === 'recipe' ? `${Math.round(grams)} g` : nutCount(food, grams, unit)
-  const portion = portionText(amount, unit)
-  return extra ? `${portion} (${extra})` : portion
+  const count = nutCount(food, grams, unit)
+  return count ? withNote(portionText(amount, unit), count) : sizeText(amount, unit, grams)
+}
+
+/** The same with room to spare: "1 oz (28 g, ~23 almonds)". */
+function portionInFull(food: Food, amount: number, unit: string): string {
+  const grams = toGrams({ unitConversions: food.unit_conversions }, amount, unit).grams
+  const count = nutCountWords(food, grams, unit)
+  return count ? withNote(sizeText(amount, unit, grams), count) : sizeText(amount, unit, grams)
 }
 
 /** The serving on a button. */
@@ -91,9 +95,14 @@ export function QuickLogSheet({
   const { foods, logFood, updateFood } = useData()
   const serving = servingOf(food)
   const [times, setTimes] = useState('1')
+  const servingGrams = toGrams({ unitConversions: food.unit_conversions }, serving.amount, serving.unit).grams
+  const [weightUnit, setWeightUnit] = useState<'oz' | 'g'>(serving.unit === 'g' ? 'g' : 'oz')
+  /** What's being typed in the weight field; otherwise it follows the number of servings. */
+  const [weightText, setWeightText] = useState<string | null>(null)
   const [when, setWhen] = useState(() => toLocalInput(defaultTime(date)))
   const steps = Number(times) > 0 ? Number(times) : 0
-  const pairs = useMemo(() => pairsFor(food, foods), [food, foods])
+  // Salt, pepper and oil are offered even if they aren't saved yet; logging one saves it.
+  const pairs = useMemo(() => pairsFor(food, [...foods, ...STAPLES.filter((s) => !foods.some(s.have)).map((s) => s.food)]), [food, foods])
   /** Pairings left out of this one log. */
   const [skipped, setSkipped] = useState<string[]>([])
   const [pairing, setPairing] = useState(false)
@@ -110,6 +119,15 @@ export function QuickLogSheet({
   const portion = portionLabel(food, amount, serving.unit)
   const mealLabel = MEALS.find((m) => m.value === meal)!.label.toLowerCase()
   const sections = sectionsOf(food)
+  const perUnit = weightUnit === 'oz' ? GRAMS_PER_OZ : 1
+  function setWeight(text: string) {
+    setWeightText(text)
+    if (Number(text) > 0) setTimes(String(Math.round(((Number(text) * perUnit) / servingGrams) * 1000) / 1000))
+  }
+  function setServings(text: string) {
+    setWeightText(null)
+    setTimes(text)
+  }
   const fmt = (v: number | undefined, d = 0) => (v == null ? '—' : (Math.round(v * 10 ** d) / 10 ** d).toLocaleString())
 
   const withIt = pairs.filter((p) => !skipped.includes(p.id))
@@ -129,7 +147,7 @@ export function QuickLogSheet({
 
   function togglePair(id: string) {
     const ids = pairs.map((p) => p.id)
-    updateFood({ ...food, meta: { ...food.meta, pairs: ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id], pairsChosen: true } })
+    updateFood({ ...food, meta: { ...food.meta, pairs: ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id] } })
   }
   /** Foods to choose pairings from: the current ones, then condiments, most used first. */
   const pairChoices = useMemo(
@@ -147,28 +165,46 @@ export function QuickLogSheet({
     const amount = Number(portionAmount)
     const portion = clear || !(amount > 0) ? { amount: 0, unit: '' } : { amount, unit: portionUnit }
     updateFood({ ...food, meta: { ...food.meta, portion } })
-    setTimes('1')
+    setServings('1')
     setPortioning(false)
   }
 
   return (
     <Sheet title={unshout(food.name)} subtitle={food.brand ?? undefined} onClose={onClose}>
       <span className="label">
-        How many portions
+        How many servings
         {setPortion && labelServing && labelServing.unit !== setPortion.unit && ` · label serving: ${portionText(1, labelServing.unit)}`}
       </span>
       <div className="portion-times">
-        <button type="button" aria-label="Less" onClick={() => setTimes(String(Math.max(0.5, Math.ceil(steps * 2 - 1) / 2)))}>
+        <button type="button" aria-label="Less" onClick={() => setServings(String(Math.max(0.5, Math.ceil(steps * 2 - 1) / 2)))}>
           −
         </button>
-        <input aria-label="Number of portions" type="number" inputMode="decimal" min={0} step="any" value={times} onChange={(e) => setTimes(e.target.value)} onFocus={(e) => e.target.select()} />
-        <button type="button" aria-label="More" onClick={() => setTimes(String(Math.floor(steps * 2 + 1) / 2))}>
+        <input aria-label="Number of servings" type="number" inputMode="decimal" min={0} step="any" value={times} onChange={(e) => setServings(e.target.value)} onFocus={(e) => e.target.select()} />
+        <button type="button" aria-label="More" onClick={() => setServings(String(Math.floor(steps * 2 + 1) / 2))}>
           +
         </button>
         <span>
-          × {portionText(serving.amount, serving.unit)}
-          {steps !== 1 && steps > 0 && <b> = {portion}</b>}
+          × {portionInFull(food, serving.amount, serving.unit)}
+          {steps !== 1 && steps > 0 && <b> = {portionInFull(food, amount, serving.unit)}</b>}
         </span>
+      </div>
+      <div className="quick-when">
+        <label htmlFor="quick-weight">Or weigh it</label>
+        <input
+          id="quick-weight"
+          type="number"
+          inputMode="decimal"
+          min={0}
+          step="any"
+          value={weightText ?? (grams > 0 ? Math.round((grams / perUnit) * 10) / 10 : '')}
+          onChange={(e) => setWeight(e.target.value)}
+          onFocus={(e) => e.target.select()}
+          onBlur={() => setWeightText(null)}
+        />
+        <select aria-label="Weight unit" value={weightUnit} onChange={(e) => setWeightUnit(e.target.value as 'oz' | 'g')}>
+          <option value="oz">oz</option>
+          <option value="g">g</option>
+        </select>
       </div>
       {pairs.length > 0 && !pairing && (
         <div className="section-chips pair-chips" role="group" aria-label="Goes with">

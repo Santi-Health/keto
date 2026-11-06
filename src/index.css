@@ -1691,6 +1691,11 @@ input.drink-time {
   min-width: 0;
 }
 
+.quick-when select {
+  flex: none;
+  width: auto;
+}
+
 .drink-entry-name {
   flex: 1;
   min-width: 0;

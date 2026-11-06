@@ -1,8 +1,8 @@
 import { isDrinkFood } from './drinks'
 import { MEALS, completeNutrients, suggestForMeal, type Food, type FoodMeta, type LogEntry, type Meal } from './foods'
 import type { Nutrients } from './nutrients'
-import { SECTIONS, portionText, sectionsOf, servingOf, setPortionOf, shortName, veryFrequentAt, type FoodSection } from './quickFoods'
-import type { UnitConversion } from './units'
+import { SECTIONS, sectionsOf, servingOf, setPortionOf, shortName, sizeText, veryFrequentAt, type FoodSection } from './quickFoods'
+import { toGrams, type UnitConversion } from './units'
 
 /**
  * My Foods as one spreadsheet: every food and drink with its names, where it shows on Add, portions and
@@ -154,7 +154,7 @@ const COLUMNS: Column[] = [
       }),
   },
   { head: 'usual portion (e.g. 6 oz; blank = label serving)', get: portionCell, set: (f, v) => withMeta(f, { portion: parsePortion(v, f) }) },
-  { head: 'one tap logs', get: (f) => portionText(servingOf(f).amount, servingOf(f).unit) },
+  { head: 'one tap logs', get: (f) => { const { amount, unit } = servingOf(f); return sizeText(amount, unit, toGrams({ unitConversions: f.unit_conversions }, amount, unit).grams) } },
   { head: 'portions (unit=grams; …)', get: (f) => portionsText(f.unit_conversions), set: (f, v) => ({ ...f, unit_conversions: parsePortions(v) }) },
   ...NUTRIENTS.map(
     (n): Column => ({

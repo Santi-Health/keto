@@ -53,7 +53,7 @@ describe('suggestions from your usual foods', () => {
     const tips = suggestFixes({ dayLogs: day, history, foods, targets: { ...targets, netCarbsG: 10 }, muscleGoal: 'build', fatBudget: null, past: false })
     const carbs = tips.find((t) => t.goal === 'netCarbs')!
     expect(carbs.kind).toBe('trim')
-    expect(carbs.text).toMatch(/^Have 2 × 1 slice of Keto bread instead of 4 × 1 slice$/)
+    expect(carbs.text).toMatch(/^Have 2 slices \(60 g\) of Keto bread instead of 4 slices \(120 g\)$/)
   })
   it('suggests a seasoning only when a couple of grams closes the gap, and adds at most one more usual portion', () => {
     const pepper = food('pep', 'Black pepper', { kcal: 251, protein: 10, potassiumMg: 1329, magnesiumMg: 171, netCarbs: 39 }, 'g', 1)

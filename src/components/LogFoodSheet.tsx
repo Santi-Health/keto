@@ -2,8 +2,8 @@
 import { useMemo, useState } from 'react'
 import { useData } from '../lib/data'
 import { MEALS, mealForTime, portionNutrients, setUsual, usualMealsFor, type Food, type FoodMeta, type LogEntry, type Meal, type NewFood } from '../lib/foods'
-import { isSeasoning, learnedPrefixes, servingOf, setPortionOf, suggestDisplayName, unshout } from '../lib/quickFoods'
-import { toGrams, unitsFor } from '../lib/units'
+import { isSeasoning, learnedPrefixes, servingOf, setPortionOf, sizeText, suggestDisplayName, unshout } from '../lib/quickFoods'
+import { GRAMS_PER_OZ, toGrams, unitsFor } from '../lib/units'
 import { DeleteFood } from './DeleteFood'
 import { FoodFlags, MacroStrip, foodSubtitle } from './FoodBits'
 import { Sheet } from './Sheet'
@@ -62,6 +62,18 @@ export function LogFoodSheet({ food, entry, date, meal: chosenMeal, onClose, onE
   const usualMeals = usualMealsFor({ id: saved?.id ?? '', meta: usualMeta }, logs)
   const [favorite, setFavorite] = useState(saved?.favorite ?? false)
 
+  const base = servingOf(food)
+  const baseGrams = toGrams({ unitConversions: food.unit_conversions }, base.amount, base.unit).grams
+  /** What's being typed in the servings field; otherwise it follows the amount. */
+  const [servingsText, setServingsText] = useState<string | null>(null)
+  function setServings(text: string) {
+    setServingsText(text)
+    if (Number(text) > 0) {
+      setAmount(String(Math.round(Number(text) * base.amount * 1000) / 1000))
+      setUnit(base.unit)
+    }
+  }
+
   const qty = Number(amount)
   const valid = Number.isFinite(qty) && qty > 0
   const portion = useMemo(() => {
@@ -118,6 +130,12 @@ export function LogFoodSheet({ food, entry, date, meal: chosenMeal, onClose, onE
     if (saved) updateFood({ ...saved, favorite: !favorite, meta: { ...saved.meta, meals: usualMeta.meals, notMeals: usualMeta.notMeals } })
   }
 
+  /** A named portion with its weight, unless it already says it. */
+  const unitLabel = (u: string) => {
+    const own = food.unit_conversions.find((c) => c.unit === u)
+    return own && !/\d\s*(g|oz)\b/i.test(u) ? `${u} (${Math.round(own.grams)} g)` : u
+  }
+
   const estimated = food.source === 'ai_estimate' || food.fields_estimated.length > 0
 
   return (
@@ -134,7 +152,7 @@ export function LogFoodSheet({ food, entry, date, meal: chosenMeal, onClose, onE
       {portion && <MacroStrip n={portion.n} estimated={estimated} />}
       {portion && (
         <p className="muted small" style={{ marginTop: -4 }}>
-          {portion.grams.toFixed(0)} g{portion.approximate ? ' (approximate: volume converted as water)' : ''}
+          {portion.grams.toFixed(0)} g ({(portion.grams / GRAMS_PER_OZ).toFixed(1)} oz){portion.approximate ? ' (approximate: volume converted as water)' : ''}
           {portion.n.sodiumMg != null && ` · sodium ${portion.n.sodiumMg.toFixed(0)} mg`}
           {portion.n.satFat != null && ` · sat fat ${portion.n.satFat.toFixed(1)} g`}
         </p>
@@ -155,6 +173,19 @@ export function LogFoodSheet({ food, entry, date, meal: chosenMeal, onClose, onE
         </>
       )}
 
+      <div className="field">
+        <label htmlFor="servings">Servings · 1 = {sizeText(base.amount, base.unit, baseGrams).replace(/^1 serv\. \((.*)\)$/, '$1')}</label>
+        <input
+          id="servings"
+          type="number"
+          inputMode="decimal"
+          min={0}
+          step="any"
+          value={servingsText ?? (portion ? Math.round((portion.grams / baseGrams) * 100) / 100 : '')}
+          onChange={(e) => setServings(e.target.value)}
+          onBlur={() => setServingsText(null)}
+        />
+      </div>
       <div className="row">
         <div className="field">
           <label htmlFor="amt">Amount</label>
@@ -165,7 +196,7 @@ export function LogFoodSheet({ food, entry, date, meal: chosenMeal, onClose, onE
           <select id="unit" value={unit} onChange={(e) => setUnit(e.target.value)}>
             {units.map((u) => (
               <option key={u} value={u}>
-                {u}
+                {unitLabel(u)}
               </option>
             ))}
           </select>

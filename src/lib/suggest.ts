@@ -2,10 +2,10 @@ import { LEUCINE_PER_MEAL_G, estimateAminos, type MuscleGoal } from './aminoAcid
 import { MEALS, portionNutrients, type Food, type LogEntry, type Meal } from './foods'
 import { addNutrients, type Nutrients } from './nutrients'
 import { MICROS, microStatus, vitaminCoverage } from './micros'
-import { isSeasoning, servingOf } from './quickFoods'
+import { isSeasoning, servingOf, sizeText } from './quickFoods'
 import type { Targets } from './targets'
 import type { Sex } from './types'
-import { formatAmount, toGrams } from './units'
+import { toGrams } from './units'
 import { computeWatchList, type WatchContext, type WatchSettings } from './watchlist'
 
 /**
@@ -112,7 +112,7 @@ export function usualFoods(foods: Food[], history: LogEntry[]): UsualFood[] {
 }
 
 const per = (u: UsualFood, steps: number): Nutrients => estimateAminos(portionNutrients(u.food, u.stepGrams * steps))
-const amountText = (u: UsualFood, steps: number) => formatAmount(round1(steps * u.step), u.unit)
+const amountText = (u: UsualFood, steps: number) => sizeText(round1(steps * u.step), u.unit, steps * u.stepGrams)
 const mealLabel = (m: Meal) => MEALS.find((x) => x.value === m)!.label.toLowerCase()
 
 /** Additions above this many calories aren't "a little more of something". */
@@ -355,7 +355,7 @@ export function suggestFixes({ dayLogs, history, foods, targets, muscleGoal, fat
       out.push({
         kind: 'trim',
         goal: lim.goal,
-        text: `${past ? 'Having' : 'Have'} ${formatAmount(keep, biggest.unit)} of ${biggest.food_name} instead of ${formatAmount(biggest.amount, biggest.unit)}${would}`,
+        text: `${past ? 'Having' : 'Have'} ${sizeText(keep, biggest.unit, (biggest.grams * keep) / biggest.amount)} of ${biggest.food_name} instead of ${sizeText(biggest.amount, biggest.unit, biggest.grams)}${would}`,
         effect: `About −${amt(over)}, back under your ${lim.unit ? `${lim.limit} g` : `${Math.round(lim.limit).toLocaleString()} kcal`} limit`,
       })
       continue

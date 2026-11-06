@@ -1,4 +1,4 @@
-import { toGrams } from './units'
+import { GRAMS_PER_OZ, toGrams } from './units'
 import type { Food, LogEntry } from './foods'
 import type { NutrientKey, Nutrients } from './nutrients'
 
@@ -285,6 +285,12 @@ export function nutCount(food: Pick<Food, 'name'>, grams: number, unit = ''): st
   return count > 0 ? `~${count}` : null
 }
 
+/** "~23 almonds" for a portion of whole nuts or olives, or null for anything else. */
+export function nutCountWords(food: Pick<Food, 'name'>, grams: number, unit = ''): string | null {
+  const count = nutCount(food, grams, unit)
+  return count && `${count} ${PER_OZ.find(([re]) => re.test(food.name.toLowerCase()))![2]}`
+}
+
 // --- Portions ------------------------------------------------------------------------------
 
 const FRACTIONS: Record<string, string> = { '0.25': '¼', '0.5': '½', '0.75': '¾' }
@@ -386,16 +392,15 @@ export function saltKind(f: Pick<Food, 'name'>): 'salt' | 'nusalt' | null {
 
 type Pairable = Pick<Food, 'id' | 'name' | 'brand' | 'meta' | 'source' | 'use_count'>
 
-/** The foods logged along with this one: the ones you chose, else the usual pairings found among your foods (most used first). */
+/** The foods logged along with this one. Eggs always get their four, plus any you added; other foods get the ones you chose, else the usual pairings (most used first). */
 export function pairsFor<F extends Pairable>(food: Pick<Food, 'id' | 'name' | 'brand' | 'meta'> & Partial<Pick<Food, 'source'>>, foods: F[]): F[] {
   const full = `${food.brand ?? ''} ${food.name}`.toLowerCase()
   const rule = PAIR_RULES.find((r) => r.match.test(full) && !r.not?.test(full))
-  // Lists saved on eggs before they got all four pairings don't count; ones chosen since do.
-  const stale = rule === PAIR_RULES[0] || rule === PAIR_RULES[1] ? !food.meta.pairsChosen : false
-  if (food.meta.pairs && !stale) return food.meta.pairs.map((id) => foods.find((f) => f.id === id)).filter((f): f is F => !!f)
+  const chosen = (food.meta.pairs ?? []).map((id) => foods.find((f) => f.id === id)).filter((f): f is F => !!f)
+  const isEggs = rule === PAIR_RULES[0] || rule === PAIR_RULES[1]
+  if (food.meta.pairs && !isEggs) return chosen
   // A recipe has its salt in its ingredients.
-  if (food.source === 'recipe') return []
-  if (!rule) return []
+  if (food.source === 'recipe' || !rule) return []
   const out: F[] = []
   for (const re of rule.with) {
     const ok = PAIR_PICK.find(([r]) => r === re)![1]
@@ -404,7 +409,25 @@ export function pairsFor<F extends Pairable>(food: Pick<Food, 'id' | 'name' | 'b
       .sort((a, b) => b.use_count - a.use_count)[0]
     if (hit) out.push(hit)
   }
-  return out
+  return [...out, ...chosen.filter((f) => !out.includes(f))]
+}
+
+/** Adds to what's in brackets, or starts them: "1 serv. (3 slices)" → "1 serv. (3 slices, 56 g)". */
+export const withNote = (text: string, note: string) => (text.endsWith(')') ? `${text.slice(0, -1)}, ${note})` : `${text} (${note})`)
+
+const round1 = (n: number) => Math.round(n * 10) / 10
+const fmtGrams = (g: number) => `${g < 10 ? round1(g) : Math.round(g)} g`
+/** Measures a drink is poured in, where a weight only adds clutter. */
+const NO_WEIGHT = /^(ml|fl oz|cup|tbsp|tsp|shot|can|pod|bottle)$/
+/** Below this, ounces would just read "0 oz". */
+const MIN_G_FOR_OZ = 10
+
+/** A portion with how much it is: "1 serv. (85 g)", "3 oz (85 g)", "150 g (5.3 oz)", "2 eggs (100 g)". */
+export function sizeText(amount: number, unit: string, grams: number): string {
+  const text = portionText(amount, unit)
+  if (NO_WEIGHT.test(unit)) return text
+  if (unit === 'g') return grams >= MIN_G_FOR_OZ ? `${text} (${round1(grams / GRAMS_PER_OZ)} oz)` : text
+  return withNote(text, fmtGrams(grams))
 }
 
 /** How a portion reads on a button: "2 eggs", "½ slice", "1 serving", "150 g". */
