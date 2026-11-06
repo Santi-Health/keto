@@ -26,6 +26,8 @@ export type DrinkKey =
   | 'kazar'
   | 'volluto_decaf'
   | 'ba_lungo'
+  | 'americano'
+  | 'americano_decaf'
   | 'fairlife_choc_bottle'
 
 export interface Drink {
@@ -46,6 +48,8 @@ export interface Drink {
   flOz?: number
   /** Milk that always goes in, logged as its own entry in the same tap. */
   milk?: { key: MilkKey; oz: number }
+  /** The milks this drink is offered with and how much of each, in place of the full list. */
+  milkChoices?: { key: MilkKey; oz: number }[]
   /** Logged as one of these (a bottle) instead of a can. */
   container?: { unit: string; grams: number }
 }
@@ -141,6 +145,13 @@ const FAIRLIFE_CHOC_BOTTLE: Nutrients = {
 }
 const FAIRLIFE_SWEETENERS = ['monk fruit', 'acesulfame K', 'sucralose', 'stevia']
 
+/** What goes in an americano. */
+const AMERICANO_MILKS: Drink['milkChoices'] = [
+  { key: 'whole', oz: 2 },
+  { key: 'nonfat', oz: 2 },
+  { key: 'half_and_half', oz: 1 },
+]
+
 const ALL: Drink[] = [
   { key: 'water', label: 'Water', serving: '1 glass (250 ml)', oz: GLASS_ML / ML_PER_OZ, hydration: true, color: 'var(--water)', perServing: null },
   { key: 'sparkling_water', label: 'Sparkling water', serving: '1 glass (250 ml)', oz: GLASS_ML / ML_PER_OZ, hydration: true, color: 'var(--water)', perServing: null },
@@ -229,6 +240,31 @@ const ALL: Drink[] = [
     container: { unit: 'pod', grams: LUNGO_POD_G },
   },
   {
+    key: 'americano',
+    label: 'Americano',
+    serving: '10 oz',
+    oz: 10,
+    hydration: false,
+    color: '#4a2f1d',
+    // A double espresso topped up with hot water to 10 fl oz.
+    perServing: espresso(2),
+    flOz: 10,
+    milkChoices: AMERICANO_MILKS,
+  },
+  {
+    key: 'americano_decaf',
+    label: 'Decaf Americano',
+    serving: '10 oz',
+    oz: 10,
+    hydration: false,
+    color: '#4a2f1d',
+    // Decaf keeps a few mg of caffeine per shot; the amount varies, so it's an estimate, the same as the decaf pod.
+    perServing: { ...espresso(2), caffeineMg: 6 },
+    estimated: ['caffeineMg'],
+    flOz: 10,
+    milkChoices: AMERICANO_MILKS,
+  },
+  {
     key: 'fairlife_choc_bottle',
     label: 'Fairlife choc',
     serving: '340 ml bottle',
@@ -251,6 +287,8 @@ const ORDER: DrinkKey[] = [
   'kazar',
   'volluto_decaf',
   'ba_lungo',
+  'americano',
+  'americano_decaf',
   'sparkling_water',
   'sparkling_rain',
   'spindrift',
@@ -271,7 +309,7 @@ export const DRINKS: Drink[] = ORDER.map((k) => ALL.find((d) => d.key === k)!)
 export const ALL_DRINKS = ALL
 
 /** Drinks that ask which milk went in before logging. */
-export const asksForMilk = (d: Drink) => d.key.startsWith('espresso') || d.container?.unit === 'pod'
+export const asksForMilk = (d: Drink) => d.key.startsWith('espresso') || d.container?.unit === 'pod' || !!d.milkChoices
 
 export const drinkByKey = (key: string) => ALL.find((d) => d.key === key)
 
@@ -312,7 +350,7 @@ export const drinkPortion = (d: Drink) =>
         : { amount: 1, unit: 'can' }
 
 /** Milks added to espresso, per 100 g. Fairlife from its US labels (per 1 cup = 240 ml); non-fat from USDA. */
-export type MilkKey = 'fairlife_chocolate' | 'fairlife_fat_free' | 'nonfat'
+export type MilkKey = 'fairlife_chocolate' | 'fairlife_fat_free' | 'nonfat' | 'whole' | 'half_and_half'
 
 export interface Milk {
   key: MilkKey
@@ -348,17 +386,31 @@ export const MILKS: Milk[] = [
     // USDA FoodData Central, milk, nonfat (skim).
     per100g: { kcal: 34, protein: 3.37, fat: 0.08, satFat: 0.05, carbs: 4.96, netCarbs: 4.96, sugars: 5.09, cholesterolMg: 2, sodiumMg: 42, potassiumMg: 156, calciumMg: 122, magnesiumMg: 11 },
   },
+  {
+    key: 'whole',
+    label: 'Whole',
+    // USDA FoodData Central, milk, whole, 3.25% milkfat.
+    per100g: { kcal: 61, protein: 3.15, fat: 3.25, satFat: 1.86, carbs: 4.8, netCarbs: 4.8, sugars: 5.05, cholesterolMg: 10, sodiumMg: 43, potassiumMg: 132, calciumMg: 113, magnesiumMg: 10 },
+  },
+  {
+    key: 'half_and_half',
+    label: 'Half and half',
+    // USDA FoodData Central, cream, fluid, half and half.
+    per100g: { kcal: 131, protein: 3.13, fat: 11.5, satFat: 7.03, carbs: 4.3, netCarbs: 4.3, sugars: 4.13, cholesterolMg: 35, sodiumMg: 61, potassiumMg: 132, calciumMg: 107, magnesiumMg: 10 },
+  },
 ]
 
+const milkName = (m: Milk) => (m.key === 'half_and_half' ? m.label : `${m.label} milk`)
+
 /** Names of the drink-button drinks and milks, so a copy saved by hand counts as a drink too. */
-const DRINK_NAMES = new Set([...ALL.map((d) => d.label), ...MILKS.map((m) => `${m.label} milk`)].map((n) => n.toLowerCase()))
+const DRINK_NAMES = new Set([...ALL.map((d) => d.label), ...MILKS.map(milkName)].map((n) => n.toLowerCase()))
 
 /** A saved food that is one of the drink buttons (or a milk), not a food button. */
 export const isDrinkFood = (f: Pick<Food, 'name' | 'meta'>) => !!f.meta.externalId?.startsWith('drink:') || DRINK_NAMES.has(f.name.toLowerCase())
 
 export function milkFood(m: Milk): NewFood {
   return {
-    name: `${m.label} milk`,
+    name: milkName(m),
     brand: m.key.startsWith('fairlife') ? 'fairlife' : null,
     barcode: null,
     per_100g: m.per100g,

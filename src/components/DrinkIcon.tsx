@@ -203,6 +203,8 @@ const DRAWINGS: Partial<Record<DrinkKey | 'espresso', () => ReactNode>> = {
   // From the user's photo: the decaf is black with a copper-red band and red DECAFFEINATO; BA Lungo is gunmetal.
   volluto_decaf: () => <Pod color="#1c1a1a" text="Decaf" ink="#e0412a" rim="#8a3a22" />,
   ba_lungo: () => <Pod color="#46464c" top="#8c8c93" text="BA" ink="#fff" rim="#9a9aa0" />,
+  americano: () => <TeaCup tea="#3b2416" />,
+  americano_decaf: () => <TeaCup tea="#3b2416" label="Decaf" />,
   mate_cocido: () => <Mate />,
   te_con_leche: () => <TeaCup tea="#c9a27e" />,
   rooibos: () => <TeaCup tea="#d9622b" label="Rooibos" />,

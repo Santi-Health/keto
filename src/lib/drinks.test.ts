@@ -108,6 +108,26 @@ describe('button order and Nespresso pods', () => {
   })
 })
 
+describe('americanos', () => {
+  it('logs 10 fl oz, with the caffeine of a double espresso, or a few mg for decaf', async () => {
+    const { asksForMilk } = await import('./drinks')
+    for (const [key, caffeine] of [['americano', 128], ['americano_decaf', 6]] as const) {
+      const d = drinkByKey(key)!
+      expect(drinkPortion(d)).toEqual({ amount: 10, unit: 'fl oz' })
+      expect(asksForMilk(d)).toBe(true)
+      expect(portionNutrients(asFood(drinkFood(d)), 296).caffeineMg).toBeCloseTo(caffeine, 0)
+    }
+  })
+  it('offers 2 oz whole, 2 oz non-fat or 1 oz half and half', () => {
+    expect(drinkByKey('americano')!.milkChoices).toEqual([{ key: 'whole', oz: 2 }, { key: 'nonfat', oz: 2 }, { key: 'half_and_half', oz: 1 }])
+    const food = (key: string) => asFood(milkFood(MILKS.find((m) => m.key === key)!))
+    expect(food('half_and_half').name).toBe('Half and half')
+    expect(food('whole').name).toBe('Whole milk')
+    expect(portionNutrients(food('half_and_half'), 30.5).kcal).toBeCloseTo(40, 0)
+    expect(portionNutrients(food('whole'), 61).kcal).toBeCloseTo(37, 0)
+  })
+})
+
 describe('hydration', () => {
   it('counts every drink by volume, with no caffeine penalty up to 400 mg', () => {
     // 4 cups water + a 12 oz can of Coke Zero (34 mg caffeine) + a double espresso (128 mg).

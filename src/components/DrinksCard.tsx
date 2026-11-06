@@ -309,13 +309,16 @@ function EspressoSheet({
   onLog: (d: Drink, milk: MilkKey | null, oz: number) => void
   onClose: () => void
 }) {
-  const milkFoods = MILKS.map((m) => ({ m, food: foods.find((f) => f.meta.externalId === `drink:milk_${m.key}`) }))
+  const choices = drink.milkChoices
+  const offered = choices ? choices.map((c) => MILKS.find((m) => m.key === c.key)!) : MILKS
+  const milkFoods = offered.map((m) => ({ m, food: foods.find((f) => f.meta.externalId === `drink:milk_${m.key}`) }))
   const last = milkFoods.filter((x) => x.food?.last_used_at).sort((a, b) => b.food!.last_used_at!.localeCompare(a.food!.last_used_at!))[0]
   // Espresso has a Single/Double switch; a pod (Kazaar, Decaf Ristretto, BA Lungo) is always one.
   const isEspresso = drink.key.startsWith('espresso')
   const [shots, setShots] = useState<'espresso_single' | 'espresso_double'>(isEspresso ? (drink.key as 'espresso_single') : 'espresso_single')
-  const [milk, setMilk] = useState<MilkKey | 'none'>(last?.m.key ?? 'fairlife_fat_free')
-  const [ozText, setOzText] = useState(String(last?.food?.meta.lastAmount ?? 4))
+  const [milk, setMilk] = useState<MilkKey | 'none'>(last?.m.key ?? (choices ? 'none' : 'fairlife_fat_free'))
+  const usualOz = (key: MilkKey | 'none') => choices?.find((c) => c.key === key)?.oz
+  const [ozText, setOzText] = useState(String(usualOz(milk) ?? last?.food?.meta.lastAmount ?? 4))
   const oz = Number(ozText)
   const chosen = MILKS.find((m) => m.key === milk)
   const n = chosen && oz > 0 ? portionNutrients({ ...milkFood(chosen), id: '', favorite: false, use_count: 0, last_used_at: null, updated_at: '', deleted_at: null }, oz * 30.5) : null
@@ -337,8 +340,18 @@ function EspressoSheet({
       <div className="field">
         <span className="label">Milk</span>
         <div className="chips">
-          {[...MILKS.map((m) => ({ value: m.key as MilkKey | 'none', label: m.label })), { value: 'none' as const, label: 'No milk' }].map((o) => (
-            <button key={o.value} type="button" className={`chip-btn ${milk === o.value ? 'on' : ''}`} aria-pressed={milk === o.value} onClick={() => setMilk(o.value)}>
+          {[...offered.map((m) => ({ value: m.key as MilkKey | 'none', label: usualOz(m.key) ? `${m.label} · ${usualOz(m.key)} oz` : m.label })), { value: 'none' as const, label: 'No milk' }].map((o) => (
+            <button
+              key={o.value}
+              type="button"
+              className={`chip-btn ${milk === o.value ? 'on' : ''}`}
+              aria-pressed={milk === o.value}
+              onClick={() => {
+                setMilk(o.value)
+                const oz = usualOz(o.value)
+                if (oz) setOzText(String(oz))
+              }}
+            >
               {o.label}
             </button>
           ))}
@@ -354,7 +367,7 @@ function EspressoSheet({
             </span>
           </div>
           <div className="chips" style={{ marginTop: 6 }}>
-            {[2, 4, 6, 8].map((v) => (
+            {(choices ? [1, 2, 3, 4] : [2, 4, 6, 8]).map((v) => (
               <button key={v} type="button" className={`chip-btn ${oz === v ? 'on' : ''}`} onClick={() => setOzText(String(v))}>
                 {v} oz
               </button>
@@ -375,7 +388,7 @@ function EspressoSheet({
       )}
       <button type="button" className="btn" disabled={milk !== 'none' && !(oz > 0)} onClick={() => onLog(d, milk === 'none' ? null : milk, milk === 'none' ? 0 : oz)}>
         Log {isEspresso ? `${d.serving} espresso` : d.label}
-        {milk !== 'none' && oz > 0 ? ` + ${oz} oz milk` : ''}
+        {milk !== 'none' && oz > 0 ? ` + ${oz} oz ${milk === 'half_and_half' ? 'half and half' : 'milk'}` : ''}
       </button>
     </Sheet>
   )
