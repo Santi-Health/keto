@@ -274,24 +274,69 @@ const PER_OZ: [RegExp, number, string][] = [
   [/kalamata|castelvetrano|cerignola/, 6, 'olives'],
   [/olive/, 8, 'olives'],
 ]
-/** Foods made from nuts that aren't counted by the nut. */
-const NOT_WHOLE_NUT = /\b(butter|flour|milk|meal|oil|bar|paste|tapenade|sliced|slivered|chopped|ground|crust|cookie)\b/i
+/** Fruit by the piece, USDA sizes: per ounce, so a whole apple is about 0.16. Only for foods in Fruits & nuts, since "Strawberry yogurt" isn't counted by the berry. */
+const FRUIT_PER_OZ: [RegExp, number, string][] = [
+  [/blueberr/, 20, 'blueberries'],
+  [/raspberr/, 14, 'raspberries'],
+  [/blackberr/, 6, 'blackberries'],
+  [/strawberr/, 2, 'strawberries'],
+  [/cherr/, 4, 'cherries'],
+  [/grape(?!fruit)/, 6, 'grapes'],
+  // Nonpareils, the smallest, at roughly 0.35 g each.
+  [/caper/, 80, 'capers'],
+  [/clementine|mandarin/, 0.38, 'clementines'],
+  [/pineapple|grapefruit/, 0, ''],
+  [/apple/, 0.16, 'apples'],
+  [/banana/, 0.24, 'bananas'],
+  [/orange/, 0.22, 'oranges'],
+  [/lemon/, 0.49, 'lemons'],
+  [/lime/, 0.42, 'limes'],
+  [/peach/, 0.19, 'peaches'],
+  [/pear/, 0.16, 'pears'],
+  [/plum/, 0.43, 'plums'],
+  [/kiwi/, 0.41, 'kiwis'],
+]
+/** At least this many to the ounce, so an ounce is a sensible first portion. */
+const SMALL_PIECES = 2
+/** Foods made from nuts or fruit, and dishes with them, that aren't counted by the piece. */
+const NOT_WHOLE_NUT = /\b(butter|flour|milk|meal|oil|bar|paste|tapenade|sliced|slivered|chopped|ground|crust|cookie|dried|freeze|jam|jelly|puree|powder|chips|tomato(es)?|chicken|salmon|fish|beef|pork|salad)\b/i
 
-/** "~23" (almonds, olives…) for a portion of whole nuts or olives, or null for anything else. */
-export function nutCount(food: Pick<Food, 'name'>, grams: number, unit = ''): string | null {
+type Countable = Pick<Food, 'name'> & Partial<Pick<Food, 'meta' | 'source'>>
+const inFruitsNuts = (food: Countable) => !!food.meta && sectionsOf({ name: food.name, meta: food.meta, source: food.source ?? 'manual' }).includes('fruits_nuts')
+
+/** How a food is counted: what it's called and how many to the ounce, or null if it isn't. */
+function countEntry(food: Countable): [RegExp, number, string] | null {
   if (NOT_WHOLE_NUT.test(food.name)) return null
   const n = food.name.toLowerCase()
-  const hit = PER_OZ.find(([re]) => re.test(n))
+  const hit = PER_OZ.find(([re]) => re.test(n)) ?? (inFruitsNuts(food) ? FRUIT_PER_OZ.find(([re]) => re.test(n)) : undefined)
+  return hit?.[1] ? hit : null
+}
+
+const pieceWord = (entry: [RegExp, number, string]) => entry[2].split(' ')[0].toLowerCase().replace(/(ies|es|s)$/, '')
+
+/** "~23" (almonds, olives…) for a portion of whole nuts, olives or fruit, or null for anything else. */
+export function nutCount(food: Countable, grams: number, unit = ''): string | null {
+  const hit = countEntry(food)
   // A portion that already counts them ("5 olives") needs no estimate.
-  if (!hit || unit.toLowerCase().includes(hit[2].split(' ')[0].replace(/s$/, ''))) return null
+  if (!hit || unit.toLowerCase().includes(pieceWord(hit))) return null
   const count = Math.round((grams / 28.35) * hit[1])
   return count > 0 ? `~${count}` : null
 }
 
 /** "~23 almonds" for a portion of whole nuts or olives, or null for anything else. */
-export function nutCountWords(food: Pick<Food, 'name'>, grams: number, unit = ''): string | null {
+export function nutCountWords(food: Countable, grams: number, unit = ''): string | null {
   const count = nutCount(food, grams, unit)
-  return count && `${count} ${PER_OZ.find(([re]) => re.test(food.name.toLowerCase()))![2]}`
+  return count && `${count} ${countEntry(food)![2]}`
+}
+
+/** A Fruits & nuts button: the weight in ounces and about how many, "1 oz (49)". Null for other foods and for a pinch too small to read "0.1 oz". */
+export function fruitNutPortion(food: Countable, amount: number, unit: string, grams: number): string | null {
+  const ounces = round1(grams / GRAMS_PER_OZ)
+  if (!inFruitsNuts(food) || !ounces) return null
+  const hit = countEntry(food)
+  const stated = hit && unit.toLowerCase().match(new RegExp(`(\\d+) ${pieceWord(hit)}`))
+  const count = stated ? Number(stated[1]) * amount : nutCount(food, grams, unit)?.slice(1)
+  return count ? `${ounces} oz (${count})` : `${ounces} oz`
 }
 
 // --- Portions ------------------------------------------------------------------------------
@@ -306,7 +351,11 @@ export function frac(n: number): string {
 }
 
 /** Usual portions for specific foods, when no portion was set on the food itself. */
-const USUAL_PORTIONS: { match: RegExp; brand?: RegExp; amount: number; unit: string }[] = [{ match: /\begg whites?\b/, brand: /kirkland/, amount: 6, unit: 'oz' }]
+const USUAL_PORTIONS: { match: RegExp; brand?: RegExp; amount: number; unit: string }[] = [
+  { match: /\begg whites?\b/, brand: /kirkland/, amount: 6, unit: 'oz' },
+  // A tablespoon: an ounce of capers is far saltier than anyone eats. Not dishes made with them.
+  { match: /^(?!.*\b(with|and|sauce|chicken|salmon|fish)\b).*\bcapers?\b/, amount: 9, unit: 'g' },
+]
 
 /** The portion the food's own setting or a usual-portion rule gives, if any. */
 export function setPortionOf(food: Partial<Pick<Food, 'name' | 'brand' | 'meta'>>): { amount: number; unit: string } | null {
@@ -349,11 +398,16 @@ export function resized<L extends Pick<LogEntry, 'amount' | 'unit' | 'grams' | '
 /** The entry as a 1 g pinch. */
 export const asPinch = <L extends Pick<LogEntry, 'amount' | 'unit' | 'grams' | 'nutrients'>>(entry: L): L => ({ ...resized(entry, 1), amount: 1, unit: 'g' })
 
-/** The food's serving to log by default: the portion set for it ("6 oz"), its first portion ("1 slice"), else 100 g. Salt and pepper are 1 g. */
+/** The food's serving to log by default: the portion set for it ("6 oz"), an ounce of nuts or berries, its first portion ("1 slice"), else 100 g. Salt and pepper are 1 g. */
 export function servingOf(food: Pick<Food, 'unit_conversions'> & Partial<Pick<Food, 'name' | 'brand' | 'meta' | 'source'>>): { amount: number; unit: string } {
   const set = setPortionOf(food)
   if (isSeasoning(food)) return set && toGrams({ unitConversions: food.unit_conversions }, set.amount, set.unit).grams <= MAX_SEASONING_G ? set : { amount: 1, unit: 'g' }
   if (set) return set
+  // Nuts, olives and berries start at an ounce, unless you went back to the label serving.
+  if (food.name && !food.meta?.portion) {
+    const named = { ...food, name: food.name }
+    if (inFruitsNuts(named) && (countEntry(named)?.[1] ?? 0) >= SMALL_PIECES) return { amount: 1, unit: 'oz' }
+  }
   const first = food.unit_conversions[0]
   return first && first.unit !== 'g' ? { amount: 1, unit: first.unit } : { amount: 100, unit: 'g' }
 }

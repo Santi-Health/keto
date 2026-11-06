@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { asPinch, brandsToShow, foodIcon, nutCountWords, oversizedSeasonings, sizeText, learnedPrefixes, nutCount, unshout, suggestDisplayName, sectionsOf, veryFrequentAt, pairsFor, portionText, saltKind, servingOf, shortName } from './quickFoods'
+import { asPinch, brandsToShow, foodIcon, fruitNutPortion, nutCountWords, oversizedSeasonings, sizeText, learnedPrefixes, nutCount, unshout, suggestDisplayName, sectionsOf, veryFrequentAt, pairsFor, portionText, saltKind, servingOf, shortName } from './quickFoods'
 
 const f = (name: string, brand: string | null = null, meta = {}, id = name) => ({ id, name, brand, meta, source: 'manual' as const })
 
@@ -107,7 +107,33 @@ describe('food buttons', () => {
     expect(nutCount(f('Kalamata olives', 'Mezzetta'), 15)).toBe('~3')
     expect(nutCount(f('Olive tapenade'), 15)).toBe(null)
     expect(nutCount(f('Extra virgin olive oil'), 14)).toBe(null)
-    expect(nutCount(f('Blueberries'), 74)).toBe(null)
+    expect(nutCount(f('Blueberries'), 74)).toBe('~52')
+    expect(nutCount(f('Blueberry muffin'), 74)).toBe(null)
+    expect(nutCount(f('Strawberry yogurt'), 150)).toBe(null)
+  })
+  it('shows fruits and nuts as ounces and about how many', () => {
+    expect(fruitNutPortion(f('Pistachios, dry roasted'), 1, 'oz', 28.35)).toBe('1 oz (49)')
+    expect(fruitNutPortion(f('Almonds'), 1, '1 serving (30 g)', 30)).toBe('1.1 oz (24)')
+    expect(fruitNutPortion(f('Strawberries'), 100, 'g', 100)).toBe('3.5 oz (7)')
+    expect(fruitNutPortion(f('Apple'), 1, '1 medium', 182)).toBe('6.4 oz (1)')
+    expect(fruitNutPortion(f('Green olives'), 1, '5 olives', 17)).toBe('0.6 oz (5)')
+    expect(fruitNutPortion(f('Mango'), 100, 'g', 100)).toBe('3.5 oz')
+    expect(fruitNutPortion(f('Capers'), 9, 'g', 9)).toBe('0.3 oz (25)')
+    expect(fruitNutPortion(f('Capers'), 1, 'g', 1)).toBe(null)
+    expect(fruitNutPortion(f('Chia seeds'), 1, '1 tbsp', 12)).toBe('0.4 oz')
+    expect(fruitNutPortion(f('Salmon'), 1, 'oz', 28.35)).toBe(null)
+  })
+  it('starts nuts, olives and berries at an ounce, but keeps a portion you chose', () => {
+    const food = (name: string, meta = {}, unit_conversions = [{ unit: '1 serving (30 g)', grams: 30 }]) => ({ name, source: 'manual' as const, meta, unit_conversions })
+    expect(servingOf(food('Pistachios'))).toEqual({ amount: 1, unit: 'oz' })
+    expect(servingOf(food('Blueberries', {}, []))).toEqual({ amount: 1, unit: 'oz' })
+    expect(servingOf(food('Almonds', { portion: { amount: 2, unit: 'oz' } }))).toEqual({ amount: 2, unit: 'oz' })
+    expect(servingOf(food('Almonds', { portion: { amount: 0, unit: 'g' } }))).toEqual({ amount: 1, unit: '1 serving (30 g)' })
+    expect(servingOf(food('Apple', {}, [{ unit: '1 medium', grams: 182 }]))).toEqual({ amount: 1, unit: '1 medium' })
+    expect(servingOf(food('Almond yogurt'))).toEqual({ amount: 1, unit: '1 serving (30 g)' })
+    expect(servingOf(food('Capers'))).toEqual({ amount: 9, unit: 'g' })
+    expect(servingOf(food('Capers', { portion: { amount: 2, unit: '1 tbsp' } }))).toEqual({ amount: 2, unit: '1 tbsp' })
+    expect(servingOf(food('Chicken with capers'))).toEqual({ amount: 1, unit: '1 serving (30 g)' })
   })
   it('suggests display names with the brand short forms you use, learning new ones from your renames', () => {
     const prefixes = learnedPrefixes([f('Baby Spinach', 'Trader Joe\'s', { buttonName: 'TJ Baby Spinach' }), f('Avocados', null, { buttonName: 'Avocados' })])

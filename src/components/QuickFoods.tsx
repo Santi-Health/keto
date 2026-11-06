@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useData } from '../lib/data'
 import { MEALS, portionNutrients, type Food, type LogEntry, type Meal } from '../lib/foods'
-import { SECTIONS, nutCount, nutCountWords, pairsFor, portionText, sectionsOf, servingOf, setPortionOf, shortName, sizeText, unshout, withNote } from '../lib/quickFoods'
+import { SECTIONS, fruitNutPortion, nutCount, nutCountWords, pairsFor, portionText, sectionsOf, servingOf, setPortionOf, shortName, sizeText, unshout, withNote } from '../lib/quickFoods'
 import type { SavedMeal } from '../lib/savedMeals'
 import { STAPLES } from '../lib/starterFoods'
 import { GRAMS_PER_OZ, toGrams, unitsFor } from '../lib/units'
@@ -52,9 +52,11 @@ export function FoodButtons({
   )
 }
 
-/** What one portion reads as: "1 slice (28 g)", "1 oz (~23)" for whole nuts, "1 serv. (300 g)". */
+/** What one portion reads as: "1 slice (28 g)", "1 serv. (300 g)", and for fruits and nuts "1 oz (49)". */
 function portionLabel(food: Food, amount: number, unit: string): string {
   const grams = toGrams({ unitConversions: food.unit_conversions }, amount, unit).grams
+  const fruitNut = fruitNutPortion(food, amount, unit, grams)
+  if (fruitNut) return fruitNut
   const count = nutCount(food, grams, unit)
   return count ? withNote(portionText(amount, unit), count) : sizeText(amount, unit, grams)
 }
