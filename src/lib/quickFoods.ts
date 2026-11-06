@@ -493,6 +493,38 @@ export function sizeText(amount: number, unit: string, grams: number): string {
   return withNote(text, fmtGrams(grams))
 }
 
+/** A little paprika or garlic powder; a few grams of mustard is not a pinch. */
+const MAX_PINCH_G = 2
+const SPOON = /(\d+(?:\.\d+)?|\d\/\d|[½¼¾])?\s*(tbsp|tablespoons?|tsp|teaspoons?|cups?)\b/i
+const spoonCount = (n: string | undefined) => (!n ? 1 : n.includes('/') ? Number(n[0]) / Number(n[2]) : ({ '½': 0.5, '¼': 0.25, '¾': 0.75 }[n] ?? Number(n)))
+
+/** A condiment by what you'd measure it in, never "serving": "2 tbsp (31 g)", "1 pinch (1 g)", else its weight. */
+function condimentPortion(amount: number, unit: string, grams: number, times: number, seasoning: boolean): string {
+  const spoon = unit.match(SPOON)
+  if (spoon) {
+    const count = spoonCount(spoon[1]) * amount
+    const word = spoon[2].toLowerCase().replace(/^tablespoons?$/, 'tbsp').replace(/^teaspoons?$/, 'tsp').replace(/^cups?$/, count > 1 ? 'cups' : 'cup')
+    return `${frac(count)} ${word} (${fmtGrams(grams)})`
+  }
+  if (seasoning || grams <= MAX_PINCH_G) return `${frac(times)} ${times > 1 ? 'pinches' : 'pinch'} (${fmtGrams(grams)})`
+  return unit === 'g' || /serving|portion/i.test(unit) ? fmtGrams(grams) : sizeText(amount, unit, grams)
+}
+
+/**
+ * How a portion reads for a food in a bottom section, from the section alone so new foods follow it:
+ * condiments "2 tbsp (31 g)", fruits and nuts "1 oz (49)", picada "1 serving (28 g)". Null for other foods.
+ */
+export function sectionPortion(food: Pick<Food, 'name' | 'brand' | 'meta' | 'source' | 'unit_conversions'>, amount: number, unit: string, grams: number): string | null {
+  const sections = sectionsOf(food)
+  const serving = servingOf(food)
+  const times = serving.unit === unit && serving.amount ? amount / serving.amount : 1
+  if (sections.includes('condiments')) return condimentPortion(amount, unit, grams, times, isSeasoning(food))
+  // Olives are in both of these, and keep their count.
+  if (sections.includes('fruits_nuts')) return fruitNutPortion(food, amount, unit, grams)
+  if (sections.includes('picada')) return `${frac(times)} ${times > 1 ? 'servings' : 'serving'} (${fmtGrams(grams)})`
+  return null
+}
+
 /** How a portion reads on a button: "2 eggs", "½ slice", "1 serving", "150 g". */
 /** Short words for portions: "serv." and "cont."; slice and can stay whole. */
 const abbreviate = (s: string) => s.replace(/\bservings?\b/g, 'serv.').replace(/\bcontainers?\b/g, 'cont.')

@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useData } from '../lib/data'
 import { MEALS, portionNutrients, type Food, type LogEntry, type Meal } from '../lib/foods'
-import { SECTIONS, fruitNutPortion, nutCount, nutCountWords, pairsFor, portionText, sectionsOf, servingOf, setPortionOf, shortName, sizeText, unshout, withNote } from '../lib/quickFoods'
+import { SECTIONS, nutCount, nutCountWords, pairsFor, portionText, sectionPortion, sectionsOf, servingOf, setPortionOf, shortName, sizeText, unshout, withNote } from '../lib/quickFoods'
 import type { SavedMeal } from '../lib/savedMeals'
 import { STAPLES } from '../lib/starterFoods'
 import { GRAMS_PER_OZ, toGrams, unitsFor } from '../lib/units'
@@ -52,11 +52,11 @@ export function FoodButtons({
   )
 }
 
-/** What one portion reads as: "1 slice (28 g)", "1 serv. (300 g)", and for fruits and nuts "1 oz (49)". */
+/** What one portion reads as: "1 slice (28 g)", "1 serv. (300 g)", or as its section has it: "1 oz (49)". */
 function portionLabel(food: Food, amount: number, unit: string): string {
   const grams = toGrams({ unitConversions: food.unit_conversions }, amount, unit).grams
-  const fruitNut = fruitNutPortion(food, amount, unit, grams)
-  if (fruitNut) return fruitNut
+  const inSection = sectionPortion(food, amount, unit, grams)
+  if (inSection) return inSection
   const count = nutCount(food, grams, unit)
   return count ? withNote(portionText(amount, unit), count) : sizeText(amount, unit, grams)
 }
@@ -65,7 +65,7 @@ function portionLabel(food: Food, amount: number, unit: string): string {
 function portionInFull(food: Food, amount: number, unit: string): string {
   const grams = toGrams({ unitConversions: food.unit_conversions }, amount, unit).grams
   const count = nutCountWords(food, grams, unit)
-  return count ? withNote(sizeText(amount, unit, grams), count) : sizeText(amount, unit, grams)
+  return count ? withNote(sizeText(amount, unit, grams), count) : (sectionPortion(food, amount, unit, grams) ?? sizeText(amount, unit, grams))
 }
 
 /** The serving on a button. */
@@ -174,7 +174,7 @@ export function QuickLogSheet({
   return (
     <Sheet title={unshout(food.name)} subtitle={food.brand ?? undefined} onClose={onClose}>
       <span className="label">
-        How many servings
+        {sectionsOf(food).includes('condiments') ? 'How many' : 'How many servings'}
         {setPortion && labelServing && labelServing.unit !== setPortion.unit && ` · label serving: ${portionText(1, labelServing.unit)}`}
       </span>
       <div className="portion-times">

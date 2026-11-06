@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { asPinch, brandsToShow, foodIcon, fruitNutPortion, nutCountWords, oversizedSeasonings, sizeText, learnedPrefixes, nutCount, unshout, suggestDisplayName, sectionsOf, veryFrequentAt, pairsFor, portionText, saltKind, servingOf, shortName } from './quickFoods'
+import { asPinch, brandsToShow, foodIcon, fruitNutPortion, sectionPortion, nutCountWords, oversizedSeasonings, sizeText, learnedPrefixes, nutCount, unshout, suggestDisplayName, sectionsOf, veryFrequentAt, pairsFor, portionText, saltKind, servingOf, shortName } from './quickFoods'
 
 const f = (name: string, brand: string | null = null, meta = {}, id = name) => ({ id, name, brand, meta, source: 'manual' as const })
 
@@ -124,6 +124,24 @@ describe('food buttons', () => {
     expect(fruitNutPortion(f('Raw pine nuts'), 8.4, 'g', 8.4)).toBe('0.3 oz (1 tbsp)')
     expect(fruitNutPortion(f('Raw pine nuts'), 1, 'oz', 28.35)).toBe('1 oz (3½ tbsp)')
     expect(fruitNutPortion(f('Salmon'), 1, 'oz', 28.35)).toBe(null)
+  })
+  it('reads each section the same way, for any food', () => {
+    const food = (name: string, unit_conversions: { unit: string; grams: number }[] = [], meta = {}) => ({ name, brand: null, source: 'manual' as const, meta, unit_conversions })
+    expect(sectionPortion(food('Philadelphia cream cheese'), 1, '1 serving (2 tbsp (31 g))', 31)).toBe('2 tbsp (31 g)')
+    expect(sectionPortion(food('Butter'), 2, '1 tbsp', 28)).toBe('2 tbsp (28 g)')
+    expect(sectionPortion(food('Mayonnaise'), 1, '1 Tablespoon (14 g)', 14)).toBe('1 tbsp (14 g)')
+    expect(sectionPortion(food('Avocado oil'), 1, '1 tsp', 4.5)).toBe('1 tsp (4.5 g)')
+    expect(sectionPortion(food('Salt'), 1, 'g', 1)).toBe('1 pinch (1 g)')
+    expect(sectionPortion(food('Salt'), 2, 'g', 2)).toBe('2 pinches (2 g)')
+    expect(sectionPortion(food('NuSalt', [{ unit: '1 serving (1 portion (0.5 g))', grams: 0.5 }]), 1, '1 serving (1 portion (0.5 g))', 0.5)).toBe('1 pinch (0.5 g)')
+    expect(sectionPortion(food('Mustard', [{ unit: '1 serving (30 g)', grams: 30 }]), 1, '1 serving (30 g)', 30)).toBe('30 g')
+    expect(sectionPortion(food('Mustard', [{ unit: '1 serving (5 g)', grams: 5 }]), 1, '1 serving (5 g)', 5)).toBe('5 g')
+    expect(sectionPortion(food('Paprika', [{ unit: '1 serving (1 g)', grams: 1 }]), 1, '1 serving (1 g)', 1)).toBe('1 pinch (1 g)')
+    expect(sectionPortion(food('Manchego', [{ unit: '1 oz', grams: 28 }]), 1, '1 oz', 28)).toBe('1 serving (28 g)')
+    expect(sectionPortion(food('Salami', [{ unit: '1 serving (3 slices (56 g))', grams: 56 }]), 2, '1 serving (3 slices (56 g))', 112)).toBe('2 servings (112 g)')
+    expect(sectionPortion(food('Almonds'), 1, 'oz', 28.35)).toBe('1 oz (23)')
+    expect(sectionPortion(food('Green olives'), 1, '5 olives', 17)).toBe('0.6 oz (5)')
+    expect(sectionPortion(food('Salmon'), 1, 'oz', 28.35)).toBe(null)
   })
   it('starts nuts, olives and berries at an ounce, but keeps a portion you chose', () => {
     const food = (name: string, meta = {}, unit_conversions = [{ unit: '1 serving (30 g)', grams: 30 }]) => ({ name, source: 'manual' as const, meta, unit_conversions })
