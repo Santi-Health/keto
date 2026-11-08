@@ -29,6 +29,12 @@ export type DrinkKey =
   | 'americano'
   | 'americano_decaf'
   | 'fairlife_choc_bottle'
+  | 'ultra_zero'
+  | 'bacardi'
+  | 'whisky'
+  | 'red_wine'
+  | 'white_wine'
+  | 'budweiser'
 
 export interface Drink {
   key: DrinkKey
@@ -52,7 +58,18 @@ export interface Drink {
   milkChoices?: { key: MilkKey; oz: number }[]
   /** Logged as one of these (a bottle) instead of a can. */
   container?: { unit: string; grams: number }
+  /** Asks how many ounces (a can by default), for a drink also poured by the glass. */
+  byOz?: boolean
+  /** A spirit: asks how many ounces and what it was mixed with. Grams per fluid ounce, lighter than water. */
+  spirit?: { mixers: MixerKey[]; gPerFlOz: number }
+  /** Beer and wine: not counted as fluid, the same as spirits. */
+  alcohol?: boolean
 }
+
+/** What a spirit is mixed with: Coke Zero logs as Coke Zero by the ounce, sparkling water as water. */
+export type MixerKey = 'coke_zero' | 'sparkling_water'
+/** Ounces a spirit starts at. */
+export const SPIRIT_OZ = 2
 
 const CAN_G = 355
 const SHOT_G = 30
@@ -152,6 +169,16 @@ const AMERICANO_MILKS: Drink['milkChoices'] = [
   { key: 'half_and_half', oz: 1 },
 ]
 
+/**
+ * 80-proof spirits, USDA FoodData Central "alcoholic beverage, distilled, 80 proof": 231 kcal per 100 g, no carbs.
+ * A fluid ounce weighs 27.8 g, so 64 kcal. Alcohol itself isn't tracked; its calories are.
+ */
+const SPIRIT_G_PER_FL_OZ = 27.8
+const spirit80 = (): Nutrients => tea({ kcal: 64, sodiumMg: 0, potassiumMg: 0.3 })
+
+/** A 5 fl oz glass of wine. */
+const WINE_GLASS_G = 147
+
 const ALL: Drink[] = [
   { key: 'water', label: 'Water', serving: '1 glass (250 ml)', oz: GLASS_ML / ML_PER_OZ, hydration: true, color: 'var(--water)', perServing: null },
   { key: 'sparkling_water', label: 'Sparkling water', serving: '1 glass (250 ml)', oz: GLASS_ML / ML_PER_OZ, hydration: true, color: 'var(--water)', perServing: null },
@@ -159,7 +186,7 @@ const ALL: Drink[] = [
   // Lemon, from Spindrift's label: real juice, so it has a few calories and is logged as a food, not as water.
   { key: 'spindrift', label: 'Spindrift', serving: '355 ml can', oz: 12, hydration: false, color: '#f2d64b', perServing: tea({ kcal: 3, carbs: 1, netCarbs: 1, sodiumMg: 0, caffeineMg: 0 }) },
   { key: 'diet_coke', label: 'Diet Coke', serving: '355 ml can', oz: 12, hydration: false, color: '#b8b8b8', perServing: soda(46, 40), sweeteners: ['aspartame'] },
-  { key: 'coke_zero', label: 'Coke Zero', serving: '355 ml can', oz: 12, hydration: false, color: '#e4002b', perServing: soda(34, 40, 60), sweeteners: ['aspartame', 'acesulfame K'] },
+  { key: 'coke_zero', label: 'Coke Zero', serving: '355 ml can', oz: 12, hydration: false, color: '#e4002b', perServing: soda(34, 40, 60), sweeteners: ['aspartame', 'acesulfame K'], byOz: true },
   { key: 'diet_pepsi', label: 'Diet Pepsi', serving: '355 ml can', oz: 12, hydration: false, color: '#1f4fa0', perServing: soda(35, 35), sweeteners: ['aspartame', 'acesulfame K'] },
   { key: 'squirt_zero', label: 'Squirt Zero', serving: '355 ml can', oz: 12, hydration: false, color: '#f2c200', perServing: soda(0, 40), sweeteners: ['aspartame', 'acesulfame K'], estimated: ['sodiumMg'] },
   { key: 'fanta_zero', label: 'Fanta Zero', serving: '355 ml can', oz: 12, hydration: false, color: '#ff8200', perServing: soda(0, 40), sweeteners: ['aspartame', 'acesulfame K'], estimated: ['sodiumMg'] },
@@ -275,6 +302,46 @@ const ALL: Drink[] = [
     sweeteners: FAIRLIFE_SWEETENERS,
     container: { unit: 'bottle', grams: BOTTLE_340_G },
   },
+  // Michelob Ultra Zero, alcohol-free, from its label: 29 kcal, 6.5 g carbs, 0 g fat, under 1 g protein per 12 oz can.
+  { key: 'ultra_zero', label: 'Ultra Zero', serving: '355 ml can, 0% alc', oz: 12, hydration: false, color: '#1d3c78', perServing: tea({ kcal: 29, carbs: 6.5, netCarbs: 6.5 }) },
+  { key: 'bacardi', label: 'Bacardi rum', serving: `${SPIRIT_OZ} oz`, oz: SPIRIT_OZ, hydration: false, color: '#c9a227', perServing: spirit80(), flOz: 1, spirit: { mixers: ['coke_zero'], gPerFlOz: SPIRIT_G_PER_FL_OZ } },
+  {
+    key: 'whisky',
+    label: 'Whisky',
+    serving: `${SPIRIT_OZ} oz`,
+    oz: SPIRIT_OZ,
+    hydration: false,
+    color: '#b5651d',
+    perServing: spirit80(),
+    flOz: 1,
+    spirit: { mixers: ['coke_zero', 'sparkling_water'], gPerFlOz: SPIRIT_G_PER_FL_OZ },
+  },
+  // USDA FoodData Central, red table wine (no Malbec entry): per 100 g 85 kcal, 2.61 g carbs, 0.62 g sugar.
+  {
+    key: 'red_wine',
+    label: 'Malbec',
+    serving: '5 oz glass',
+    oz: 5,
+    hydration: false,
+    color: '#6d1a2a',
+    perServing: tea({ kcal: 125, protein: 0.1, carbs: 3.8, netCarbs: 3.8, sugars: 0.9, sodiumMg: 6, potassiumMg: 187, magnesiumMg: 18 }),
+    container: { unit: 'glass', grams: WINE_GLASS_G },
+    alcohol: true,
+  },
+  // USDA FoodData Central, Pinot Grigio: per 100 g 83 kcal, 2.06 g carbs.
+  {
+    key: 'white_wine',
+    label: 'Pinot Grigio',
+    serving: '5 oz glass',
+    oz: 5,
+    hydration: false,
+    color: '#e8d98a',
+    perServing: tea({ kcal: 122, protein: 0.1, carbs: 3, netCarbs: 3, sugars: 1.4, sodiumMg: 7, potassiumMg: 104, magnesiumMg: 15 }),
+    container: { unit: 'glass', grams: WINE_GLASS_G },
+    alcohol: true,
+  },
+  // Budweiser's label: 145 kcal, 10.6 g carbs, 1.3 g protein, 0 g fat per 12 oz can, 5% alcohol.
+  { key: 'budweiser', label: 'Budweiser', serving: '355 ml can', oz: 12, hydration: false, color: '#c8102e', perServing: tea({ kcal: 145, protein: 1.3, carbs: 10.6, netCarbs: 10.6 }), alcohol: true },
 ]
 
 
@@ -300,6 +367,12 @@ const ORDER: DrinkKey[] = [
   'te_con_leche',
   'rooibos',
   'fairlife_choc_bottle',
+  'ultra_zero',
+  'bacardi',
+  'whisky',
+  'red_wine',
+  'white_wine',
+  'budweiser',
 ]
 
 /** The buttons, in order. Single espresso isn't a button; it's the Single/Double switch in the espresso sheet. */
@@ -316,7 +389,8 @@ export const drinkByKey = (key: string) => ALL.find((d) => d.key === key)
 /** Food row for a soda or espresso (single and double share one food): nutrients per 100 g plus a serving unit. */
 export function drinkFood(d: Drink): NewFood {
   const isEspresso = d.key.startsWith('espresso')
-  const grams = d.container ? d.container.grams : d.flOz ? d.flOz * FL_OZ_G : isEspresso ? SHOT_G * (d.key === 'espresso_double' ? 2 : 1) : CAN_G
+  const flOzG = d.spirit?.gPerFlOz ?? FL_OZ_G
+  const grams = d.container ? d.container.grams : d.flOz ? d.flOz * flOzG : isEspresso ? SHOT_G * (d.key === 'espresso_double' ? 2 : 1) : CAN_G
   const per100: Nutrients = {}
   for (const [k, v] of Object.entries(d.perServing ?? {})) per100[k as keyof Nutrients] = Math.round((v * 100 * 1000) / grams) / 1000
   return {
@@ -325,7 +399,9 @@ export function drinkFood(d: Drink): NewFood {
     barcode: null,
     per_100g: per100,
     unit_conversions: [
-      d.container ? { unit: d.container.unit, grams: d.container.grams } : d.flOz ? { unit: 'fl oz', grams: FL_OZ_G } : { unit: isEspresso ? 'shot' : 'can', grams: isEspresso ? SHOT_G : CAN_G },
+      d.container ? { unit: d.container.unit, grams: d.container.grams } : d.flOz ? { unit: 'fl oz', grams: flOzG } : { unit: isEspresso ? 'shot' : 'can', grams: isEspresso ? SHOT_G : CAN_G },
+      // A can is 12 fl oz.
+      ...(d.byOz ? [{ unit: 'fl oz', grams: CAN_G / 12 }] : []),
     ],
     ingredients_text: null,
     keto_notes: d.sweeteners?.length ? `${d.perServing?.sugars ? 'No added sugar' : 'Zero sugar'}; sweetened with ${d.sweeteners.join(' and ')}.` : null,
@@ -339,7 +415,9 @@ export function drinkFood(d: Drink): NewFood {
 
 /** Amount and unit to log for one tap. */
 export const drinkPortion = (d: Drink) =>
-  d.container
+  d.spirit
+    ? { amount: SPIRIT_OZ, unit: 'fl oz' }
+    : d.container
     ? { amount: 1, unit: d.container.unit }
     : d.flOz
     ? { amount: d.flOz, unit: 'fl oz' }

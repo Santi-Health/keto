@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useData } from '../lib/data'
-import { ALL_DRINKS, CAFFEINE_FREE_MG, DRINKS, ML_PER_OZ, drinkByKey, glasses, liters, MILKS, asksForMilk, drinkFood, drinkPortion, hydration, milkFood, type Drink, type DrinkKey, type MilkKey } from '../lib/drinks'
+import { ALL_DRINKS, CAFFEINE_FREE_MG, DRINKS, ML_PER_OZ, SPIRIT_OZ, drinkByKey, glasses, liters, MILKS, asksForMilk, drinkFood, drinkPortion, hydration, milkFood, type Drink, type DrinkKey, type MilkKey, type MixerKey } from '../lib/drinks'
 import { buildLogEntry, portionNutrients, type Food, type LogEntry } from '../lib/foods'
 import { mealForTime } from '../lib/foods'
 import { portionText, unshout } from '../lib/quickFoods'
@@ -11,13 +11,17 @@ import { Segmented } from './Fields'
 import { toLocalInput } from './LogFoodSheet'
 import { Sheet } from './Sheet'
 
+/** Drinks that can be made half: what was left in the can, bottle or glass. */
+const HALVES = ['can', 'bottle', 'glass']
+
 interface Props {
   /** Days to show: one day, or a week (counts are totals, water is a daily average). */
   days: string[]
   waterTargetOz: number
 }
 
-type Undo = { kind: 'reading' | 'log'; ids: string[]; label: string; can?: { entry: LogEntry; food: Food } }
+/** `readings` are water logged in the same tap as food logs (whisky and sparkling water). */
+type Undo = { kind: 'reading' | 'log'; ids: string[]; label: string; can?: { entry: LogEntry; food: Food }; readings?: string[] }
 
 /** The same moment at another clock time that day. Seconds stay, so two drinks moved to one minute stay apart. */
 function atClock(iso: string, hhmm: string): Date {
@@ -37,17 +41,26 @@ export function DrinksCard({ days, waterTargetOz }: Props) {
   const { readingsOn, saveReading, deleteReading, logsOn, deleteLog, updateLog, foods, foodById, saveFood, logFood } = useData()
   const [undo, setUndo] = useState<Undo | null>(null)
   const [espresso, setEspresso] = useState<Drink | null>(null)
+  const [byOz, setByOz] = useState<Drink | null>(null)
+  const [spirit, setSpirit] = useState<Drink | null>(null)
   const isToday = days.length === 1 && days[0] === localDate()
   const water = days.flatMap((d) => readingsOn(d)).filter((r) => r.kind === 'water')
   const waterOz = water.reduce((s, r) => s + (r.value ?? 0), 0) / days.length
   const isDrinkLog = (l: { food_id: string | null }) => !!l.food_id && !!foodById[l.food_id]?.meta.externalId?.startsWith('drink:')
   const drinkLogs = days.flatMap((d) => logsOn(d)).filter(isDrinkLog)
   const isMilkLog = (l: { food_id: string | null }) => !!foodById[l.food_id!]?.meta.externalId?.startsWith('drink:milk_')
+  const drinkOf = (l: { food_id: string | null }) => drinkByKey(foodById[l.food_id!]?.meta.externalId?.slice('drink:'.length) ?? '')
+  const isSpiritLog = (l: { food_id: string | null }) => !!drinkOf(l)?.spirit
+  const allDrinkLogs = days.flatMap((d) => logsOn(d)).filter(isDrinkLog)
+  /** Milk in a coffee, or Coke Zero poured into a rum: logged in the same tap, part of that drink. */
+  const isAddOn = (l: { id: string; food_id: string | null; eaten_at: string }) =>
+    isMilkLog(l) || (!isSpiritLog(l) && allDrinkLogs.some((o) => o.id !== l.id && o.eaten_at === l.eaten_at && isSpiritLog(o)))
   // Fluid per day (caffeine is judged per day), averaged over the week.
   const perDay = days.map((d) =>
     hydration(
       readingsOn(d).filter((r) => r.kind === 'water').reduce((s, r) => s + (r.value ?? 0), 0),
-      logsOn(d).filter(isDrinkLog).map((l) => ({ grams: l.grams, caffeineMg: l.nutrients.caffeineMg })),
+      // Spirits, beer and wine don't count as fluid.
+      logsOn(d).filter(isDrinkLog).map((l) => ({ grams: drinkOf(l)?.spirit || drinkOf(l)?.alcohol ? 0 : l.grams, caffeineMg: l.nutrients.caffeineMg })),
     ),
   )
   const avg = (get: (h: (typeof perDay)[number]) => number) => perDay.reduce((s, h) => s + get(h), 0) / days.length
@@ -59,10 +72,11 @@ export function DrinksCard({ days, waterTargetOz }: Props) {
     counts[key] = (counts[key] ?? 0) + 1
   }
   for (const l of drinkLogs) {
+    if (isAddOn(l)) continue
     const ext = foodById[l.food_id!].meta.externalId!.slice('drink:'.length)
     const key = (ext === 'espresso' ? (l.amount >= 2 ? 'espresso_double' : 'espresso_single') : ext) as DrinkKey
-    // Cans and bottles count by amount, so half a can shows as ½.
-    counts[key] = (counts[key] ?? 0) + (l.unit === 'can' || l.unit === 'bottle' ? l.amount : 1)
+    // Cans, bottles and glasses count by amount, so half a can shows as ½.
+    counts[key] = (counts[key] ?? 0) + (HALVES.includes(l.unit) ? l.amount : 1)
   }
   const caffeine = drinkLogs.reduce((s, l) => s + (l.nutrients.caffeineMg ?? 0), 0)
   const label = (d: Drink) => (d.key.startsWith('espresso') ? `${d.serving.split(' ')[0]} espresso` : d.label)
@@ -70,7 +84,7 @@ export function DrinksCard({ days, waterTargetOz }: Props) {
   // Milk goes with the coffee or tea logged in the same tap; anything else stands alone.
   const groups = new Map<string, typeof drinkLogs>()
   for (const l of drinkLogs) {
-    const key = isMilkLog(l) ? (drinkLogs.find((o) => o.eaten_at === l.eaten_at && !isMilkLog(o))?.id ?? l.id) : l.id
+    const key = isAddOn(l) ? (drinkLogs.find((o) => o.eaten_at === l.eaten_at && !isAddOn(o))?.id ?? l.id) : l.id
     groups.set(key, [...(groups.get(key) ?? []), l])
   }
   const drinkGroups = [...groups.values()]
@@ -86,11 +100,11 @@ export function DrinksCard({ days, waterTargetOz }: Props) {
     })),
     // Coffee or tea and the milk poured in it are one drink: logged in the same tap, removed together.
     ...drinkGroups.map((group) => {
-      const parts = [...group].sort((a, b) => Number(isMilkLog(a)) - Number(isMilkLog(b)))
+      const parts = [...group].sort((a, b) => Number(isAddOn(a)) - Number(isAddOn(b)))
       return {
         id: parts[0].id,
         at: parts[0].eaten_at,
-        name: parts.map((l) => (isMilkLog(l) ? `${portionText(l.amount, l.unit)} ${unshout(foodById[l.food_id!]?.name ?? l.food_name)}` : `${unshout(foodById[l.food_id!]?.name ?? l.food_name)} · ${portionText(l.amount, l.unit)}`)).join(' + '),
+        name: parts.map((l) => (isAddOn(l) ? `${portionText(l.amount, l.unit)} ${unshout(foodById[l.food_id!]?.name ?? l.food_name)}` : `${unshout(foodById[l.food_id!]?.name ?? l.food_name)} · ${portionText(l.amount, l.unit)}`)).join(' + '),
         remove: () => parts.forEach((l) => deleteLog(l.id)),
         // The milk moves with its drink, so they stay one entry.
         retime: (hhmm: string) => {
@@ -126,9 +140,17 @@ export function DrinksCard({ days, waterTargetOz }: Props) {
       setEspresso(d)
       return
     }
+    if (d.spirit) {
+      setSpirit(d)
+      return
+    }
+    if (d.byOz) {
+      setByOz(d)
+      return
+    }
     const { entry, food } = logDrinkFood(d, now)
     const ids = [entry.id]
-    if (entry.unit === 'can' || entry.unit === 'bottle') {
+    if (HALVES.includes(entry.unit)) {
       setUndo({ kind: 'log', ids, label: label(d), can: { entry, food } })
       return
     }
@@ -148,10 +170,11 @@ export function DrinksCard({ days, waterTargetOz }: Props) {
     if (
       found.name === template.name &&
       JSON.stringify(found.per_100g) === JSON.stringify(template.per_100g) &&
-      JSON.stringify(found.fields_estimated) === JSON.stringify(template.fields_estimated)
+      JSON.stringify(found.fields_estimated) === JSON.stringify(template.fields_estimated) &&
+      JSON.stringify(found.unit_conversions) === JSON.stringify(template.unit_conversions)
     )
       return found
-    const refreshed: Food = { ...found, name: template.name, per_100g: template.per_100g, fields_estimated: template.fields_estimated, confidence: template.confidence }
+    const refreshed: Food = { ...found, name: template.name, per_100g: template.per_100g, unit_conversions: template.unit_conversions, fields_estimated: template.fields_estimated, confidence: template.confidence }
     saveFood(refreshed)
     return refreshed
   }
@@ -160,6 +183,31 @@ export function DrinksCard({ days, waterTargetOz }: Props) {
     const { amount, unit } = drinkPortion(d)
     const food = findOrSave(drinkFood(d))
     return { entry: logFood(food, amount, unit, mealForTime(at), at), food }
+  }
+
+  /** Coke Zero by the ounce: a full can logs as a can (so it can be halved), anything else in ounces. */
+  function logByOz(d: Drink, oz: number) {
+    const now = new Date()
+    const food = findOrSave(drinkFood(d))
+    const entry = oz === 12 ? logFood(food, 1, 'can', mealForTime(now), now) : logFood(food, oz, 'fl oz', mealForTime(now), now)
+    setUndo({ kind: 'log', ids: [entry.id], label: oz === 12 ? label(d) : `${oz} oz ${label(d)}`, can: oz === 12 ? { entry, food } : undefined })
+    setByOz(null)
+  }
+
+  /** A spirit and what it was mixed with, at the same moment so they read as one drink. */
+  function logSpirit(d: Drink, oz: number, mixer: MixerKey | null, mixerOz: number) {
+    const now = new Date()
+    const ids = [logFood(findOrSave(drinkFood(d)), oz, 'fl oz', mealForTime(now), now).id]
+    const readings: string[] = []
+    if (mixer === 'coke_zero' && mixerOz > 0) ids.push(logFood(findOrSave(drinkFood(drinkByKey('coke_zero')!)), mixerOz, 'fl oz', mealForTime(now), now).id)
+    if (mixer === 'sparkling_water' && mixerOz > 0) {
+      const id = crypto.randomUUID()
+      saveReading({ id, taken_at: now.toISOString(), kind: 'water', value: mixerOz, urine_level: null, context: 'other', note: null, predicted_value: null, unit: 'oz', meta: { drink: 'sparkling_water', tz: deviceTz() }, updated_at: now.toISOString(), deleted_at: null })
+      readings.push(id)
+    }
+    const mixed = mixer && mixerOz > 0 ? ` and ${mixer === 'coke_zero' ? 'Coke Zero' : 'sparkling water'}` : ''
+    setUndo({ kind: 'log', ids, readings, label: `${oz} oz ${label(d)}${mixed}` })
+    setSpirit(null)
   }
 
   /** You only had half the can or bottle: same entry, half the amount (and half the caffeine, sodium and fluid). */
@@ -244,6 +292,7 @@ export function DrinksCard({ days, waterTargetOz }: Props) {
               if (undo.kind === 'reading') deleteReading(id)
               else deleteLog(id)
             }
+            for (const id of undo.readings ?? []) deleteReading(id)
             setUndo(null)
           }}
         >
@@ -274,6 +323,8 @@ export function DrinksCard({ days, waterTargetOz }: Props) {
       {espresso && (
         <EspressoSheet drink={espresso} foods={foods} onLog={logEspresso} onClose={() => setEspresso(null)} />
       )}
+      {byOz && <OuncesSheet drink={byOz} onLog={logByOz} onClose={() => setByOz(null)} />}
+      {spirit && <SpiritSheet drink={spirit} onLog={logSpirit} onClose={() => setSpirit(null)} />}
     </section>
   )
 }
@@ -389,6 +440,91 @@ function EspressoSheet({
       <button type="button" className="btn" disabled={milk !== 'none' && !(oz > 0)} onClick={() => onLog(d, milk === 'none' ? null : milk, milk === 'none' ? 0 : oz)}>
         Log {isEspresso ? `${d.serving} espresso` : d.label}
         {milk !== 'none' && oz > 0 ? ` + ${oz} oz ${milk === 'half_and_half' ? 'half and half' : 'milk'}` : ''}
+      </button>
+    </Sheet>
+  )
+}
+
+/** An amount in ounces: typed, or one of the usual ones. */
+function OzField({ id, label, value, onChange, chips }: { id: string; label: string; value: string; onChange: (v: string) => void; chips: number[] }) {
+  return (
+    <div className="field">
+      <label htmlFor={id}>{label}</label>
+      <div className="row">
+        <input id={id} type="number" inputMode="decimal" step={0.5} min={0} value={value} onChange={(e) => onChange(e.target.value)} onFocus={(e) => e.target.select()} />
+        <span className="muted small" style={{ flex: 'none' }}>
+          oz
+        </span>
+      </div>
+      <div className="chips" style={{ marginTop: 6 }}>
+        {chips.map((v) => (
+          <button key={v} type="button" className={`chip-btn ${Number(value) === v ? 'on' : ''}`} onClick={() => onChange(String(v))}>
+            {v} oz
+          </button>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+/** How many ounces of a soda, a can by default. */
+function OuncesSheet({ drink, onLog, onClose }: { drink: Drink; onLog: (d: Drink, oz: number) => void; onClose: () => void }) {
+  const [ozText, setOzText] = useState('12')
+  const oz = Number(ozText)
+  return (
+    <Sheet title={drink.label} subtitle="How much did you have?" onClose={onClose}>
+      <OzField id="soda-oz" label="Ounces (a can is 12)" value={ozText} onChange={setOzText} chips={[4, 6, 8, 12, 16, 20]} />
+      <button type="button" className="btn" disabled={!(oz > 0)} onClick={() => onLog(drink, oz)}>
+        Log {oz > 0 ? `${oz} oz ` : ''}
+        {drink.label}
+      </button>
+    </Sheet>
+  )
+}
+
+const MIXER_NAMES: Record<MixerKey, string> = { coke_zero: 'Coke Zero', sparkling_water: 'Sparkling water' }
+const mixerMemory = (d: Drink) => `keto.mixer.${d.key}`
+
+/** A spirit: how much (2 oz to start), and what it went with, remembered for next time. */
+function SpiritSheet({ drink, onLog, onClose }: { drink: Drink; onLog: (d: Drink, oz: number, mixer: MixerKey | null, mixerOz: number) => void; onClose: () => void }) {
+  const mixers = drink.spirit!.mixers
+  const remembered = (() => {
+    try {
+      return JSON.parse(localStorage.getItem(mixerMemory(drink)) ?? 'null') as { mixer: MixerKey | 'none'; oz: number } | null
+    } catch {
+      return null
+    }
+  })()
+  const [ozText, setOzText] = useState(String(SPIRIT_OZ))
+  const [mixer, setMixer] = useState<MixerKey | 'none'>(remembered && (remembered.mixer === 'none' || mixers.includes(remembered.mixer)) ? remembered.mixer : mixers[0])
+  const [mixerText, setMixerText] = useState(String(remembered?.oz ?? 6))
+  const oz = Number(ozText)
+  const mixerOz = Number(mixerText)
+  const log = () => {
+    try {
+      localStorage.setItem(mixerMemory(drink), JSON.stringify({ mixer, oz: mixerOz }))
+    } catch {
+      // Only a convenience.
+    }
+    onLog(drink, oz, mixer === 'none' ? null : mixer, mixer === 'none' ? 0 : mixerOz)
+  }
+  return (
+    <Sheet title={drink.label} subtitle={`${Math.round(oz * 64) || 0} kcal, no carbs`} onClose={onClose}>
+      <OzField id="spirit-oz" label={`How much ${drink.label.toLowerCase()}`} value={ozText} onChange={setOzText} chips={[1, 1.5, 2, 3]} />
+      <div className="field">
+        <span className="label">With</span>
+        <div className="chips">
+          {[...mixers.map((m) => ({ value: m as MixerKey | 'none', label: MIXER_NAMES[m] })), { value: 'none' as const, label: 'Nothing' }].map((o) => (
+            <button key={o.value} type="button" className={`chip-btn ${mixer === o.value ? 'on' : ''}`} aria-pressed={mixer === o.value} onClick={() => setMixer(o.value)}>
+              {o.label}
+            </button>
+          ))}
+        </div>
+      </div>
+      {mixer !== 'none' && <OzField id="mixer-oz" label={`How much ${MIXER_NAMES[mixer]}`} value={mixerText} onChange={setMixerText} chips={[4, 6, 8, 12]} />}
+      <button type="button" className="btn" disabled={!(oz > 0) || (mixer !== 'none' && !(mixerOz > 0))} onClick={log}>
+        Log {oz} oz {drink.label}
+        {mixer !== 'none' && mixerOz > 0 ? ` + ${mixerOz} oz ${MIXER_NAMES[mixer]}` : ''}
       </button>
     </Sheet>
   )

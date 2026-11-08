@@ -57,7 +57,7 @@ describe('teas', () => {
   })
   it('logs the Fairlife chocolate button as one bottle with the label numbers, last in the row', () => {
     const d = drinkByKey('fairlife_choc_bottle')!
-    expect(DRINKS[DRINKS.length - 1].key).toBe('fairlife_choc_bottle')
+    expect(DRINKS.slice(-7).map((x) => x.key)).toEqual(['fairlife_choc_bottle', 'ultra_zero', 'bacardi', 'whisky', 'red_wine', 'white_wine', 'budweiser'])
     expect(drinkPortion(d)).toEqual({ amount: 1, unit: 'bottle' })
     const food = asFood(drinkFood(d))
     const n = portionNutrients(food, food.unit_conversions[0].grams)
@@ -156,5 +156,39 @@ describe('drinks tracker glasses', () => {
     expect(liters(12)).toBe('350 ml')
     expect(liters(2000 / ML_PER_OZ)).toBe('2 L')
     expect(liters(1440 / ML_PER_OZ)).toBe('1.4 L')
+  })
+})
+
+describe('beer and spirits', () => {
+  it('logs Ultra Zero as a 29 kcal can', () => {
+    const d = drinkByKey('ultra_zero')!
+    expect(drinkPortion(d)).toEqual({ amount: 1, unit: 'can' })
+    const n = portionNutrients(asFood(drinkFood(d)), 355)
+    expect(Math.round(n.kcal!)).toBe(29)
+    expect(n.netCarbs).toBeCloseTo(6.5, 1)
+  })
+  it('logs rum and whisky by the ounce, 2 oz to start, at 64 kcal an ounce', () => {
+    for (const key of ['bacardi', 'whisky']) {
+      const d = drinkByKey(key)!
+      expect(drinkPortion(d)).toEqual({ amount: 2, unit: 'fl oz' })
+      const food = asFood(drinkFood(d))
+      expect(Math.round(portionNutrients(food, 2 * food.unit_conversions[0].grams).kcal!)).toBe(128)
+    }
+    expect(drinkByKey('bacardi')!.spirit!.mixers).toEqual(['coke_zero'])
+    expect(drinkByKey('whisky')!.spirit!.mixers).toEqual(['coke_zero', 'sparkling_water'])
+  })
+  it('logs wine by the 5 oz glass and Budweiser by the can', () => {
+    const red = drinkByKey('red_wine')!
+    expect(drinkPortion(red)).toEqual({ amount: 1, unit: 'glass' })
+    expect(Math.round(portionNutrients(asFood(drinkFood(red)), 147).kcal!)).toBe(125)
+    expect(Math.round(portionNutrients(asFood(drinkFood(drinkByKey('white_wine')!)), 147).kcal!)).toBe(122)
+    const bud = portionNutrients(asFood(drinkFood(drinkByKey('budweiser')!)), 355)
+    expect(Math.round(bud.kcal!)).toBe(145)
+    expect(bud.netCarbs).toBeCloseTo(10.6, 1)
+  })
+  it('lets Coke Zero be logged by the ounce as well as the can', () => {
+    const units = drinkFood(drinkByKey('coke_zero')!).unit_conversions
+    expect(units.map((u) => u.unit)).toEqual(['can', 'fl oz'])
+    expect(units[1].grams * 12).toBeCloseTo(355)
   })
 })

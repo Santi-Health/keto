@@ -61,6 +61,28 @@ function Pod({ color, text, ink, top, rim }: { color: string; text: string; ink:
   )
 }
 
+/** A short rocks glass with a pour in it. */
+function Rocks({ pour, ice }: { pour: string; ice?: boolean }) {
+  return (
+    <>
+      <path d="M7.6 20 L24.4 20 L23.4 35 L8.6 35 Z" fill={pour} opacity="0.9" />
+      {ice && <rect x="12" y="21.5" width="6" height="6" rx="1" fill="#fff" opacity="0.55" transform="rotate(12 15 24.5)" />}
+      <path d="M6.5 12 L25.5 12 L24 36.5 L8 36.5 Z" fill="none" stroke="#8a929c" strokeWidth="1.4" strokeLinejoin="round" />
+    </>
+  )
+}
+
+/** A stemmed wine glass. */
+function WineGlass({ wine }: { wine: string }) {
+  return (
+    <>
+      <path d="M9.4 12 L22.6 12 Q22.4 21 16 21.5 Q9.6 21 9.4 12 Z" fill={wine} />
+      <path d="M8.5 4 L23.5 4 Q24.5 21 16 22 Q7.5 21 8.5 4 Z" fill="none" stroke="#8a929c" strokeWidth="1.4" strokeLinejoin="round" />
+      <path d="M16 22 L16 34 M10.5 35.5 L21.5 35.5" stroke="#8a929c" strokeWidth="1.6" strokeLinecap="round" />
+    </>
+  )
+}
+
 /** A cup with a tea bag string over the rim and a tag hanging outside. */
 function TeaCup({ tea, label }: { tea: string; label?: string }) {
   return (
@@ -209,6 +231,28 @@ const DRAWINGS: Partial<Record<DrinkKey | 'espresso', () => ReactNode>> = {
   te_con_leche: () => <TeaCup tea="#c9a27e" />,
   rooibos: () => <TeaCup tea="#d9622b" label="Rooibos" />,
   fairlife_choc_bottle: () => <FairlifeBottle />,
+  ultra_zero: () => (
+    <Can
+      body="#f2f4f7"
+      lines={[
+        { t: 'ULTRA', fill: '#1d3c78', size: 5, y: 18 },
+        { t: 'ZERO', fill: '#2f8fd8', size: 5, y: 25, w: 12 },
+      ]}
+    />
+  ),
+  bacardi: () => <Rocks pour="#4a2516" ice />,
+  whisky: () => <Rocks pour="#c27a2c" ice />,
+  red_wine: () => <WineGlass wine="#6d1a2a" />,
+  white_wine: () => <WineGlass wine="#e8d98a" />,
+  budweiser: () => (
+    <Can
+      body="#c8102e"
+      lines={[
+        { t: 'Bud', fill: '#fff', size: 6, y: 20, w: 11 },
+        { t: 'weiser', fill: '#fff', size: 4.5, y: 26, w: 13 },
+      ]}
+    />
+  ),
 }
 
 /** The drawing for a drink, or its color dot when it has none. */
