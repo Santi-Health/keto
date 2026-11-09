@@ -2188,6 +2188,16 @@ input.drink-time {
   --ready-b: var(--warn);
 }
 
+.ready-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: -4px 0 6px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-2);
+}
+
 .ready-top {
   display: flex;
   align-items: center;

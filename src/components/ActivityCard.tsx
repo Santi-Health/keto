@@ -195,10 +195,31 @@ function Gauge({ score, label }: { score: number; label: string }) {
 }
 
 /** The app's readiness score for the day (or the week's average), with what drove it. */
-function ReadinessBlock({ days, isWeek }: { days: string[]; isWeek: boolean }) {
+function ReadinessBlock({ days: shown, isWeek }: { days: string[]; isWeek: boolean }) {
   const { activity } = useData()
+  // ‹ › steps back through earlier days (one day at a time, not in the week view).
+  const [back, setBack] = useState(0)
+  const days = isWeek || !back ? shown : [shift(shown[0], -back)]
   const scores = days.map((d) => ({ day: d, r: readinessFor(d, activity) }))
   const known = scores.filter((x): x is { day: string; r: NonNullable<typeof x.r> } => !!x.r)
+  const nav = !isWeek && (
+    <div className="ready-nav">
+      <button type="button" className="icon-btn" aria-label="Previous day" disabled={!activity[shift(days[0], -1)]} onClick={() => setBack(back + 1)}>
+        ‹
+      </button>
+      <span>{back ? new Date(`${days[0]}T12:00:00`).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }) : 'Readiness'}</span>
+      <button type="button" className="icon-btn" aria-label="Next day" disabled={!back} onClick={() => setBack(back - 1)}>
+        ›
+      </button>
+    </div>
+  )
+  if (back && !known.length)
+    return (
+      <div className="ready">
+        {nav}
+        <p className="muted small" style={{ margin: 0 }}>No readiness for this day (not enough Fitbit data).</p>
+      </div>
+    )
   if (!known.length) {
     // Today before Fitbit has finished syncing: say what the score is waiting for instead of showing nothing.
     const a = !isWeek && days[0] === localDate() ? activity[days[0]] : undefined
@@ -211,11 +232,12 @@ function ReadinessBlock({ days, isWeek }: { days: string[]; isWeek: boolean }) {
   const band = bandOf(score)
   return (
     <div className={`ready ${band}`}>
+      {nav}
       <div className="ready-top">
         <Gauge score={score} label={isWeek ? '7-day avg' : 'readiness'} />
         <div className="ready-head">
           <b>{!isWeek && r.illness ? 'Possible illness' : BAND_TITLE[band]}</b>
-          {!isWeek && <span>{r.illness ? ILLNESS_TEXT : advice(band)}</span>}
+          {!isWeek && !back && <span>{r.illness ? ILLNESS_TEXT : advice(band)}</span>}
           {!isWeek && r.illness && <span className="ready-cap">Held at {r.illness.cap} by your {r.illness.signs.join(' and ')}, off your normal.</span>}
           {!isWeek && r.cappedBySleep && (
             <span className="ready-cap">
