@@ -6,7 +6,7 @@
  *
  * The server's clock is UTC, so anything grouped by "local day" is shifted into the user's time zone first.
  */
-import { catchUpDays, mergeActivity, weightReadings, type ActivityDay } from '../lib/activity'
+import { catchUpDays, hasVitals, mergeActivity, weightReadings, type ActivityDay } from '../lib/activity'
 import { mergeIntoDays, parseGlucosePoint, type CgmDay } from '../lib/cgm'
 import { backupDue, backupToDrive } from '../lib/driveBackup'
 import type { Exercise } from '../lib/exercise'
@@ -171,7 +171,7 @@ export async function syncUser(env: Env, userId: string, tokens: { health: strin
   const activityRows = await d.select<ActivityDay>('daily_activity', `user_id=eq.${userId}&deleted_at=is.null`)
   const activity = Object.fromEntries(activityRows.map((a) => [a.id, a]))
   const lastDay = activityRows.filter((a) => a.steps != null).map((a) => a.day).sort().pop() ?? null
-  const act = await fetchActivity(token, since(catchUpDays(lastDay, today, { min: 7, first: 30 }) - 1), today)
+  const act = await fetchActivity(token, since(catchUpDays(lastDay, today, { min: 7, first: 30 }) - 1), today, hasVitals(activityRows) ? undefined : since(29))
   const days = mergeActivity(act, activity)
   await d.upsert('daily_activity', forUser(userId, days), 'user_id,id')
   const weights = await d.select<ReadingRow>('readings', `user_id=eq.${userId}&kind=eq.weight`)

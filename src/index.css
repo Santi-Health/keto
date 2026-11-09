@@ -2350,6 +2350,25 @@ input.drink-time {
   color: var(--text-2);
 }
 
+.ready-vitals {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  font-size: 0.78rem;
+  color: var(--text-2);
+}
+
+.ready-vitals b {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+
+.ready-vitals .sign,
+.ready-vitals .sign b {
+  color: var(--warn);
+}
+
 .ready-foot {
   margin-top: 10px;
   font-size: 0.68rem;

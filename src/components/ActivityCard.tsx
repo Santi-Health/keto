@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { formatSleep, type ActivityDay } from '../lib/activity'
 import { useData } from '../lib/data'
 import { addNutrients } from '../lib/nutrients'
-import { READINESS_TEXT, readinessFor } from '../lib/readiness'
+import { ILLNESS_TEXT, READINESS_TEXT, readinessFor } from '../lib/readiness'
 import { localDate } from '../lib/targets'
 
 const shift = (date: string, days: number) => {
@@ -214,8 +214,9 @@ function ReadinessBlock({ days, isWeek }: { days: string[]; isWeek: boolean }) {
       <div className="ready-top">
         <Gauge score={score} label={isWeek ? '7-day avg' : 'readiness'} />
         <div className="ready-head">
-          <b>{BAND_TITLE[band]}</b>
-          {!isWeek && <span>{advice(band)}</span>}
+          <b>{!isWeek && r.illness ? 'Possible illness' : BAND_TITLE[band]}</b>
+          {!isWeek && <span>{r.illness ? ILLNESS_TEXT : advice(band)}</span>}
+          {!isWeek && r.illness && <span className="ready-cap">Held at {r.illness.cap} by your {r.illness.signs.join(' and ')}, off your normal.</span>}
           {!isWeek && r.cappedBySleep && (
             <span className="ready-cap">
               Held at {r.cappedBySleep.cap} by a short night ({formatSleep(r.cappedBySleep.minutes)}).
@@ -247,6 +248,15 @@ function ReadinessBlock({ days, isWeek }: { days: string[]; isWeek: boolean }) {
             </div>
           ))}
           {r.missing.length > 0 && <div className="muted small">No {r.missing.join(' or ')} data yet.</div>}
+          {r.vitals.length > 0 && (
+            <div className="ready-vitals" aria-label="Overnight vitals">
+              {r.vitals.map((v) => (
+                <span key={v.label} className={v.sign ? 'sign' : ''} title={v.detail}>
+                  {v.label} <b>{v.short}</b>
+                </span>
+              ))}
+            </div>
+          )}
         </div>
       )}
       <div className="ready-foot">The app's own score vs. your last 30 days (Fitbit's Readiness isn't shared with apps).</div>

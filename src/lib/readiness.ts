@@ -7,6 +7,10 @@ import { formatSleep } from './activity'
  * (20%, lower = better) and sleep (45%: mostly last night, plus the last 3 nights). A night under
  * 6 hours also caps the score, so good HRV can't hide a short night. Not Fitbit's number, which
  * Google Health doesn't share.
+ *
+ * Overnight vitals catch what those three miss, getting sick: skin temperature well above your baseline,
+ * faster breathing or lower blood oxygen. One sign holds the score in the low band, two or more hold it
+ * near the bottom, so a flu night doesn't read like a merely tired one.
  */
 
 export type ReadinessBand = 'high' | 'moderate' | 'low'
@@ -20,7 +24,18 @@ export interface Readiness {
   missing: string[]
   /** Set when a short night held the score down. */
   cappedBySleep?: { cap: number; minutes: number }
+  /** Last night's vitals against your normal; sign = outside your usual range. */
+  vitals: { label: string; short: string; detail: string; sign: boolean }[]
+  /** Set when vitals point to getting sick. */
+  illness?: { cap: number; signs: string[] }
 }
+
+/** Skin temperature this far above baseline, breathing this much faster, or blood oxygen this much lower is a sign. */
+export const SKIN_TEMP_SIGN_C = 0.8
+export const BREATHING_SIGN = 1.5
+export const SPO2_SIGN = 2
+/** The score with one sign of illness can't go above this (low band); with two or more, this. */
+export const ILLNESS_CAP = [44, 25]
 
 /** Under 6 hours asleep the score can't go above this: 30 at 4 h, rising to 65 at 6 h. */
 export const shortSleepCap = (minutes: number) => (minutes >= 360 ? 100 : Math.round(30 + (Math.max(240, minutes) - 240) * (35 / 120)))
@@ -77,14 +92,49 @@ export function readinessFor(day: string, activity: Record<string, ActivityDay>)
   const total = weights.reduce((a, b) => a + b, 0)
   const blended = clamp(parts.reduce((s, p, i) => s + p.score * weights[i], 0) / total)
   const cap = lastNight ? shortSleepCap(lastNight) : 100
-  const score = Math.min(blended, cap)
+  const vitals = vitalsFor(today, history)
+  const signs = vitals.filter((v) => v.sign).map((v) => v.label.toLowerCase())
+  const illCap = signs.length ? ILLNESS_CAP[Math.min(signs.length, 2) - 1] : 100
+  const score = Math.min(blended, cap, illCap)
   return {
     score,
     band: score >= 70 ? 'high' : score >= 45 ? 'moderate' : 'low',
     parts,
     missing,
-    cappedBySleep: cap < blended ? { cap, minutes: lastNight! } : undefined,
+    cappedBySleep: cap < blended && cap <= illCap ? { cap, minutes: lastNight! } : undefined,
+    vitals,
+    illness: signs.length ? { cap: illCap, signs } : undefined,
   }
+}
+
+const signed = (x: number, digits: number) => `${x > 0 ? '+' : x < 0 ? '−' : '±'}${Math.abs(x).toFixed(digits)}`
+
+/** Last night's breathing rate, skin temperature and blood oxygen, each against your own normal. */
+export function vitalsFor(today: ActivityDay, history: ActivityDay[]): Readiness['vitals'] {
+  const out: Readiness['vitals'] = []
+  const normal = (get: (d: ActivityDay) => number | undefined) => {
+    const xs = history.map(get).filter((x): x is number => x != null && x > 0)
+    return xs.length >= 7 ? mean(xs) : null
+  }
+  const m = today.meta
+  if (m.skinTempC != null) {
+    const base = m.skinTempBaseC ?? normal((d) => d.meta.skinTempC)
+    if (base != null) {
+      const diff = Math.round((m.skinTempC - base) * 10) / 10
+      out.push({ label: 'Skin temp', short: `${signed(diff, 1)} °C`, detail: `skin temperature ${signed(diff, 1)} °C vs your normal`, sign: diff >= SKIN_TEMP_SIGN_C })
+    }
+  }
+  if (m.breathingRate != null) {
+    const base = normal((d) => d.meta.breathingRate)
+    const diff = base == null ? 0 : Math.round((m.breathingRate - base) * 10) / 10
+    out.push({ label: 'Breathing', short: `${m.breathingRate.toFixed(1)}/min${base == null ? '' : ` · ${signed(diff, 1)}`}`, detail: `breathing ${m.breathingRate.toFixed(1)}/min${base == null ? '' : `, ${signed(diff, 1)} vs your normal (${base.toFixed(1)})`}`, sign: base != null && diff >= BREATHING_SIGN })
+  }
+  if (m.spo2Pct != null) {
+    const base = normal((d) => d.meta.spo2Pct)
+    const diff = base == null ? 0 : Math.round((m.spo2Pct - base) * 10) / 10
+    out.push({ label: 'Blood oxygen', short: `${Math.round(m.spo2Pct)}%${base == null ? '' : ` · ${signed(diff, 1)}`}`, detail: `blood oxygen ${Math.round(m.spo2Pct)}%${base == null ? '' : `, ${signed(diff, 1)} vs your normal (${Math.round(base)}%)`}`, sign: (base != null && diff <= -SPO2_SIGN) || m.spo2Pct < 92 })
+  }
+  return out
 }
 
 export const READINESS_TEXT: Record<ReadinessBand, string> = {
@@ -92,3 +142,5 @@ export const READINESS_TEXT: Record<ReadinessBand, string> = {
   moderate: 'Moderately recovered: train as planned, keep the intensity in check.',
   low: 'Low recovery: favor yoga, a walk or easy cardio, and prioritize sleep tonight.',
 }
+
+export const ILLNESS_TEXT = 'Signs you may be getting sick: rest, drink fluids and skip hard training today.'

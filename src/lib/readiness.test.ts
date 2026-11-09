@@ -53,3 +53,43 @@ describe('short sleep', () => {
     expect(readinessFor('2026-10-31', month(row('2026-10-31', 55, 46, 420)))!.cappedBySleep).toBeUndefined()
   })
 })
+
+describe('overnight vitals', () => {
+  const at = (n: number) => {
+    const d = new Date('2026-11-08T12:00:00')
+    d.setDate(d.getDate() - n)
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  }
+  const day = (n: number, meta: ActivityDay['meta'], over: Partial<ActivityDay> = {}): ActivityDay => ({
+    id: at(n), day: at(n), steps: 8000, calories_out: 2500, resting_hr: 55, sleep_minutes: 450, meta: { hrvMs: 40, ...meta }, updated_at: '', deleted_at: null, ...over,
+  })
+  const usual = { breathingRate: 14, skinTempC: 33.5, spo2Pct: 96 }
+  const history = Object.fromEntries(Array.from({ length: 30 }, (_, i) => [at(i + 1), day(i + 1, usual)]))
+
+  it('leaves a tired night alone when the vitals are normal', () => {
+    const r = readinessFor(at(0), { ...history, [at(0)]: day(0, { ...usual, hrvMs: 32 }, { sleep_minutes: 400 }) })!
+    expect(r.illness).toBeUndefined()
+    expect(r.vitals.map((v) => v.label)).toEqual(['Skin temp', 'Breathing', 'Blood oxygen'])
+    expect(r.vitals.every((v) => !v.sign)).toBe(true)
+  })
+
+  it('holds a sick night near the bottom even with decent HRV and sleep', () => {
+    const r = readinessFor(at(0), { ...history, [at(0)]: day(0, { breathingRate: 16, skinTempC: 34.7, spo2Pct: 95.5 }) })!
+    expect(r.illness?.signs).toHaveLength(2)
+    expect(r.score).toBeLessThanOrEqual(25)
+    expect(r.band).toBe('low')
+  })
+
+  it('one sign keeps the score in the low band', () => {
+    const r = readinessFor(at(0), { ...history, [at(0)]: day(0, { ...usual, skinTempC: 34.4 }) })!
+    expect(r.illness?.signs).toEqual(['skin temp'])
+    expect(r.vitals[0].short).toBe('+0.9 °C')
+    expect(r.score).toBeLessThanOrEqual(44)
+  })
+
+  it("uses Fitbit's own skin temperature baseline when it sends one", () => {
+    const r = readinessFor(at(0), { ...history, [at(0)]: day(0, { ...usual, skinTempC: 34.4, skinTempBaseC: 34.0 }) })!
+    expect(r.vitals[0].short).toBe('+0.4 °C')
+    expect(r.illness).toBeUndefined()
+  })
+})

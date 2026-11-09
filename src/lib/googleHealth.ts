@@ -350,12 +350,24 @@ export function parseSleep(p: Record<string, unknown>): SleepNight | null {
 
 const localDay = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 
+export interface Vitals {
+  /** Breaths per minute during the main sleep. */
+  breathingRate?: number
+  /** Average skin temperature during sleep, and Fitbit's own 30-night baseline (°C). */
+  skinTempC?: number
+  skinTempBaseC?: number
+  /** Average blood oxygen during sleep (%). */
+  spo2Pct?: number
+}
+
 export interface ActivityImport {
   steps: Record<string, number>
   caloriesOut: Record<string, number>
   restingHr: Record<string, number>
   /** Overnight HRV (RMSSD, ms) by the morning it was measured. */
   hrv: Record<string, number>
+  /** Overnight vitals by the morning they were measured: breathing rate, skin temperature, blood oxygen. */
+  vitals: Record<string, Vitals>
   sleep: SleepNight[]
   weights: { id: string; at: string; kg: number }[]
   bodyFat: { at: string; pct: number }[]
@@ -364,8 +376,8 @@ export interface ActivityImport {
 }
 
 /** Pulls daily activity for a date range. Each part fails on its own so one missing permission doesn't block the rest. */
-export async function fetchActivity(token: string, fromDate: string, toDate: string): Promise<ActivityImport> {
-  const out: ActivityImport = { steps: {}, caloriesOut: {}, restingHr: {}, hrv: {}, sleep: [], weights: [], bodyFat: [], skipped: [] }
+export async function fetchActivity(token: string, fromDate: string, toDate: string, vitalsFrom?: string): Promise<ActivityImport> {
+  const out: ActivityImport = { steps: {}, caloriesOut: {}, restingHr: {}, hrv: {}, vitals: {}, sleep: [], weights: [], bodyFat: [], skipped: [] }
   const civilRange = (field: string) => `${field} >= "${civil(fromDate)}" AND ${field} < "${civil(toDate, 1)}"`
   const part = async (label: string, run: () => Promise<void>) => {
     try {
@@ -395,6 +407,35 @@ export async function fetchActivity(token: string, fromDate: string, toDate: str
       const day = fromCivil(v?.date)
       const ms = Number(v?.averageHeartRateVariabilityMilliseconds)
       if (day && ms > 0) out.hrv[day] = Math.round(ms * 10) / 10
+    }
+  })
+  // Overnight vitals, the signs of getting sick: from vitalsFrom, which can reach further back to fill in history.
+  const vFrom = vitalsFrom && vitalsFrom < fromDate ? vitalsFrom : fromDate
+  const daily = (type: string, filter: string, key: string) => listPoints(token, type, `${filter}.date >= "${vFrom}" AND ${filter}.date < "${addDays(toDate, 1)}"`).then((ps) => ps.map((p) => p[key] as Record<string, unknown> | undefined))
+  const vital = (day: string | null) => (day ? (out.vitals[day] ??= {}) : null)
+  const num = (x: unknown) => (x == null || x === '' ? NaN : Number(x))
+  await part('breathing rate', async () => {
+    for (const v of await daily('daily-respiratory-rate', 'daily_respiratory_rate', 'dailyRespiratoryRate')) {
+      const n = num(v?.breathsPerMinute)
+      const t = vital(fromCivil(v?.date))
+      if (t && n > 0) t.breathingRate = Math.round(n * 10) / 10
+    }
+  })
+  await part('skin temperature', async () => {
+    for (const v of await daily('daily-sleep-temperature-derivations', 'daily_sleep_temperature_derivations', 'dailySleepTemperatureDerivations')) {
+      const n = num(v?.nightlyTemperatureCelsius)
+      const base = num(v?.baselineTemperatureCelsius)
+      const t = vital(fromCivil(v?.date))
+      if (!t || !(n > 0)) continue
+      t.skinTempC = Math.round(n * 100) / 100
+      if (base > 0) t.skinTempBaseC = Math.round(base * 100) / 100
+    }
+  })
+  await part('blood oxygen', async () => {
+    for (const v of await daily('daily-oxygen-saturation', 'daily_oxygen_saturation', 'dailyOxygenSaturation')) {
+      const n = num(v?.averagePercentage)
+      const t = vital(fromCivil(v?.date))
+      if (t && n > 0) t.spo2Pct = Math.round(n * 10) / 10
     }
   })
   await part('sleep', async () => {

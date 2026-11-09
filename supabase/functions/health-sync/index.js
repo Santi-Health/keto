@@ -90,6 +90,10 @@ function mergeActivity(imp, existing) {
 		...get(day).meta,
 		hrvMs: v
 	};
+	for (const [day, v] of Object.entries(imp.vitals ?? {})) get(day).meta = {
+		...get(day).meta,
+		...v
+	};
 	const byDay = /* @__PURE__ */ new Map();
 	for (const n of imp.sleep) byDay.set(n.day, [...byDay.get(n.day) ?? [], n]);
 	for (const [day, nights] of byDay) {
@@ -156,6 +160,8 @@ async function weightReadings(imp, existing, tz = deviceTz()) {
 * How many days back an import should reach: from the last day already imported (so a week or two
 * away gets filled in), at least `min` days (recent days are still filling in), at most 90.
 */
+/** Whether any day has the overnight vitals yet; until then an import reaches back a month for them. */
+const hasVitals = (days) => days.some((d) => d.meta.breathingRate != null || d.meta.skinTempC != null || d.meta.spo2Pct != null);
 function catchUpDays(lastDay, today, opts) {
 	if (!lastDay) return opts.first;
 	const gap = Math.round((Date.parse(`${today}T12:00:00`) - Date.parse(`${lastDay}T12:00:00`)) / 864e5) + 1;
@@ -332,6 +338,15 @@ const DEFAULT_YOGA_ROUTINE = {
 ].join(" ");
 const API = "https://health.googleapis.com/v4/users/me";
 const TOKEN_KEY = "keto.googleHealth.token";
+/** Google's own explanation from an error response, e.g. "(Google: Request had insufficient authentication scopes.)". */
+async function googleReason(res) {
+	try {
+		const body = await res.json();
+		return body.error?.message ? `(Google: ${body.error.message})` : "";
+	} catch {
+		return "";
+	}
+}
 function forgetGoogleToken() {
 	try {
 		sessionStorage.removeItem(TOKEN_KEY);
@@ -393,7 +408,8 @@ async function listGlucose(token, from, to) {
 		}
 		if (res.status === 403) {
 			forgetGoogleToken();
-			throw new Error("Google needs your OK to read glucose. Tap Import again and allow \"health metrics\".");
+			const reason = await googleReason(res);
+			throw new Error(`${/disallowed OAuth scope/i.test(reason) ? "Google refused this sign-in. Tap Import again." : "Google needs your OK to read glucose. Tap Import again and tick \"health metrics\"."} ${reason}`);
 		}
 		if (!res.ok) {
 			const body = await res.text().catch(() => "");
@@ -422,7 +438,7 @@ async function healthFetch(token, url, init) {
 	}
 	if (res.status === 403) {
 		forgetGoogleToken();
-		throw new NeedsConsentError("Google needs your OK for this data. Tap Import again and allow it.");
+		throw new NeedsConsentError(`Google needs your OK for this data. Tap Import again and allow it. ${await googleReason(res)}`);
 	}
 	if (!res.ok) {
 		const body = await res.text().catch(() => "");
@@ -515,12 +531,13 @@ function parseSleep(p) {
 }
 const localDay = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 /** Pulls daily activity for a date range. Each part fails on its own so one missing permission doesn't block the rest. */
-async function fetchActivity(token, fromDate, toDate) {
+async function fetchActivity(token, fromDate, toDate, vitalsFrom) {
 	const out = {
 		steps: {},
 		caloriesOut: {},
 		restingHr: {},
 		hrv: {},
+		vitals: {},
 		sleep: [],
 		weights: [],
 		bodyFat: [],
@@ -555,6 +572,34 @@ async function fetchActivity(token, fromDate, toDate) {
 			const day = fromCivil(v?.date);
 			const ms = Number(v?.averageHeartRateVariabilityMilliseconds);
 			if (day && ms > 0) out.hrv[day] = Math.round(ms * 10) / 10;
+		}
+	});
+	const vFrom = vitalsFrom && vitalsFrom < fromDate ? vitalsFrom : fromDate;
+	const daily = (type, filter, key) => listPoints(token, type, `${filter}.date >= "${vFrom}" AND ${filter}.date < "${addDays(toDate, 1)}"`).then((ps) => ps.map((p) => p[key]));
+	const vital = (day) => day ? out.vitals[day] ??= {} : null;
+	const num = (x) => x == null || x === "" ? NaN : Number(x);
+	await part("breathing rate", async () => {
+		for (const v of await daily("daily-respiratory-rate", "daily_respiratory_rate", "dailyRespiratoryRate")) {
+			const n = num(v?.breathsPerMinute);
+			const t = vital(fromCivil(v?.date));
+			if (t && n > 0) t.breathingRate = Math.round(n * 10) / 10;
+		}
+	});
+	await part("skin temperature", async () => {
+		for (const v of await daily("daily-sleep-temperature-derivations", "daily_sleep_temperature_derivations", "dailySleepTemperatureDerivations")) {
+			const n = num(v?.nightlyTemperatureCelsius);
+			const base = num(v?.baselineTemperatureCelsius);
+			const t = vital(fromCivil(v?.date));
+			if (!t || !(n > 0)) continue;
+			t.skinTempC = Math.round(n * 100) / 100;
+			if (base > 0) t.skinTempBaseC = Math.round(base * 100) / 100;
+		}
+	});
+	await part("blood oxygen", async () => {
+		for (const v of await daily("daily-oxygen-saturation", "daily_oxygen_saturation", "dailyOxygenSaturation")) {
+			const n = num(v?.averagePercentage);
+			const t = vital(fromCivil(v?.date));
+			if (t && n > 0) t.spo2Pct = Math.round(n * 10) / 10;
 		}
 	});
 	await part("sleep", async () => {
@@ -1130,7 +1175,7 @@ async function syncUser(env, userId, tokens, tz) {
 	const act = await fetchActivity(token, since(catchUpDays(activityRows.filter((a) => a.steps != null).map((a) => a.day).sort().pop() ?? null, today, {
 		min: 7,
 		first: 30
-	}) - 1), today);
+	}) - 1), today, hasVitals(activityRows) ? void 0 : since(29));
 	const days = mergeActivity(act, activity);
 	await d.upsert("daily_activity", forUser(userId, days), "user_id,id");
 	const weighIns = await weightReadings(act, await d.select("readings", `user_id=eq.${userId}&kind=eq.weight`), tz);

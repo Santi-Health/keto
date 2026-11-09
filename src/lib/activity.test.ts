@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { averageBurn, mergeActivity, stableUuid, type ActivityDay } from './activity'
 import { parseSleep, type ActivityImport } from './googleHealth'
 
-const imp = (over: Partial<ActivityImport>): ActivityImport => ({ steps: {}, caloriesOut: {}, restingHr: {}, hrv: {}, sleep: [], weights: [], bodyFat: [], skipped: [], ...over })
+const imp = (over: Partial<ActivityImport>): ActivityImport => ({ steps: {}, caloriesOut: {}, restingHr: {}, hrv: {}, vitals: {}, sleep: [], weights: [], bodyFat: [], skipped: [], ...over })
 
 describe('activity import', () => {
   it('reads a Google Health sleep point', () => {

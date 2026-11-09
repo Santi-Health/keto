@@ -1,6 +1,6 @@
 import { useMemo, useState, type ReactNode } from 'react'
 import { daysSinceStrength, routineDue, routineSession, sessionLabel, trainingWarnings } from '../lib/exercise'
-import { catchUpDays, mergeActivity, weightReadings } from '../lib/activity'
+import { catchUpDays, hasVitals, mergeActivity, weightReadings } from '../lib/activity'
 import { DRIVE_SCOPE, cachedToken, fetchActivity, getGoogleToken, heartRateCalories, learnTypes, listExercises, mergeImported, toAppExercise } from '../lib/googleHealth'
 import { useInstall } from '../lib/install'
 import { STATUS_TEXT, estimateKetosis, tomorrowMorning } from '../lib/ketosis'
@@ -116,7 +116,9 @@ export function Today({ profile, targets, onOpenSettings, onToggleRefeed, onNavi
       // Workouts are already saved; a problem here is reported without losing them.
       let actMessage: string
       try {
-        const act = await fetchActivity(token, localDate(actFrom), today)
+        const monthAgo = new Date()
+        monthAgo.setDate(monthAgo.getDate() - 29)
+        const act = await fetchActivity(token, localDate(actFrom), today, hasVitals(Object.values(activity)) ? undefined : localDate(monthAgo))
         const changedDays = mergeActivity(act, activity)
         for (const d of changedDays) saveActivity(d)
         const weighIns = await weightReadings(act, readings)

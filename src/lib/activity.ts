@@ -20,6 +20,13 @@ export interface ActivityDay {
     awakeMin?: number
     /** Overnight heart rate variability (RMSSD, ms). */
     hrvMs?: number
+    /** Breaths per minute during sleep. */
+    breathingRate?: number
+    /** Average skin temperature during sleep and Fitbit's 30-night baseline (°C). */
+    skinTempC?: number
+    skinTempBaseC?: number
+    /** Average blood oxygen during sleep (%). */
+    spo2Pct?: number
   }
   updated_at: string
   deleted_at: string | null
@@ -45,6 +52,7 @@ export function mergeActivity(imp: ActivityImport, existing: Record<string, Acti
   for (const [day, v] of Object.entries(imp.caloriesOut)) if (v > 0) get(day).calories_out = v
   for (const [day, v] of Object.entries(imp.restingHr)) get(day).resting_hr = v
   for (const [day, v] of Object.entries(imp.hrv)) get(day).meta = { ...get(day).meta, hrvMs: v }
+  for (const [day, v] of Object.entries(imp.vitals ?? {})) get(day).meta = { ...get(day).meta, ...v }
   // Naps add to the day's sleep; the longest sleep sets the bed and wake times.
   const byDay = new Map<string, ActivityImport['sleep']>()
   for (const n of imp.sleep) byDay.set(n.day, [...(byDay.get(n.day) ?? []), n])
@@ -123,6 +131,9 @@ export const formatSleep = (min: number) => {
  * How many days back an import should reach: from the last day already imported (so a week or two
  * away gets filled in), at least `min` days (recent days are still filling in), at most 90.
  */
+/** Whether any day has the overnight vitals yet; until then an import reaches back a month for them. */
+export const hasVitals = (days: ActivityDay[]) => days.some((d) => d.meta.breathingRate != null || d.meta.skinTempC != null || d.meta.spo2Pct != null)
+
 export function catchUpDays(lastDay: string | null, today: string, opts: { min: number; first: number; max?: number }): number {
   if (!lastDay) return opts.first
   const gap = Math.round((Date.parse(`${today}T12:00:00`) - Date.parse(`${lastDay}T12:00:00`)) / 86_400_000) + 1
