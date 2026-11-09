@@ -9,8 +9,10 @@ import { formatSleep } from './activity'
  * Google Health doesn't share.
  *
  * Overnight vitals catch what those three miss, getting sick: skin temperature well above your baseline,
- * faster breathing or lower blood oxygen. One sign holds the score in the low band, two or more hold it
- * near the bottom, so a flu night doesn't read like a merely tired one.
+ * faster breathing or lower blood oxygen. Two signs hold the score at 10, a sick day; one sign holds it in the
+ * low band only with HRV well down too, since a warm night or a drink can lift skin temperature alone.
+ * Tuned on real nights: a flu night (Oct 29) showed skin +1.9 °C, breathing +2.1 and HRV −55%; a merely
+ * tired night (Nov 8) had HRV −43% with normal vitals.
  */
 
 export type ReadinessBand = 'high' | 'moderate' | 'low'
@@ -31,11 +33,15 @@ export interface Readiness {
 }
 
 /** Skin temperature this far above baseline, breathing this much faster, or blood oxygen this much lower is a sign. */
-export const SKIN_TEMP_SIGN_C = 0.8
+export const SKIN_TEMP_SIGN_C = 1
 export const BREATHING_SIGN = 1.5
 export const SPO2_SIGN = 2
-/** The score with one sign of illness can't go above this (low band); with two or more, this. */
-export const ILLNESS_CAP = [44, 25]
+/** One sign counts only with HRV at least this far below normal. */
+export const ILLNESS_HRV_DROP = 0.25
+/** The score with one sign of illness (and HRV down) can't go above this (low band); with two or more, this. */
+export const ILLNESS_CAP = [44, 10]
+/** Skin readings outside this range are sensor glitches (one night read 41.8 °C), not temperature. */
+const skinOk = (c: number | undefined) => (c != null && c >= 30 && c <= 40 ? c : undefined)
 
 /** Under 6 hours asleep the score can't go above this: 30 at 4 h, rising to 65 at 6 h. */
 export const shortSleepCap = (minutes: number) => (minutes >= 360 ? 100 : Math.round(30 + (Math.max(240, minutes) - 240) * (35 / 120)))
@@ -62,9 +68,11 @@ export function readinessFor(day: string, activity: Record<string, ActivityDay>)
 
   const hrvs = history.map((d) => d.meta.hrvMs).filter((x): x is number => x != null && x > 0)
   const hrv = today.meta.hrvMs
+  let hrvChange = 0
   if (hrv != null && hrvs.length >= 7) {
     const base = mean(hrvs)
     const change = hrv / base - 1
+    hrvChange = change
     // Your normal scores 60; +20% scores 90, −20% scores 30.
     parts.push({ label: 'HRV', score: clamp(60 + 150 * change), short: `${Math.round(hrv)} ms · ${change >= 0 ? '+' : '−'}${Math.abs(Math.round(change * 100))}%`, detail: `${Math.round(hrv)} ms, ${Math.abs(Math.round(change * 100))}% ${change >= 0 ? 'above' : 'below'} your normal (${Math.round(base)})` })
     weights.push(0.35)
@@ -94,7 +102,8 @@ export function readinessFor(day: string, activity: Record<string, ActivityDay>)
   const cap = lastNight ? shortSleepCap(lastNight) : 100
   const vitals = vitalsFor(today, history)
   const signs = vitals.filter((v) => v.sign).map((v) => v.label.toLowerCase())
-  const illCap = signs.length ? ILLNESS_CAP[Math.min(signs.length, 2) - 1] : 100
+  const ill = signs.length >= 2 || (signs.length === 1 && hrvChange <= -ILLNESS_HRV_DROP)
+  const illCap = ill ? ILLNESS_CAP[Math.min(signs.length, 2) - 1] : 100
   const score = Math.min(blended, cap, illCap)
   return {
     score,
@@ -103,7 +112,7 @@ export function readinessFor(day: string, activity: Record<string, ActivityDay>)
     missing,
     cappedBySleep: cap < blended && cap <= illCap ? { cap, minutes: lastNight! } : undefined,
     vitals,
-    illness: signs.length ? { cap: illCap, signs } : undefined,
+    illness: ill ? { cap: illCap, signs } : undefined,
   }
 }
 
@@ -117,10 +126,11 @@ export function vitalsFor(today: ActivityDay, history: ActivityDay[]): Readiness
     return xs.length >= 7 ? mean(xs) : null
   }
   const m = today.meta
-  if (m.skinTempC != null) {
-    const base = m.skinTempBaseC ?? normal((d) => d.meta.skinTempC)
+  const skin = skinOk(m.skinTempC)
+  if (skin != null) {
+    const base = skinOk(m.skinTempBaseC) ?? normal((d) => skinOk(d.meta.skinTempC))
     if (base != null) {
-      const diff = Math.round((m.skinTempC - base) * 10) / 10
+      const diff = Math.round((skin - base) * 10) / 10
       out.push({ label: 'Skin temp', short: `${signed(diff, 1)} °C`, detail: `skin temperature ${signed(diff, 1)} °C vs your normal`, sign: diff >= SKIN_TEMP_SIGN_C })
     }
   }

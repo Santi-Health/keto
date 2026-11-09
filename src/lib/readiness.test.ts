@@ -76,20 +76,41 @@ describe('overnight vitals', () => {
   it('holds a sick night near the bottom even with decent HRV and sleep', () => {
     const r = readinessFor(at(0), { ...history, [at(0)]: day(0, { breathingRate: 16, skinTempC: 34.7, spo2Pct: 95.5 }) })!
     expect(r.illness?.signs).toHaveLength(2)
-    expect(r.score).toBeLessThanOrEqual(25)
+    expect(r.score).toBe(10)
     expect(r.band).toBe('low')
   })
 
-  it('one sign keeps the score in the low band', () => {
-    const r = readinessFor(at(0), { ...history, [at(0)]: day(0, { ...usual, skinTempC: 34.4 }) })!
+  it('one sign with HRV well down keeps the score in the low band', () => {
+    const r = readinessFor(at(0), { ...history, [at(0)]: day(0, { ...usual, skinTempC: 34.6, hrvMs: 28 }) })!
     expect(r.illness?.signs).toEqual(['skin temp'])
-    expect(r.vitals[0].short).toBe('+0.9 °C')
     expect(r.score).toBeLessThanOrEqual(44)
+  })
+
+  it('one sign alone (a warm night, a drink) shows but does not hold the score', () => {
+    const r = readinessFor(at(0), { ...history, [at(0)]: day(0, { ...usual, skinTempC: 34.6 }) })!
+    expect(r.vitals[0].sign).toBe(true)
+    expect(r.illness).toBeUndefined()
+  })
+
+  it('ignores impossible skin readings', () => {
+    const r = readinessFor(at(0), { ...history, [at(0)]: day(0, { ...usual, skinTempC: 41.8, skinTempBaseC: 41.6 }) })!
+    expect(r.vitals.map((v) => v.label)).toEqual(['Breathing', 'Blood oxygen'])
   })
 
   it("uses Fitbit's own skin temperature baseline when it sends one", () => {
     const r = readinessFor(at(0), { ...history, [at(0)]: day(0, { ...usual, skinTempC: 34.4, skinTempBaseC: 34.0 }) })!
     expect(r.vitals[0].short).toBe('+0.4 °C')
     expect(r.illness).toBeUndefined()
+  })
+
+  it('your real nights: flags the Oct 29 flu, not the tired Nov 8', () => {
+    // From your Fitbit data: the 30 nights before were HRV ~56, resting HR ~58, breathing ~14.2, skin ~33.5, oxygen ~96.
+    const base = Object.fromEntries(Array.from({ length: 30 }, (_, i) => [at(i + 1), day(i + 1, { hrvMs: 56, breathingRate: 14.2, skinTempC: 33.5, spo2Pct: 96 }, { resting_hr: 58 })]))
+    const flu = readinessFor(at(0), { ...base, [at(0)]: day(0, { hrvMs: 25.3, breathingRate: 16.4, skinTempC: 35.32, skinTempBaseC: 33.46, spo2Pct: 95.4 }, { resting_hr: 59, sleep_minutes: 442 }) })!
+    expect(flu.illness?.signs).toEqual(['skin temp', 'breathing'])
+    expect(flu.score).toBe(10)
+    const tired = readinessFor(at(0), { ...base, [at(0)]: day(0, { hrvMs: 31.9, breathingRate: 14.2, skinTempC: 33.75, skinTempBaseC: 33.68, spo2Pct: 94.9 }, { resting_hr: 59, sleep_minutes: 415 }) })!
+    expect(tired.illness).toBeUndefined()
+    expect(tired.score).toBeGreaterThan(flu.score)
   })
 })
