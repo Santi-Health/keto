@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { DRINKS, MILKS, drinkByKey, drinkFood, drinkPortion, hydration, milkFood, glasses, liters, ML_PER_OZ } from './drinks'
+import { DRINKS, MILKS, drinkByKey, drinkFood, isCan, drinkPortion, hydration, milkFood, glasses, liters, ML_PER_OZ } from './drinks'
 import { portionNutrients, type Food } from './foods'
 
 const asFood = (f: ReturnType<typeof drinkFood>): Food => ({ ...f, id: 'x', favorite: false, use_count: 0, last_used_at: null, updated_at: '', deleted_at: null })
@@ -186,9 +186,16 @@ describe('beer and spirits', () => {
     expect(Math.round(bud.kcal!)).toBe(145)
     expect(bud.netCarbs).toBeCloseTo(10.6, 1)
   })
-  it('lets Coke Zero be logged by the ounce as well as the can', () => {
-    const units = drinkFood(drinkByKey('coke_zero')!).unit_conversions
-    expect(units.map((u) => u.unit)).toEqual(['can', 'fl oz'])
-    expect(units[1].grams * 12).toBeCloseTo(355)
+  it('lets every can be logged by the ounce as well as the can', () => {
+    for (const key of ['coke_zero', 'diet_coke', 'spindrift', 'ultra_zero', 'budweiser']) {
+      const d = drinkByKey(key)!
+      expect(isCan(d)).toBe(true)
+      expect(drinkPortion(d)).toEqual({ amount: 1, unit: 'can' })
+      const units = drinkFood(d).unit_conversions
+      expect(units.map((u) => u.unit)).toEqual(['can', 'fl oz'])
+      expect(units[1].grams * 12).toBeCloseTo(355)
+    }
+    expect(isCan(drinkByKey('sparkling_rain')!)).toBe(true)
+    for (const key of ['bacardi', 'red_wine', 'fairlife_choc_bottle', 'espresso_double', 'kazar', 'water']) expect(isCan(drinkByKey(key)!)).toBe(false)
   })
 })

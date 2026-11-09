@@ -58,8 +58,6 @@ export interface Drink {
   milkChoices?: { key: MilkKey; oz: number }[]
   /** Logged as one of these (a bottle) instead of a can. */
   container?: { unit: string; grams: number }
-  /** Asks how many ounces (a can by default), for a drink also poured by the glass. */
-  byOz?: boolean
   /** A spirit: asks how many ounces and what it was mixed with. Grams per fluid ounce, lighter than water. */
   spirit?: { mixers: MixerKey[]; gPerFlOz: number }
   /** Beer and wine: not counted as fluid, the same as spirits. */
@@ -186,7 +184,7 @@ const ALL: Drink[] = [
   // Lemon, from Spindrift's label: real juice, so it has a few calories and is logged as a food, not as water.
   { key: 'spindrift', label: 'Spindrift', serving: '355 ml can', oz: 12, hydration: false, color: '#f2d64b', perServing: tea({ kcal: 3, carbs: 1, netCarbs: 1, sodiumMg: 0, caffeineMg: 0 }) },
   { key: 'diet_coke', label: 'Diet Coke', serving: '355 ml can', oz: 12, hydration: false, color: '#b8b8b8', perServing: soda(46, 40), sweeteners: ['aspartame'] },
-  { key: 'coke_zero', label: 'Coke Zero', serving: '355 ml can', oz: 12, hydration: false, color: '#e4002b', perServing: soda(34, 40, 60), sweeteners: ['aspartame', 'acesulfame K'], byOz: true },
+  { key: 'coke_zero', label: 'Coke Zero', serving: '355 ml can', oz: 12, hydration: false, color: '#e4002b', perServing: soda(34, 40, 60), sweeteners: ['aspartame', 'acesulfame K'] },
   { key: 'diet_pepsi', label: 'Diet Pepsi', serving: '355 ml can', oz: 12, hydration: false, color: '#1f4fa0', perServing: soda(35, 35), sweeteners: ['aspartame', 'acesulfame K'] },
   { key: 'squirt_zero', label: 'Squirt Zero', serving: '355 ml can', oz: 12, hydration: false, color: '#f2c200', perServing: soda(0, 40), sweeteners: ['aspartame', 'acesulfame K'], estimated: ['sodiumMg'] },
   { key: 'fanta_zero', label: 'Fanta Zero', serving: '355 ml can', oz: 12, hydration: false, color: '#ff8200', perServing: soda(0, 40), sweeteners: ['aspartame', 'acesulfame K'], estimated: ['sodiumMg'] },
@@ -386,6 +384,9 @@ export const asksForMilk = (d: Drink) => d.key.startsWith('espresso') || d.conta
 
 export const drinkByKey = (key: string) => ALL.find((d) => d.key === key)
 
+/** A 12 oz can: a tap logs the can, holding the button asks how many ounces. */
+export const isCan = (d: Drink) => d.serving.includes('can') && !d.container && !d.flOz && !d.spirit && !d.key.startsWith('espresso')
+
 /** Food row for a soda or espresso (single and double share one food): nutrients per 100 g plus a serving unit. */
 export function drinkFood(d: Drink): NewFood {
   const isEspresso = d.key.startsWith('espresso')
@@ -401,7 +402,7 @@ export function drinkFood(d: Drink): NewFood {
     unit_conversions: [
       d.container ? { unit: d.container.unit, grams: d.container.grams } : d.flOz ? { unit: 'fl oz', grams: flOzG } : { unit: isEspresso ? 'shot' : 'can', grams: isEspresso ? SHOT_G : CAN_G },
       // A can is 12 fl oz.
-      ...(d.byOz ? [{ unit: 'fl oz', grams: CAN_G / 12 }] : []),
+      ...(isCan(d) ? [{ unit: 'fl oz', grams: CAN_G / 12 }] : []),
     ],
     ingredients_text: null,
     keto_notes: d.sweeteners?.length ? `${d.perServing?.sugars ? 'No added sugar' : 'Zero sugar'}; sweetened with ${d.sweeteners.join(' and ')}.` : null,

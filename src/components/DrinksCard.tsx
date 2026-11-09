@@ -1,6 +1,6 @@
-import { useState } from 'react'
+import { useRef, useState, type ReactNode } from 'react'
 import { useData } from '../lib/data'
-import { ALL_DRINKS, CAFFEINE_FREE_MG, DRINKS, ML_PER_OZ, SPIRIT_OZ, drinkByKey, glasses, liters, MILKS, asksForMilk, drinkFood, drinkPortion, hydration, milkFood, type Drink, type DrinkKey, type MilkKey, type MixerKey } from '../lib/drinks'
+import { ALL_DRINKS, CAFFEINE_FREE_MG, DRINKS, ML_PER_OZ, SPIRIT_OZ, drinkByKey, glasses, liters, MILKS, asksForMilk, isCan, drinkFood, drinkPortion, hydration, milkFood, type Drink, type DrinkKey, type MilkKey, type MixerKey } from '../lib/drinks'
 import { buildLogEntry, portionNutrients, type Food, type LogEntry } from '../lib/foods'
 import { mealForTime } from '../lib/foods'
 import { portionText, unshout } from '../lib/quickFoods'
@@ -144,10 +144,6 @@ export function DrinksCard({ days, waterTargetOz }: Props) {
       setSpirit(d)
       return
     }
-    if (d.byOz) {
-      setByOz(d)
-      return
-    }
     const { entry, food } = logDrinkFood(d, now)
     const ids = [entry.id]
     if (HALVES.includes(entry.unit)) {
@@ -185,9 +181,16 @@ export function DrinksCard({ days, waterTargetOz }: Props) {
     return { entry: logFood(food, amount, unit, mealForTime(at), at), food }
   }
 
-  /** Coke Zero by the ounce: a full can logs as a can (so it can be halved), anything else in ounces. */
+  /** A can by the ounce (held button): a full can logs as a can (so it can be halved), anything else in ounces. */
   function logByOz(d: Drink, oz: number) {
     const now = new Date()
+    if (d.hydration) {
+      const id = crypto.randomUUID()
+      saveReading({ id, taken_at: now.toISOString(), kind: 'water', value: oz, urine_level: null, context: 'other', note: null, predicted_value: null, unit: 'oz', meta: { drink: d.key, tz: deviceTz() }, updated_at: now.toISOString(), deleted_at: null })
+      setUndo({ kind: 'reading', ids: [id], label: oz === 12 ? label(d) : `${oz} oz ${label(d)}` })
+      setByOz(null)
+      return
+    }
     const food = findOrSave(drinkFood(d))
     const entry = oz === 12 ? logFood(food, 1, 'can', mealForTime(now), now) : logFood(food, oz, 'fl oz', mealForTime(now), now)
     setUndo({ kind: 'log', ids: [entry.id], label: oz === 12 ? label(d) : `${oz} oz ${label(d)}`, can: oz === 12 ? { entry, food } : undefined })
@@ -264,14 +267,15 @@ export function DrinksCard({ days, waterTargetOz }: Props) {
       {!isToday && !tally.length && !water.length && <p className="muted small">No drinks logged.</p>}
       {isToday && <div className="drink-grid">
         {DRINKS.map((d) => (
-          <button key={d.key} type="button" className="drink-btn" onClick={() => add(d)} aria-label={`Log ${label(d)}, ${d.serving}`}>
+          <DrinkButton key={d.key} label={`Log ${label(d)}, ${d.serving}`} onTap={() => add(d)} onHold={isCan(d) ? () => setByOz(d) : undefined}>
             <DrinkIcon drink={d.key} color={d.color} />
             <span className="drink-name">{d.key.startsWith('espresso') ? 'Espresso' : d.label}</span>
             <span className="drink-serving">{d.serving}</span>
             {counts[d.key] ? <span className="drink-count">{counts[d.key]}</span> : null}
-          </button>
+          </DrinkButton>
         ))}
       </div>}
+      {isToday && <p className="muted small" style={{ margin: '6px 0 0' }}>Tap a can to log it. Hold it to pick the ounces.</p>}
       {undo && isToday && (
         <div className="row-btns" style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginTop: 8 }}>
         {justLogged && (
@@ -467,7 +471,70 @@ function OzField({ id, label, value, onChange, chips }: { id: string; label: str
   )
 }
 
-/** How many ounces of a soda, a can by default. */
+const HOLD_MS = 450
+
+/** A drink button: a tap logs the usual amount; holding it (cans) opens the ounces instead. */
+function DrinkButton({ label, onTap, onHold, children }: { label: string; onTap: () => void; onHold?: () => void; children: ReactNode }) {
+  const timer = useRef<number | undefined>(undefined)
+  const held = useRef(false)
+  const from = useRef<{ x: number; y: number } | null>(null)
+  const [holding, setHolding] = useState(false)
+  const cancel = () => {
+    window.clearTimeout(timer.current)
+    timer.current = undefined
+    from.current = null
+    setHolding(false)
+  }
+  const hold = () => {
+    if (held.current || !onHold) return
+    held.current = true
+    cancel()
+    navigator.vibrate?.(15)
+    onHold()
+  }
+  return (
+    <button
+      type="button"
+      className={`drink-btn${holding ? ' holding' : ''}`}
+      aria-label={onHold ? `${label}. Hold to pick the ounces.` : label}
+      onPointerDown={
+        onHold &&
+        ((e) => {
+          held.current = false
+          from.current = { x: e.clientX, y: e.clientY }
+          setHolding(true)
+          timer.current = window.setTimeout(hold, HOLD_MS)
+        })
+      }
+      onPointerMove={(e) => {
+        // A scroll, not a hold.
+        if (from.current && Math.hypot(e.clientX - from.current.x, e.clientY - from.current.y) > 10) cancel()
+      }}
+      onPointerUp={cancel}
+      onPointerLeave={cancel}
+      onPointerCancel={cancel}
+      onContextMenu={
+        onHold &&
+        ((e) => {
+          // The phone's own long press: no menu, and it counts as the hold.
+          e.preventDefault()
+          if (timer.current !== undefined) hold()
+        })
+      }
+      onClick={() => {
+        if (held.current) {
+          held.current = false
+          return
+        }
+        onTap()
+      }}
+    >
+      {children}
+    </button>
+  )
+}
+
+/** How many ounces of a can, 12 by default. */
 function OuncesSheet({ drink, onLog, onClose }: { drink: Drink; onLog: (d: Drink, oz: number) => void; onClose: () => void }) {
   const [ozText, setOzText] = useState('12')
   const oz = Number(ozText)

@@ -1647,7 +1647,15 @@ input[type='time'] {
   cursor: pointer;
 }
 
-.drink-btn:active {
+.drink-btn {
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+  touch-action: manipulation;
+}
+
+.drink-btn:active,
+.drink-btn.holding {
   background: var(--surface-2);
 }
 
