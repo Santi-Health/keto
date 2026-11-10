@@ -1105,6 +1105,58 @@ input[type='date'] {
   color: #fff;
 }
 
+.lift-card {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  margin-bottom: 10px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+
+.lift-top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.lift-top select {
+  flex: 1;
+  min-width: 0;
+  min-height: 40px;
+}
+
+.lift-top .check {
+  margin: 0;
+  white-space: nowrap;
+}
+
+.lift-card .lift-name {
+  width: 100%;
+  min-height: 44px;
+}
+
+.lift-nums {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.lift-nums label {
+  display: grid;
+  gap: 2px;
+  font-size: 0.75rem;
+  color: var(--text-2);
+}
+
+.lift-nums input,
+.lift-nums select {
+  width: 100%;
+  min-width: 0;
+  min-height: 40px;
+  padding: 8px;
+}
+
 .lift-row {
   display: grid;
   grid-template-columns: minmax(0, 2fr) repeat(3, minmax(0, 1fr)) auto;

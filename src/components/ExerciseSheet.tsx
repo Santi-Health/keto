@@ -276,35 +276,53 @@ export function ExerciseSheet({ weightKg, hr, exercise, date, onClose }: Props) 
         <>
           <div className="section-label">Lifts (optional, lets the app spot strength trends)</div>
           {lifts.map((l, i) => (
-            <div key={i} className="lift-row">
-              <input type="text" aria-label="Lift" list={`lift-options-${i}`} placeholder="Pick or type" value={l.name} onChange={(e) => setLift(i, { name: e.target.value })} />
+            <div key={i} className="lift-card">
+              <div className="lift-top">
+                <select aria-label="Gym" value={l.gym ?? ''} onChange={(e) => setLift(i, { gym: (e.target.value || undefined) as GymId | undefined })}>
+                  <option value="">Any gym</option>
+                  {GYM_IDS.map((g) => (
+                    <option key={g} value={g}>
+                      {g === 'Home' ? 'Home' : `Gym ${g}`}
+                    </option>
+                  ))}
+                </select>
+                <label className="check">
+                  <input type="checkbox" checked={!!l.assisted} onChange={(e) => setLift(i, { assisted: e.target.checked })} /> Assisted
+                </label>
+                <button type="button" className="icon-btn" aria-label="Remove lift" onClick={() => setLifts(lifts.filter((_, j) => j !== i))}>
+                  ×
+                </button>
+              </div>
+              <input type="text" className="lift-name" aria-label="Lift" list={`lift-options-${i}`} placeholder="Lift name (tap to pick or type)" value={l.name} onChange={(e) => setLift(i, { name: e.target.value })} />
               <datalist id={`lift-options-${i}`}>
                 {libraryFor(l.gym).map((x) => (
                   <option key={x.id} value={x.name} />
                 ))}
               </datalist>
-              <input type="number" inputMode="decimal" aria-label="Weight" placeholder="weight" value={liftWeight(l) ?? ''} onChange={(e) => setLift(i, { weight: num(e.target.value), weightLb: null })} />
-              <select aria-label="Unit" value={liftUnit(l)} onChange={(e) => setLift(i, { unit: e.target.value as WeightUnit })}>
-                <option value="lb">lb</option>
-                <option value="kg">kg</option>
-              </select>
-              <input type="number" inputMode="numeric" aria-label="Reps" placeholder="reps" value={l.reps ?? ''} onChange={(e) => setLift(i, { reps: num(e.target.value) })} />
-              <input type="number" inputMode="numeric" aria-label="Sets" placeholder="sets" value={l.sets ?? ''} onChange={(e) => setLift(i, { sets: num(e.target.value) })} />
-              <label className="check">
-                <input type="checkbox" checked={!!l.assisted} onChange={(e) => setLift(i, { assisted: e.target.checked })} /> Assisted
-              </label>
-              <select aria-label="Gym" value={l.gym ?? ''} onChange={(e) => setLift(i, { gym: (e.target.value || undefined) as GymId | undefined })}>
-                <option value="">Gym</option>
-                {GYM_IDS.map((g) => (
-                  <option key={g} value={g}>{g}</option>
-                ))}
-              </select>
-              <button type="button" className="icon-btn" aria-label="Remove lift" onClick={() => setLifts(lifts.filter((_, j) => j !== i))}>
-                ×
-              </button>
+              <div className="lift-nums">
+                <label>
+                  <span>{l.assisted ? 'Assist' : 'Weight'}</span>
+                  <input type="number" inputMode="decimal" value={liftWeight(l) ?? ''} onChange={(e) => setLift(i, { weight: num(e.target.value), weightLb: null })} />
+                </label>
+                <label>
+                  <span>Unit</span>
+                  <select value={liftUnit(l)} onChange={(e) => setLift(i, { unit: e.target.value as WeightUnit })}>
+                    <option value="lb">lb</option>
+                    <option value="kg">kg</option>
+                  </select>
+                </label>
+                <label>
+                  <span>Reps</span>
+                  <input type="number" inputMode="numeric" value={l.reps ?? ''} onChange={(e) => setLift(i, { reps: num(e.target.value) })} />
+                </label>
+                <label>
+                  <span>Sets</span>
+                  <input type="number" inputMode="numeric" value={l.sets ?? ''} onChange={(e) => setLift(i, { sets: num(e.target.value) })} />
+                </label>
+              </div>
             </div>
           ))}
-          <button type="button" className="btn secondary" onClick={() => setLifts([...lifts, { name: '', weight: null, unit: 'lb', weightLb: null, reps: null, sets: null, assisted: false }])}>
+          <button type="button" className="btn secondary" onClick={() => setLifts([...lifts, { name: '', weight: null, unit: lifts.length ? liftUnit(lifts[lifts.length - 1]) : 'lb', weightLb: null, reps: null, sets: null, assisted: false, gym: lifts[lifts.length - 1]?.gym }])}>
             + Add lift
           </button>
         </>
