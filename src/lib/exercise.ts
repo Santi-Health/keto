@@ -124,11 +124,39 @@ export function heartRateKcal(opts: {
   return Math.max(0, Math.round((perMin - resting) * minutes))
 }
 
+export type WeightUnit = 'lb' | 'kg'
+export const GYM_IDS = ['41', 'MP2', 'Home'] as const
+export type GymId = (typeof GYM_IDS)[number]
+
 export interface Lift {
   name: string
+  /** Legacy field, always lb. Read it with liftWeight(). */
   weightLb: number | null
+  /** Weight as entered, in `unit`. On an assisted machine this is the assist weight. */
+  weight?: number | null
+  unit?: WeightUnit
   reps: number | null
   sets: number | null
+  /** Assisted machine: the weight offsets body weight, so a lower number is harder. */
+  assisted?: boolean
+  gym?: GymId
+  note?: string
+}
+
+/** Weight as entered; falls back to the legacy lb field for older entries. */
+export function liftWeight(l: Lift): number | null {
+  return l.weight ?? l.weightLb ?? null
+}
+
+export function liftUnit(l: Lift): WeightUnit {
+  return l.unit ?? 'lb'
+}
+
+/** Weight in kg, so sessions logged in lb or kg can be compared. */
+export function liftKg(l: Lift): number | null {
+  const w = liftWeight(l)
+  if (w == null) return null
+  return liftUnit(l) === 'kg' ? w : Math.round(w * 0.45359237 * 100) / 100
 }
 
 /** Row shape of the `exercises` table. */
