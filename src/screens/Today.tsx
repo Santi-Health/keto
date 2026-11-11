@@ -20,6 +20,8 @@ import { ReadingsCard } from '../components/ReadingsCard'
 import { Molecule } from '../components/Molecules'
 import { Bar, Ring } from '../components/Progress'
 import { DeficitNow } from '../components/DeficitNow'
+import { DayEnergyCard } from '../components/DayEnergyCard'
+import { dayEnergy } from '../lib/deficit'
 import { WatchListCard } from '../components/WatchListCard'
 import { useData } from '../lib/data'
 import { addNutrients, type NutrientKey, type Nutrients } from '../lib/nutrients'
@@ -255,6 +257,13 @@ export function Today({ profile, targets, onOpenSettings, onToggleRefeed, onNavi
     [isToday, viewDays, logs, readings, exercises, activity, cgmDays],
   )
   const showDeficit = isToday && targets.bmr != null
+  // Yesterday and the week show burned vs. eaten instead of the calorie target.
+  const showEnergy = !isToday && targets.bmr != null
+  const energyDays = useMemo(
+    () => (showEnergy ? viewDays.map((d) => dayEnergy({ day: d, bmr: targets.bmr!, logs: logsOn(d), exercises: exercisesOn(d), activity: activity[d] && !activity[d].deleted_at ? activity[d] : null })) : []),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [showEnergy, viewDays, targets.bmr, logs, exercises, activity],
+  )
   const carbsLeft = targets.netCarbsG * mult - totals.netCarbs
   const proteinLeft = targets.proteinG - totals.protein
   const fmtDay = (d: string, opts: Intl.DateTimeFormatOptions) => new Date(`${d}T12:00:00`).toLocaleDateString('en-US', opts)
@@ -341,19 +350,20 @@ export function Today({ profile, targets, onOpenSettings, onToggleRefeed, onNavi
               goal={targets.isRefeed ? null : profile.deficitKcal}
             />
           )}
+          {showEnergy && <DayEnergyCard days={energyDays} totals={showTotals} goal={profile.deficitKcal ?? null} />}
           <section className="card">
             <h2>Macros</h2>
-            <div className="rings" style={showDeficit ? { gridTemplateColumns: 'repeat(3, minmax(0, 1fr))' } : undefined}>
+            <div className="rings" style={showDeficit || showEnergy ? { gridTemplateColumns: 'repeat(3, minmax(0, 1fr))' } : undefined}>
               {tap(AREAS.netCarbs, <Ring label="Net carbs" value={totals.netCarbs} target={targets.netCarbsG * mult} unit="g" color="var(--carbs)" isLimit molecule="glucose" />)}
               {tap(AREAS.protein, <Ring label="Protein" value={totals.protein} target={targets.proteinG * mult} unit="g" color="var(--protein)" molecule="protein" />)}
               {tap(AREAS.fat, <Ring label="Fat" value={totals.fat} target={fatBudget} unit="g" color="var(--fat)" isLimit caption="Fat budget" molecule="fat" />)}
               {/* Today's calories live in the summary card above. */}
-              {!showDeficit && tap(AREAS.kcal, <Ring label="Calories" value={totals.calories} target={t(targets.calories)} unit="" color="var(--calories)" isLimit molecule="energy" />)}
+              {!showDeficit && !showEnergy && tap(AREAS.kcal, <Ring label="Calories" value={totals.calories} target={t(targets.calories)} unit="" color="var(--calories)" isLimit molecule="energy" />)}
             </div>
             {dayLogs.length > 0 && (
               <p className="muted small" style={{ margin: '4px 0 0' }}>
                 Tap anything to see the foods behind it, your usual and what to change. A green dot marks the top suggestions for today.
-                {showDeficit && (
+                {(showDeficit || showEnergy) && (
                   <>
                     {' '}
                     <button type="button" className="link" style={{ margin: 0 }} aria-expanded={openArea === AREAS.kcal.id} onClick={() => setOpenArea(openArea === AREAS.kcal.id ? null : AREAS.kcal.id)}>

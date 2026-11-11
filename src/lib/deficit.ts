@@ -105,3 +105,37 @@ export function deficitSoFar(opts: {
     hours,
   }
 }
+
+export interface DayEnergy {
+  day: string
+  burned: number
+  eaten: number
+  /** Burned minus eaten; positive is a deficit. */
+  deficit: number
+  burnSource: 'fitbit' | 'estimate'
+  /** Food was logged that day, so the deficit means something. */
+  logged: boolean
+}
+
+/**
+ * A finished day's calories burned and eaten. Fitbit's total counts in full when it was imported after the day
+ * ended; one imported during the day is topped up with the estimate for the rest of it, like the live view.
+ */
+export function dayEnergy(opts: {
+  day: string
+  bmr: number
+  logs: Pick<LogEntry, 'eaten_at' | 'nutrients'>[]
+  exercises: Exercise[]
+  activity?: Pick<ActivityDay, 'calories_out' | 'updated_at'> | null
+}): DayEnergy {
+  const { day, activity } = opts
+  const end = new Date(`${day}T00:00:00`).getTime() + 86_400_000
+  const eaten = Math.round(opts.logs.reduce((s, l) => s + (l.nutrients.kcal ?? 0), 0))
+  const logged = opts.logs.length > 0
+  const out = activity?.calories_out
+  if (out != null && out > 0 && Date.parse(activity!.updated_at) >= end) {
+    return { day, burned: Math.round(out), eaten, deficit: Math.round(out) - eaten, burnSource: 'fitbit', logged }
+  }
+  const d = deficitSoFar({ ...opts, now: new Date(end) })
+  return { day, burned: d.burned, eaten, deficit: d.burned - eaten, burnSource: d.burnSource, logged }
+}

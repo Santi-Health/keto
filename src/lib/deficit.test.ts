@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { deficitSoFar } from './deficit'
+import { dayEnergy, deficitSoFar } from './deficit'
 import type { Exercise } from './exercise'
 
 const at = (h: number, m = 0) => new Date(2026, 9, 31, h, m)
@@ -47,5 +47,19 @@ describe('deficit so far today', () => {
   it("ignores Fitbit's number from before today", () => {
     const activity = { calories_out: 2400, updated_at: new Date(2026, 9, 30, 22).toISOString() }
     expect(deficitSoFar({ ...base, now: at(6), logs: [], exercises: [], activity }).burnSource).toBe('estimate')
+  })
+})
+
+describe('dayEnergy', () => {
+  const food = (iso: string, kcal: number) => ({ eaten_at: iso, nutrients: { kcal } as never })
+  it('uses Fitbit’s full-day total when it was imported after the day ended', () => {
+    const e = dayEnergy({ day: '2026-11-10', bmr: 1600, logs: [food('2026-11-10T12:00:00', 1800)], exercises: [], activity: { calories_out: 2600, updated_at: '2026-11-11T08:00:00' } })
+    expect(e).toMatchObject({ burned: 2600, eaten: 1800, deficit: 800, burnSource: 'fitbit', logged: true })
+  })
+  it('estimates the whole day without Fitbit, and a surplus is negative', () => {
+    const e = dayEnergy({ day: '2026-11-10', bmr: 1500, logs: [food('2026-11-10T12:00:00', 2000)], exercises: [], activity: null })
+    expect(e.burned).toBe(1800)
+    expect(e.deficit).toBe(-200)
+    expect(e.burnSource).toBe('estimate')
   })
 })

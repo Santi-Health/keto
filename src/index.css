@@ -394,6 +394,59 @@ select {
   color: var(--text-2);
 }
 
+/* Yesterday / last 7 days: deficit on top, burned and eaten under it. */
+.energy-card {
+  display: grid;
+  gap: 12px;
+}
+
+.energy-head {
+  text-align: center;
+}
+
+.energy-label {
+  font-weight: 600;
+  color: var(--text-2);
+}
+
+.energy-big {
+  font-size: 2.2rem;
+  font-weight: 800;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.energy-pair {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 8px;
+  border-top: 1px solid var(--border);
+  padding-top: 12px;
+}
+
+.energy-minus {
+  font-size: 1.4rem;
+  color: var(--text-2);
+}
+
+.energy-row {
+  display: grid;
+  grid-template-columns: 4.5em 1fr auto;
+  align-items: baseline;
+  gap: 8px;
+  font-variant-numeric: tabular-nums;
+}
+
+.energy-row b {
+  white-space: nowrap;
+}
+
+.energy-none {
+  grid-column: 2 / 4;
+}
+
 /* Progress toward today's deficit goal as a colored ring. */
 .deficit-badge {
   width: 84px;
