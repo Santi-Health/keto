@@ -17,7 +17,7 @@ import { scansOf } from '../lib/bodyScan'
 import { suggestFixes } from '../lib/suggest'
 import { liveFatBudget, localDate, type Targets } from '../lib/targets'
 import { entryDay } from '../lib/time'
-import { groupsDue, hardCardioThisWeek, liftPlans, liftStreak, weekCoverage } from '../lib/training'
+import { groupsDue, hardCardioThisWeek, liftDaysThisWeek, liftPlans, liftStreak, weekCoverage } from '../lib/training'
 import { lastDays, type RangeDays } from '../lib/trends'
 import type { Profile, WeightUnit } from '../lib/types'
 import { useKetoModel } from '../lib/useKetoModel'
@@ -126,6 +126,13 @@ export function Coach({ profile, targets, weightUnit, onApplyLimit, onOpenReport
         daysSinceStrength: daysSinceStrength(exercises),
         liftStreak: liftStreak(exercises, today),
         hardCardio: hardCardioThisWeek(exercises, today),
+        doneToday: {
+          strength: exercisesOn(today).some((e) => e.kind === 'strength'),
+          hardCardio: exercisesOn(today).some((e) => e.kind === 'cardio' && e.intensity === 'high'),
+          any: exercisesOn(today).length > 0,
+        },
+        liftDays: liftDaysThisWeek(exercises, today),
+        eatenTodayKcal: n.kcal,
         odd,
         spikeFoods,
         cgmDays: recentCgm.filter((d) => d.day >= shift(today, -6)).length,

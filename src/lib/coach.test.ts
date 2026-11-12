@@ -27,6 +27,9 @@ const base = (over: Partial<CoachInput> = {}): CoachInput => ({
   daysSinceStrength: 1,
   liftStreak: 0,
   hardCardio: 1,
+  doneToday: { strength: false, hardCardio: false, any: false },
+  liftDays: 2,
+  eatenTodayKcal: 0,
   odd: [],
   spikeFoods: [],
   cgmDays: 3,
@@ -67,6 +70,12 @@ describe('coach', () => {
 })
 
 describe('no repeats, nothing obvious', () => {
+  it('judges the deficit on the week, not on today’s steep target', () => {
+    const ids = buildCoach(base({ muscleWarning: 'steep' })).map((t) => t.id)
+    expect(ids).toContain('deficit-ok')
+    expect(ids).not.toContain('muscle-warning')
+    expect(buildCoach(base({ week: [], muscleWarning: 'steep' })).map((t) => t.id)).toContain('muscle-warning')
+  })
   it('drops the steep-target warning when the weekly deficit already says it', () => {
     const ids = buildCoach(base({ week: week(1000), muscleWarning: 'steep' })).map((t) => t.id)
     expect(ids).toContain('deficit-high')
@@ -79,5 +88,29 @@ describe('no repeats, nothing obvious', () => {
   it('gives no generic advice for foods that spike', () => {
     const tips = buildCoach(base({ spikeFoods: [{ name: 'Rice', events: 3, avgRise: 60, level: 'spike' }] }))
     expect(tips.filter((t) => t.section === 'sugar')).toEqual([])
+  })
+})
+
+describe('today and the week together', () => {
+  it('says lift today when the week is behind and nothing is done yet', () => {
+    expect(buildCoach(base()).find((t) => t.id === 'next-session')?.title).toMatch(/^Today: lift abs/)
+  })
+  it('moves it to tomorrow once you lifted today', () => {
+    const t = buildCoach(base({ doneToday: { strength: true, hardCardio: false, any: true } })).find((x) => x.id === 'next-session')!
+    expect(t.title).toMatch(/^Tomorrow: lift/)
+    expect(t.detail).toMatch(/You lifted today/)
+  })
+  it('suggests nothing more after lifting today when the week is on track', () => {
+    const tips = buildCoach(base({ due: [], liftDays: 4, doneToday: { strength: true, hardCardio: false, any: true } }))
+    expect(tips.find((t) => t.id === 'next-session')).toBeUndefined()
+    expect(tips.find((t) => t.id === 'week-on-track')?.tone).toBe('good')
+  })
+  it('puts intervals on another day after lifting', () => {
+    const t = buildCoach(base({ hardCardio: 0, doneToday: { strength: true, hardCardio: false, any: true } })).find((x) => x.id === 'vo2')!
+    expect(t.title).toMatch(/^Tomorrow/)
+  })
+  it('shows today’s intake inside the weekly deficit tip', () => {
+    const t = buildCoach(base({ week: week(1000), eatenTodayKcal: 1200 })).find((x) => x.id === 'deficit-high')!
+    expect(t.detail).toMatch(/Today so far: 1,200 kcal eaten; about 2,100 for the day.*900 more/)
   })
 })

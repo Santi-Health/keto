@@ -168,3 +168,9 @@ export function liftStreak(exercises: Exercise[], today: string): number {
   while (days.has(shift(today, -n))) n++
   return n
 }
+
+/** Days with strength training in the 7 days ending today. */
+export function liftDaysThisWeek(exercises: Exercise[], today: string): number {
+  const from = shift(today, -6)
+  return new Set(exercises.filter((e) => !e.deleted_at && e.kind === 'strength').map((e) => entryDay(e.started_at, e.meta.tz)).filter((d) => d >= from && d <= today)).size
+}
