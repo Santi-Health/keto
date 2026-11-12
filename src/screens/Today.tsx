@@ -1,5 +1,5 @@
 import { useMemo, useState, type ReactNode } from 'react'
-import { daysSinceStrength, routineDue, routineSession, sessionLabel, trainingWarnings } from '../lib/exercise'
+import { daysSinceStrength, routineDue, routineSession, sessionLabel } from '../lib/exercise'
 import { catchUpDays, hasVitals, mergeActivity, weightReadings } from '../lib/activity'
 import { DRIVE_SCOPE, cachedToken, fetchActivity, getGoogleToken, heartRateCalories, learnTypes, listExercises, mergeImported, toAppExercise } from '../lib/googleHealth'
 import { useInstall } from '../lib/install'
@@ -12,6 +12,7 @@ import { VitaminsCard } from '../components/VitaminsCard'
 import { useOpenSyncState } from '../lib/backgroundSync'
 import { deviceTz, travelDay, zoneLabel } from '../lib/time'
 import { DrinksCard } from '../components/DrinksCard'
+import { GlucoseDayCard, GlucoseImport } from '../components/GlucoseDayCard'
 import { ExerciseSheet } from '../components/ExerciseSheet'
 import { TrainingCard } from '../components/TrainingCard'
 import { InstallCard } from '../components/InstallCard'
@@ -28,13 +29,11 @@ import { addNutrients, type NutrientKey, type Nutrients } from '../lib/nutrients
 import { liveFatBudget, localDate, type Targets } from '../lib/targets'
 import type { Profile } from '../lib/types'
 import { AREAS, type Area, type AreaView } from '../lib/areas'
-import { suggestFixes } from '../lib/suggest'
 import { computeWatchList } from '../lib/watchlist'
 import { KG_PER_LB, ketoneBand, latest, type ReadingKind } from '../lib/readings'
 import { useKetoModel } from '../lib/useKetoModel'
 import { useBackup } from '../lib/useBackup'
 import { backupDue } from '../lib/driveBackup'
-import { READINESS_TEXT, readinessFor } from '../lib/readiness'
 import { dailySeries, lastDays } from '../lib/trends'
 import { formatSleep } from '../lib/activity'
 
@@ -214,17 +213,9 @@ export function Today({ profile, targets, onOpenSettings, onToggleRefeed, onNavi
   const fatBudget = dailyFat == null ? null : dailyFat * mult
   const sessionsToday = viewDays.flatMap((d) => exercisesOn(d))
   const sinceStrength = daysSinceStrength(exercises)
-  const readiness = isToday ? readinessFor(today, activity) : null
   const [morning, doneMorning] = useMorningReadiness()
-  const suggestWatch = useMemo(
-    () => ({ ctx: { calorieTarget: targets.calories, weightKg: profile.weightKg }, settings: profile.watchList, weekItems: weekLogs.filter((l) => !dayLogs.includes(l)).map((l) => l.nutrients) }),
-    [targets.calories, profile.weightKg, profile.watchList, weekLogs, dayLogs],
-  )
-  const tips = useMemo(
-    () => (isWeek ? [] : suggestFixes({ dayLogs, history: logs, foods, targets, muscleGoal: profile.muscleGoal, fatBudget, past: !isToday, sex: profile.sex, watch: suggestWatch })),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [view, logs, foods, targets, profile.muscleGoal, fatBudget, profile.sex, suggestWatch],
-  )
+  // Suggestions live in Coach now; the detail panels show the foods and your usual only.
+  const tips: AreaView['tips'] = []
   const areaView: AreaView = { logs: dayLogs, weekLogs, history: logs, foods, days: viewDays, isToday, isWeek, tips, sex: profile.sex, age: targets.age, netCarbLimit: targets.netCarbsG }
   const [openArea, setOpenArea] = useState<string | null>(null)
   const potassiumArea = { ...AREAS.potassium, target: targets.potassiumMg }
@@ -236,12 +227,6 @@ export function Today({ profile, targets, onOpenSettings, onToggleRefeed, onNavi
     </Tap>
   )
   const detail = (...areas: Area[]) => areas.map((a) => openArea === a.id && <AreaDetail key={a.id} area={a} view={areaView} />)
-  const trainWarnings = !isToday ? [] : [...(readiness?.band === 'low' ? [{ level: 'yellow' as const, text: `Readiness is ${readiness.score}: ${READINESS_TEXT.low}` }] : []), ...trainingWarnings({
-    exercisesToday: sessionsToday,
-    daysSinceStrength: sinceStrength,
-    effectiveDeficit: targets.effectiveDeficit,
-    isRefeed: targets.isRefeed,
-  })]
   const ketoModel = useKetoModel(targets.netCarbsG, targets.proteinG)
   const ketoOpts = { logs, exercises, netCarbLimit: targets.netCarbsG, proteinTarget: targets.proteinG, model: ketoModel.adjuster }
   // Past days are judged at the end of the day (11:59 PM).
@@ -307,6 +292,11 @@ export function Today({ profile, targets, onOpenSettings, onToggleRefeed, onNavi
       <div className="grid two">
         <div className="grid">
           {isToday && <RelinkBanner />}
+          {isToday && (
+            <button type="button" className="notice coach-link" onClick={() => onNavigate('coach')}>
+              🧭 What to do today for your goals: <u>open Coach</u>
+            </button>
+          )}
           {isToday && morning && <MorningReadiness onDone={doneMorning} />}
           {travelDays.map(({ day: d, t }) => {
             const pct = Math.round((t.hours / 24 - 1) * 100)
@@ -362,7 +352,7 @@ export function Today({ profile, targets, onOpenSettings, onToggleRefeed, onNavi
             </div>
             {dayLogs.length > 0 && (
               <p className="muted small" style={{ margin: '4px 0 0' }}>
-                Tap anything to see the foods behind it, your usual and what to change. A green dot marks the top suggestions for today.
+                Tap anything to see the foods behind it and your usual. What to change is in Coach.
                 {(showDeficit || showEnergy) && (
                   <>
                     {' '}
@@ -436,11 +426,6 @@ export function Today({ profile, targets, onOpenSettings, onToggleRefeed, onNavi
                       : 'Add your height in Settings to get a calorie target.'}
             </p>
             )}
-            {isToday && targets.muscleWarning && (
-              <p className="notice" role="status">
-                <strong>Muscle check:</strong> {targets.muscleWarning}
-              </p>
-            )}
             {isToday && (
               <button type="button" className={`btn ${targets.isRefeed ? '' : 'secondary'}`} onClick={onToggleRefeed} aria-pressed={targets.isRefeed}>
                 {targets.isRefeed ? 'Refeed day ✓ (tap to undo)' : 'Make today a refeed day'}
@@ -451,6 +436,7 @@ export function Today({ profile, targets, onOpenSettings, onToggleRefeed, onNavi
           {/* First until something is logged (the morning mate cocido), then the macros lead. Moved with order so its Undo survives. */}
           <div style={{ order: isToday && dayLogs.length === 0 ? -1 : 0 }}>
             <DrinksCard days={viewDays} waterTargetOz={profile.waterOz} />
+            {isToday && <GlucoseImport />}
           </div>
           </div>
 
@@ -508,7 +494,7 @@ export function Today({ profile, targets, onOpenSettings, onToggleRefeed, onNavi
           <TrainingCard
             today={sessionsToday}
             daysSinceStrength={sinceStrength}
-            warnings={trainWarnings}
+            warnings={[]}
             onLog={() => setLogExercise(true)}
             period={isToday ? 'today' : isWeek ? 'in these 7 days' : 'yesterday'}
             routine={isToday && profile.yogaRoutine && routineDue(profile.yogaRoutine, sessionsToday) ? profile.yogaRoutine : null}
@@ -576,15 +562,14 @@ export function Today({ profile, targets, onOpenSettings, onToggleRefeed, onNavi
             <p className="small" style={{ margin: '8px 0 0' }}>
               <b>Tomorrow 7 AM</b> if you don't eat more tonight: {STATUS_TEXT[ketoTomorrow.status].toLowerCase()} ({ketoTomorrow.low}–
               {ketoTomorrow.high} mmol/L).
-              {keto.status === 'out' && ketoTomorrow.status === 'out' && ' Back under 25 g a day, it usually takes 1–3 days to return to ketosis.'}
-            </p>
+                          </p>
             )}
             <p className="muted small" style={{ marginBottom: 0 }}>
               {ketoModel.n === 0
                 ? 'Estimate from general research (carbs, fasting, exercise, protein). Ketosis means about 0.5+ mmol/L. Add blood ketone readings and it learns your own pattern.'
                 : `Personal model from ${ketoModel.n} blood reading${ketoModel.n > 1 ? 's' : ''} (${ketoModel.confidence === 'solid' ? 'solid' : 'still learning'}). Ketosis means about 0.5+ mmol/L. `}
               {ketoModel.n > 0 && (
-                <button type="button" className="link-btn" onClick={() => onNavigate('insights')}>
+                <button type="button" className="link-btn" onClick={() => onNavigate('coach')}>
                   See how it's doing
                 </button>
               )}
@@ -592,6 +577,11 @@ export function Today({ profile, targets, onOpenSettings, onToggleRefeed, onNavi
           </section>
         </div>
       </div>
+      {!isWeek && (
+        <div style={{ marginTop: 'var(--gap, 14px)' }}>
+          <GlucoseDayCard day={day} />
+        </div>
+      )}
       {readingSheet && (
         <ReadingSheet
           weightUnit={profile.weightUnit}

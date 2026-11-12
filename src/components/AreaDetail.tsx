@@ -1,16 +1,13 @@
 import type { ReactNode } from 'react'
-import { MIN_BASELINE_DAYS, areaAdvice, areaInsight, fmtAmount, hasTip, type Area, type AreaView } from '../lib/areas'
+import { MIN_BASELINE_DAYS, areaInsight, fmtAmount, type Area, type AreaView } from '../lib/areas'
 import { unshout } from '../lib/quickFoods'
 
 /** Longer lists (mostly the 7-day view) stop here and add up the rest. */
 const MAX_FOODS = 8
 
-const ICON = { add: '＋', trim: '−', swap: '⇄', note: '→' } as const
-
-/** The foods behind an area, how it compares with your usual, and what to change. */
+/** The foods behind an area and how it compares with your usual. Advice lives in Coach. */
 export function AreaDetail({ area, view }: { area: Area; view: AreaView }) {
   const insight = areaInsight(area, view)
-  const advice = areaAdvice(area, view, insight)
   const scope = area.weekly || view.isWeek ? 'over 7 days' : view.isToday ? 'today' : 'that day'
   const missing = [...new Set(insight.parts.flatMap((p) => p.missing))]
   return (
@@ -57,25 +54,9 @@ export function AreaDetail({ area, view }: { area: Area; view: AreaView }) {
       })}
       {missing.length > 0 && <p className="muted small" style={{ margin: '8px 0 0' }}>No data, so counted as 0: {missing.map(unshout).join(', ')}.</p>}
 
-      <h3>What to change</h3>
-      {advice.length > 0 ? (
-        <div className="tips">
-          {advice.map((t) => (
-            <div key={t.text} className={`tip ${t.kind}`}>
-              <span className="tip-icon" aria-hidden="true">
-                {ICON[t.kind]}
-              </span>
-              <span>
-                {t.kind === 'note' ? t.text : <b>{t.text}</b>}
-                {t.effect && <span className="muted small">{t.effect}</span>}
-                {t.warning && <span className="tip-warn small">⚠ {t.warning}</span>}
-              </span>
-            </div>
-          ))}
-        </div>
-      ) : (
-        <div className="muted">Nothing to change right now.</div>
-      )}
+      <p className="small" style={{ margin: '10px 0 0' }}>
+        What to change lives in <a href="#coach">Coach ›</a>
+      </p>
     </div>
   )
 }
@@ -88,10 +69,10 @@ interface TapProps {
   children: ReactNode
 }
 
-/** Makes a ring or bar open its detail; the dot means there's a suggestion inside. */
-export function Tap({ area, view, open, onToggle, children }: TapProps) {
+/** Makes a ring or bar open its detail. */
+export function Tap({ area, open, onToggle, children }: TapProps) {
   return (
-    <button type="button" className={`tap ${hasTip(area, view) ? 'has-tip' : ''}`} aria-expanded={open} aria-label={`${area.label} details`} onClick={onToggle}>
+    <button type="button" className="tap" aria-expanded={open} aria-label={`${area.label} details`} onClick={onToggle}>
       {children}
     </button>
   )

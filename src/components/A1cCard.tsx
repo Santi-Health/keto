@@ -22,7 +22,7 @@ export function A1cCard() {
       </div>
       {a.estimate == null ? (
         <p className="muted small" style={{ margin: 0 }}>
-          Needs at least 3 full days of CGM data. Import your Lingo readings on this tab; a reliable estimate takes about 14 days.
+          Needs at least 3 full days of CGM data. Import your Lingo readings on Today; a reliable estimate takes about 14 days.
         </p>
       ) : (
         <>

@@ -105,7 +105,7 @@ export function ReadingsCard({ weightUnit, onAdd }: Props) {
         <p className="muted small" style={{ margin: '4px 0 0' }}>
           Last body scan: {scan.value}% body fat
           {scan.meta.scan.leanMassKg ? ` · ${(scan.meta.scan.leanMassKg / KG_PER_LB).toFixed(1)} lb lean` : ''} (
-          {new Date(scan.taken_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}). Progress is on Insights.
+          {new Date(scan.taken_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}). Progress is on Coach.
         </p>
       )}
       {labs.length > 0 && (

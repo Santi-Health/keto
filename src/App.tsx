@@ -12,14 +12,14 @@ import { computeTargets, localDate } from './lib/targets'
 import { supabase } from './lib/supabase'
 import { Add } from './screens/Add'
 import { Lock, NotConfigured } from './screens/Lock'
-import { Insights } from './screens/Insights'
+import { Coach } from './screens/Coach'
 import { Log } from './screens/Log'
 import { Report } from './screens/Report'
 import { Settings } from './screens/Settings'
 import { Today } from './screens/Today'
 import { CustomLiftsContext, type LibraryExercise } from './lib/library'
 
-type Tab = 'today' | 'log' | 'add' | 'insights' | 'settings' | 'report'
+type Tab = 'today' | 'log' | 'add' | 'coach' | 'settings' | 'report'
 
 const icon = (d: string) => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -31,13 +31,15 @@ const TABS: { id: Tab; label: string; icon: ReactNode }[] = [
   { id: 'today', label: 'Today', icon: icon('M12 3a9 9 0 1 0 9 9M12 3v9l6 3') },
   { id: 'log', label: 'Log', icon: icon('M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01') },
   { id: 'add', label: 'Add', icon: icon('M12 5v14M5 12h14') },
-  { id: 'insights', label: 'Insights', icon: icon('M3 17l6-6 4 4 8-8M15 7h6v6') },
+  { id: 'coach', label: 'Coach', icon: icon('M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM15.5 8.5l-2 5-5 2 2-5z') },
   { id: 'settings', label: 'Settings', icon: icon('M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0M14 4v4M8 10v4M16 16v4') },
 ]
 
 /** Routes look like #log/2026-10-29 or #add/scan: a tab plus an optional detail, and a part to jump to (#log/2026-10-29/lunch). */
 const getRoute = (): { tab: Tab; param: string | null; focus: string | null } => {
-  const [tab, param = null, focus = null] = window.location.hash.slice(1).split('/') as [Tab, string?, string?]
+  const [raw, param = null, focus = null] = window.location.hash.slice(1).split('/') as [string, string?, string?]
+  // Insights became Coach; old links and bookmarks still land somewhere useful.
+  const tab = (raw === 'insights' ? 'coach' : raw) as Tab
   return TABS.some((t) => t.id === tab) || tab === 'report' ? { tab, param, focus } : { tab: 'today', param: null, focus: null }
 }
 
@@ -152,11 +154,12 @@ function Tracker({ session, recovering = false, onPassphraseChanged = () => {} }
             targets={targets}
             days={param === '7' || param === '90' ? (Number(param) as 7 | 90) : 30}
             onRange={(d) => go(`report/${d}`)}
-            onBack={() => go('insights')}
+            onBack={() => go('coach')}
           />
         )}
-        {tab === 'insights' && (
-          <Insights
+        {tab === 'coach' && (
+          <Coach
+            profile={profile}
             targets={targets}
             weightUnit={profile.weightUnit}
             onApplyLimit={(g) => update({ netCarbLimitG: g })}
@@ -166,7 +169,7 @@ function Tracker({ session, recovering = false, onPassphraseChanged = () => {} }
       </main>
       <nav className="nav no-print" aria-label="Main">
         {TABS.map((t) => (
-          <button key={t.id} type="button" aria-current={tab === t.id || (tab === 'report' && t.id === 'insights') ? 'page' : undefined} onClick={() => go(t.id)}>
+          <button key={t.id} type="button" aria-current={tab === t.id || (tab === 'report' && t.id === 'coach') ? 'page' : undefined} onClick={() => go(t.id)}>
             {t.icon}
             {t.label}
           </button>

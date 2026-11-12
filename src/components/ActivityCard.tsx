@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { formatSleep, type ActivityDay } from '../lib/activity'
 import { useData } from '../lib/data'
 import { addNutrients } from '../lib/nutrients'
-import { ILLNESS_TEXT, READINESS_TEXT, readinessFor } from '../lib/readiness'
+import { readinessFor } from '../lib/readiness'
 import { localDate } from '../lib/targets'
 
 const shift = (date: string, days: number) => {
@@ -153,11 +153,6 @@ export function MorningReadiness({ onDone }: { onDone: () => void }) {
 
 const BAND_TITLE = { high: 'Well recovered', moderate: 'Moderately recovered', low: 'Low recovery' } as const
 const bandOf = (score: number) => (score >= 70 ? 'high' : score >= 45 ? 'moderate' : 'low')
-/** The advice half of the readiness text ("Train as planned, …"), capitalized. */
-const advice = (band: 'high' | 'moderate' | 'low') => {
-  const a = READINESS_TEXT[band].split(': ')[1] ?? READINESS_TEXT[band]
-  return a.charAt(0).toUpperCase() + a.slice(1)
-}
 const PART_ICON: Record<string, string> = { HRV: '〰', 'Resting HR': '♥', Sleep: '☾' }
 
 /** A 270° gauge with the score in the middle, colored by how recovered you are. */
@@ -237,7 +232,7 @@ function ReadinessBlock({ days: shown, isWeek }: { days: string[]; isWeek: boole
         <Gauge score={score} label={isWeek ? '7-day avg' : 'readiness'} />
         <div className="ready-head">
           <b>{!isWeek && r.illness ? 'Possible illness' : BAND_TITLE[band]}</b>
-          {!isWeek && !back && <span>{r.illness ? ILLNESS_TEXT : advice(band)}</span>}
+          {!isWeek && !back && <a href="#coach" className="small">What to do today: Coach ›</a>}
           {!isWeek && r.illness && <span className="ready-cap">Held at {r.illness.cap} by your {r.illness.signs.join(' and ')}, off your normal.</span>}
           {!isWeek && r.cappedBySleep && (
             <span className="ready-cap">
