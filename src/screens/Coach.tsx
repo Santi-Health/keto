@@ -38,9 +38,8 @@ const shift = (date: string, days: number) => {
 }
 
 const SECTIONS: { id: CoachSection; title: string; blurb: string }[] = [
-  { id: 'food', title: 'Food & macros', blurb: 'Protein to keep muscle, a deficit that burns fat without costing it.' },
-  { id: 'keto', title: 'Ketosis', blurb: 'Where your ketones are and what moves them.' },
-  { id: 'sugar', title: 'Blood sugar', blurb: 'What spikes you, from your CGM.' },
+  { id: 'nutrition', title: 'Nutrition', blurb: 'Deficit, protein and ketosis together: burn fat without costing muscle.' },
+  { id: 'sugar', title: 'Blood sugar', blurb: 'Only what your CGM shows that you wouldn’t guess.' },
   { id: 'training', title: 'Training & muscle', blurb: 'What your week is missing and the next numbers for each lift.' },
   { id: 'abs', title: 'Abs & chest', blurb: 'Muscle to show, and the body fat that hides it.' },
 ]
@@ -171,7 +170,8 @@ export function Coach({ profile, targets, weightUnit, onApplyLimit, onOpenReport
 
       <div className="grid two">
         {SECTIONS.map((s) => {
-          const mine = tips.all.filter((t) => t.section === s.id)
+          // Tips already in Focus now aren't repeated below.
+          const mine = tips.all.filter((t) => t.section === s.id && !top.includes(t))
           return (
             <div key={s.id} className="grid">
             <section className="card">
@@ -180,7 +180,11 @@ export function Coach({ profile, targets, weightUnit, onApplyLimit, onOpenReport
               {mine.map((t) => (
                 <Tip key={t.id} t={t} />
               ))}
-              {!mine.length && <p className="muted small" style={{ margin: 0 }}>Nothing to change here right now.</p>}
+              {!mine.length && (
+                <p className="muted small" style={{ margin: 0 }}>
+                  {tips.all.some((t) => t.section === s.id) ? 'Covered in Focus now.' : 'Nothing to change here right now.'}
+                </p>
+              )}
 
               {s.id === 'training' && tips.plans.length > 0 && (
                 <>
@@ -246,7 +250,7 @@ export function Coach({ profile, targets, weightUnit, onApplyLimit, onOpenReport
                 </>
               )}
             </section>
-            {s.id === 'keto' && <KetoModelCard model={ketoModel} netCarbLimit={targets.netCarbsG} onApplyLimit={onApplyLimit} />}
+            {s.id === 'nutrition' && <KetoModelCard model={ketoModel} netCarbLimit={targets.netCarbsG} onApplyLimit={onApplyLimit} />}
             {s.id === 'sugar' && <A1cCard />}
             </div>
           )

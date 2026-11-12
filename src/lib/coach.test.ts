@@ -65,3 +65,19 @@ describe('coach', () => {
     expect(t.detail).toMatch(/9 weeks/)
   })
 })
+
+describe('no repeats, nothing obvious', () => {
+  it('drops the steep-target warning when the weekly deficit already says it', () => {
+    const ids = buildCoach(base({ week: week(1000), muscleWarning: 'steep' })).map((t) => t.id)
+    expect(ids).toContain('deficit-high')
+    expect(ids).not.toContain('muscle-warning')
+  })
+  it('drops calorie suggestions when the weekly pace covers calories', () => {
+    const s = { kind: 'trim' as const, text: 'Skip the cheese', effect: '−200 kcal', goal: 'calories' }
+    expect(buildCoach(base({ suggestions: [s] })).some((t) => t.title === 'Skip the cheese')).toBe(false)
+  })
+  it('gives no generic advice for foods that spike', () => {
+    const tips = buildCoach(base({ spikeFoods: [{ name: 'Rice', events: 3, avgRise: 60, level: 'spike' }] }))
+    expect(tips.filter((t) => t.section === 'sugar')).toEqual([])
+  })
+})

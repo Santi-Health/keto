@@ -24,7 +24,7 @@ export type GoalId = (typeof GOALS)[number]['id']
 export const goalRank = (g: GoalId) => GOALS.findIndex((x) => x.id === g)
 export const goalLabel = (g: GoalId) => GOALS.find((x) => x.id === g)!.label
 
-export type CoachSection = 'food' | 'keto' | 'sugar' | 'training' | 'abs'
+export type CoachSection = 'nutrition' | 'sugar' | 'training' | 'abs'
 
 export interface CoachTip {
   id: string
@@ -99,7 +99,22 @@ const fmt = (n: number) => Math.round(n).toLocaleString()
 
 /** Everything the coach has to say, grouped by section, each tied to a goal. */
 export function buildCoach(c: CoachInput): CoachTip[] {
-  return [...food(c), ...keto(c), ...sugar(c), ...training(c), ...abs(c)]
+  return dedupe([...food(c), ...keto(c), ...sugar(c), ...training(c), ...abs(c)])
+}
+
+/**
+ * One tip per point: the weekly deficit covers today's calorie suggestions and the steep-target warning,
+ * and being out of ketosis covers the carb suggestion.
+ */
+function dedupe(tips: CoachTip[]): CoachTip[] {
+  const has = (id: string) => tips.some((t) => t.id === id)
+  const pace = has('deficit-high') || has('deficit-low') || has('deficit-ok')
+  return tips.filter((t) => {
+    if (t.id === 'muscle-warning' && has('deficit-high')) return false
+    if (t.id.startsWith('suggest-') && pace && (t.goal === 'fat')) return false
+    if (t.id.startsWith('suggest-') && has('keto-out') && t.goal === 'keto' && /carb/i.test(t.title)) return false
+    return true
+  })
 }
 
 /** The few tips that matter most right now: warnings first, then by goal priority. */
@@ -129,7 +144,7 @@ function food(c: CoachInput): CoachTip[] {
     if (pace.deficit > Math.max(cap, 750)) {
       out.push({
         id: 'deficit-high',
-        section: 'food',
+        section: 'nutrition',
         goal: 'muscle',
         tone: 'warn',
         title: `Eat about ${fmt(pace.deficit - DEFICIT_GOAL)} kcal more a day`,
@@ -139,7 +154,7 @@ function food(c: CoachInput): CoachTip[] {
     } else if (pace.deficit < 250) {
       out.push({
         id: 'deficit-low',
-        section: 'food',
+        section: 'nutrition',
         goal: 'fat',
         tone: 'do',
         title: `Trim about ${fmt(DEFICIT_GOAL - pace.deficit)} kcal a day`,
@@ -149,7 +164,7 @@ function food(c: CoachInput): CoachTip[] {
     } else {
       out.push({
         id: 'deficit-ok',
-        section: 'food',
+        section: 'nutrition',
         goal: 'fat',
         tone: 'good',
         title: `Deficit on pace: ${fmt(pace.deficit)} kcal a day`,
@@ -157,18 +172,18 @@ function food(c: CoachInput): CoachTip[] {
       })
     }
   }
-  if (c.muscleWarning) out.push({ id: 'muscle-warning', section: 'food', goal: 'muscle', tone: 'warn', title: 'Today’s target is a steep deficit', detail: c.muscleWarning })
+  if (c.muscleWarning) out.push({ id: 'muscle-warning', section: 'nutrition', goal: 'muscle', tone: 'warn', title: 'Today’s target is a steep deficit', detail: c.muscleWarning })
 
   const proteinLeft = c.proteinTargetG - c.proteinTodayG
   const hasProteinTip = c.suggestions.some((s) => s.goal === 'protein' || s.goal === 'leucine')
   if (proteinLeft > 5 && !hasProteinTip) {
-    out.push({ id: 'protein-left', section: 'food', goal: 'muscle', tone: 'do', title: `${fmt(proteinLeft)} g protein to go today`, detail: `Target ${c.proteinTargetG} g. Protein is what keeps muscle while you're in a deficit.` })
+    out.push({ id: 'protein-left', section: 'nutrition', goal: 'muscle', tone: 'do', title: `${fmt(proteinLeft)} g protein to go today`, detail: `Target ${c.proteinTargetG} g. Protein is what keeps muscle while you're in a deficit.` })
   }
   c.suggestions.forEach((s, i) => {
     const goal = SUGGEST_GOAL[s.goal] ?? 'fat'
     out.push({
       id: `suggest-${i}`,
-      section: 'food',
+      section: 'nutrition',
       goal,
       tone: 'do',
       title: s.text,
@@ -177,7 +192,7 @@ function food(c: CoachInput): CoachTip[] {
     })
   })
   for (const w of c.watch.filter((x) => x.status === 'over')) {
-    out.push({ id: `watch-${w.key}`, section: 'food', goal: WATCH_GOAL[w.key] ?? 'health', tone: 'warn', title: `${w.label} over your limit`, detail: w.guidance })
+    out.push({ id: `watch-${w.key}`, section: 'nutrition', goal: WATCH_GOAL[w.key] ?? 'health', tone: 'warn', title: `${w.label} over your limit`, detail: w.guidance })
   }
   return out
 }
@@ -189,7 +204,7 @@ function keto(c: CoachInput): CoachTip[] {
   if (k.status === 'out' || k.status === 'light') {
     out.push({
       id: 'keto-out',
-      section: 'keto',
+      section: 'nutrition',
       goal: 'keto',
       tone: 'warn',
       title: `Get back under ${c.netCarbLimitG} g net carbs a day`,
@@ -197,12 +212,12 @@ function keto(c: CoachInput): CoachTip[] {
       tradeoff: 'Don’t cut protein to get back in: muscle ranks above ketosis. Cut carbs, and a fasted walk or workout speeds it up.',
     })
   } else {
-    out.push({ id: 'keto-in', section: 'keto', goal: 'keto', tone: 'good', title: `In ketosis: about ${k.mid.toFixed(1)} mmol/L`, detail: reasons.trim() || `${fmt(k.carbs24h)} g net carbs in the last 24 h.` })
+    out.push({ id: 'keto-in', section: 'nutrition', goal: 'keto', tone: 'good', title: `In ketosis: about ${k.mid.toFixed(1)} mmol/L`, detail: reasons.trim() || `${fmt(k.carbs24h)} g net carbs in the last 24 h.` })
   }
   if (c.ketoTomorrow.status !== k.status) {
     out.push({
       id: 'keto-tomorrow',
-      section: 'keto',
+      section: 'nutrition',
       goal: 'keto',
       tone: c.ketoTomorrow.mid < k.mid ? 'do' : 'good',
       title: `Tomorrow 7 AM: about ${c.ketoTomorrow.mid.toFixed(1)} mmol/L`,
@@ -212,7 +227,7 @@ function keto(c: CoachInput): CoachTip[] {
   if (c.proteinTodayG > c.proteinTargetG * 1.3) {
     out.push({
       id: 'protein-keto',
-      section: 'keto',
+      section: 'nutrition',
       goal: 'muscle',
       tone: 'good',
       title: 'Protein is well above target',
@@ -230,17 +245,6 @@ function sugar(c: CoachInput): CoachTip[] {
   c.odd.forEach((o, i) =>
     out.push({ id: `odd-${i}`, section: 'sugar', goal: 'sugar', tone: o.kind === 'low' || o.kind === 'low_carb_spike' ? 'warn' : 'do', title: o.title, detail: o.detail }),
   )
-  for (const f of c.spikeFoods.filter((x) => x.level === 'spike').slice(0, 3)) {
-    out.push({
-      id: `spike-${f.name}`,
-      section: 'sugar',
-      goal: 'sugar',
-      tone: 'do',
-      title: `Swap or shrink: ${f.name}`,
-      detail: `Meals with it rose +${f.avgRise} mg/dL on average (${f.events}×). Eat it after protein or fiber, or take a 10-minute walk after.`,
-      tradeoff: 'A walk after meals also adds steps toward fat loss, so it helps both goals.',
-    })
-  }
   return out
 }
 
