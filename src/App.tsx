@@ -17,6 +17,7 @@ import { Log } from './screens/Log'
 import { Report } from './screens/Report'
 import { Settings } from './screens/Settings'
 import { Today } from './screens/Today'
+import { CustomLiftsContext, type LibraryExercise } from './lib/library'
 
 type Tab = 'today' | 'log' | 'add' | 'insights' | 'settings' | 'report'
 
@@ -62,6 +63,13 @@ function Tracker({ session, recovering = false, onPassphraseChanged = () => {} }
   const { profile, update, sync } = useProfile(session)
   const [{ tab, param, focus }, setRoute] = useState(getRoute)
   const targets = useMemo(() => computeTargets(profile, new Date(), profile.fitbitBurnKcal ?? null), [profile])
+  const customLifts = useMemo(
+    () => ({
+      custom: profile.customLifts ?? [],
+      add: (entries: LibraryExercise[]) => entries.length && update({ customLifts: [...(profile.customLifts ?? []), ...entries] }),
+    }),
+    [profile.customLifts, update],
+  )
 
   useEffect(() => {
     const onHash = () => setRoute(getRoute())
@@ -86,6 +94,7 @@ function Tracker({ session, recovering = false, onPassphraseChanged = () => {} }
 
   return (
     <DataProvider session={session}>
+    <CustomLiftsContext.Provider value={customLifts}>
     <WeightFromReadings weightKg={profile.weightKg} lastId={profile.weightReadingId ?? null} update={update} />
     <BurnFromActivity kcal={profile.fitbitBurnKcal ?? null} update={update} />
     <SyncOnOpen enabled={!!session} />
@@ -164,6 +173,7 @@ function Tracker({ session, recovering = false, onPassphraseChanged = () => {} }
         ))}
       </nav>
     </div>
+    </CustomLiftsContext.Provider>
     </DataProvider>
   )
 }

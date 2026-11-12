@@ -2575,3 +2575,33 @@ input.drink-time {
 .danger-text {
   color: var(--danger, #c0392b);
 }
+
+.lift-opts {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 12px;
+}
+
+.lift-opts .check {
+  margin: 0;
+  white-space: nowrap;
+}
+
+.lift-opts select {
+  flex: 1 1 160px;
+  min-width: 0;
+  min-height: 40px;
+}
+
+.lift-hint {
+  margin-top: -4px;
+}
+
+.lift-hint .link {
+  display: inline;
+  margin: 0;
+  padding: 0;
+  font: inherit;
+  font-weight: 600;
+}

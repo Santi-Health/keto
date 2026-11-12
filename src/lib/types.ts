@@ -1,3 +1,4 @@
+import type { LibraryExercise } from './library'
 import { DEFAULT_YOGA_ROUTINE, type Routine } from './exercise'
 import type { WatchSettings } from './watchlist'
 
@@ -48,6 +49,8 @@ export interface Profile {
   /** Average daily burn from Fitbit (last 7 full days), used instead of the estimate. */
   fitbitBurnKcal?: number | null
   fitbitBurnDays?: number
+  /** Lifts you added that aren't in the built-in list, with the gyms they're at. */
+  customLifts?: LibraryExercise[]
   /** Latest weigh-in already copied into weightKg. */
   weightReadingId?: string | null
   /** ISO timestamp of the last local edit, used to resolve sync conflicts. */

@@ -140,7 +140,25 @@ export interface Lift {
   /** Assisted machine: the weight offsets body weight, so a lower number is harder. */
   assisted?: boolean
   gym?: GymId
+  /** Two kettlebells or dumbbells: the weight is one bell, the load is twice it, and reps (always the total) split between arms. */
+  bells?: 2
+  /** One arm or leg at a time: which side, or both with the reps (the total) split evenly. */
+  side?: LiftSide
   note?: string
+}
+
+export type LiftSide = 'left' | 'right' | 'both'
+
+/** Total weight moved per rep: both bells together when there are two. */
+export function liftLoadKg(l: Lift): number | null {
+  const kg = liftKg(l)
+  return kg == null ? null : kg * (l.bells ?? 1)
+}
+
+/** Reps each arm or leg did: half the total for two bells or both sides, otherwise all of them. */
+export function repsPerSide(l: Lift): number | null {
+  if (l.reps == null) return null
+  return l.bells === 2 || l.side === 'both' ? l.reps / 2 : l.reps
 }
 
 /** Weight as entered; falls back to the legacy lb field for older entries. */

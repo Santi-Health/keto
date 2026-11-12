@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { liftKg, liftUnit, liftWeight, type Lift } from './exercise'
+import { liftKg, liftLoadKg, liftUnit, liftWeight, repsPerSide, type Lift } from './exercise'
 
 const base: Lift = { name: 'Chest press', weightLb: null, reps: 8, sets: 4 }
 
@@ -20,5 +20,18 @@ describe('lift weight', () => {
   })
   it('returns null when no weight was entered', () => {
     expect(liftKg(base)).toBeNull()
+  })
+})
+
+describe('two bells and one side', () => {
+  const l: Lift = { name: 'Double kettlebell split squat', weightLb: null, weight: 28, unit: 'kg', reps: 14, sets: 2 }
+  it('doubles the load and halves the reps per arm for two bells', () => {
+    expect(liftLoadKg({ ...l, bells: 2 })).toBe(56)
+    expect(repsPerSide({ ...l, bells: 2 })).toBe(7)
+  })
+  it('splits reps for one side at a time, and keeps them for a single side', () => {
+    expect(repsPerSide({ ...l, side: 'both' })).toBe(7)
+    expect(repsPerSide({ ...l, side: 'left' })).toBe(14)
+    expect(liftLoadKg(l)).toBe(28)
   })
 })

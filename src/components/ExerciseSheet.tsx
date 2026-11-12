@@ -17,11 +17,13 @@ import {
   GYM_IDS,
   liftUnit,
   liftWeight,
+  repsPerSide,
+  type LiftSide,
   type YogaStyle,
 } from '../lib/exercise'
 import { getGoogleToken, heartRateCalories, type HrProfile } from '../lib/googleHealth'
 import { Segmented } from './Fields'
-import { libraryFor } from '../lib/library'
+import { findLift, libraryFor, newLibraryEntries, suggestLift, tidyLiftName, useCustomLifts } from '../lib/library'
 import { deviceTz } from '../lib/time'
 import { Sheet } from './Sheet'
 
@@ -47,6 +49,7 @@ function defaultStart(date?: string): Date {
 
 export function ExerciseSheet({ weightKg, hr, exercise, date, onClose }: Props) {
   const { saveExercise, deleteExercise } = useData()
+  const { custom, add: addCustom } = useCustomLifts()
   const [kind, setKind] = useState<ExerciseKind>(exercise?.kind ?? 'strength')
   const [cardioType, setCardioType] = useState<CardioType>(exercise?.meta.cardioType ?? 'stairmaster')
   const [yogaStyle, setYogaStyle] = useState<YogaStyle>(exercise?.meta.yogaStyle ?? 'flow')
@@ -100,6 +103,9 @@ export function ExerciseSheet({ weightKg, hr, exercise, date, onClose }: Props) 
 
   function save() {
     if (!(mins > 0)) return
+    const named = kind === 'strength' ? lifts.filter((l) => l.name.trim()).map((l) => ({ ...l, name: tidyLiftName(l.name) })) : []
+    // Lifts typed in that aren't in the list yet join it, at that gym (or every gym for free weights and bodyweight).
+    addCustom(newLibraryEntries(named, libraryFor(undefined, custom)))
     saveExercise({
       id: exercise?.id ?? crypto.randomUUID(),
       started_at: new Date(start).toISOString(),
@@ -120,7 +126,7 @@ export function ExerciseSheet({ weightKg, hr, exercise, date, onClose }: Props) 
           exercise?.meta.userEdited ||
           (exercise?.source === 'fitbit' && (kind !== exercise.kind || details.cardioType !== exercise.meta.cardioType)) ||
           undefined,
-        lifts: kind === 'strength' ? lifts.filter((l) => l.name.trim()) : undefined,
+        lifts: kind === 'strength' ? named : undefined,
         caloriesEstimated: kcalText === '',
         // Heart-rate calories stay marked as such only while the number is the one it produced.
         caloriesSource: hrResult && kcalText !== '' ? 'heart-rate' : undefined,
@@ -286,22 +292,34 @@ export function ExerciseSheet({ weightKg, hr, exercise, date, onClose }: Props) 
                     </option>
                   ))}
                 </select>
-                <label className="check">
-                  <input type="checkbox" checked={!!l.assisted} onChange={(e) => setLift(i, { assisted: e.target.checked })} /> Assisted
-                </label>
                 <button type="button" className="icon-btn" aria-label="Remove lift" onClick={() => setLifts(lifts.filter((_, j) => j !== i))}>
                   ×
                 </button>
               </div>
               <input type="text" className="lift-name" aria-label="Lift" list={`lift-options-${i}`} placeholder="Lift name (tap to pick or type)" value={l.name} onChange={(e) => setLift(i, { name: e.target.value })} />
+              <LiftNameHint name={l.name} gym={l.gym} custom={custom} onPick={(name) => setLift(i, { name })} />
+              <div className="lift-opts">
+                <label className="check">
+                  <input type="checkbox" checked={!!l.assisted} onChange={(e) => setLift(i, { assisted: e.target.checked })} /> Assisted
+                </label>
+                <label className="check">
+                  <input type="checkbox" checked={l.bells === 2} onChange={(e) => setLift(i, { bells: e.target.checked ? 2 : undefined })} /> Two bells
+                </label>
+                <select aria-label="Side" value={l.side ?? ''} onChange={(e) => setLift(i, { side: (e.target.value || undefined) as LiftSide | undefined })}>
+                  <option value="">Both together</option>
+                  <option value="left">Left only</option>
+                  <option value="right">Right only</option>
+                  <option value="both">One side at a time (L + R)</option>
+                </select>
+              </div>
               <datalist id={`lift-options-${i}`}>
-                {libraryFor(l.gym).map((x) => (
+                {libraryFor(l.gym, custom).map((x) => (
                   <option key={x.id} value={x.name} />
                 ))}
               </datalist>
               <div className="lift-nums">
                 <label>
-                  <span>{l.assisted ? 'Assist' : 'Weight'}</span>
+                  <span>{l.assisted ? 'Assist' : l.bells === 2 ? 'Each bell' : 'Weight'}</span>
                   <input type="number" inputMode="decimal" value={liftWeight(l) ?? ''} onChange={(e) => setLift(i, { weight: num(e.target.value), weightLb: null })} />
                 </label>
                 <label>
@@ -312,7 +330,7 @@ export function ExerciseSheet({ weightKg, hr, exercise, date, onClose }: Props) 
                   </select>
                 </label>
                 <label>
-                  <span>Reps</span>
+                  <span>{l.bells === 2 || l.side === 'both' ? 'Reps (total)' : 'Reps'}</span>
                   <input type="number" inputMode="numeric" value={l.reps ?? ''} onChange={(e) => setLift(i, { reps: num(e.target.value) })} />
                 </label>
                 <label>
@@ -320,6 +338,14 @@ export function ExerciseSheet({ weightKg, hr, exercise, date, onClose }: Props) 
                   <input type="number" inputMode="numeric" value={l.sets ?? ''} onChange={(e) => setLift(i, { sets: num(e.target.value) })} />
                 </label>
               </div>
+              {(l.bells === 2 || l.side) && l.reps != null && (
+                <div className="muted small">
+                  {l.bells === 2 && liftWeight(l) != null && `${liftWeight(l)! * 2} ${liftUnit(l)} total · `}
+                  {l.side === 'left' || l.side === 'right'
+                    ? `${l.reps} reps, ${l.side} side`
+                    : `${repsPerSide(l)! % 1 ? repsPerSide(l)!.toFixed(1) : repsPerSide(l)} reps per ${l.side === 'both' && l.bells !== 2 ? 'side' : 'arm'}`}
+                </div>
+              )}
             </div>
           ))}
           <button type="button" className="btn secondary" onClick={() => setLifts([...lifts, { name: '', weight: null, unit: lifts.length ? liftUnit(lifts[lifts.length - 1]) : 'lb', weightLb: null, reps: null, sets: null, assisted: false, gym: lifts[lifts.length - 1]?.gym }])}>
@@ -352,4 +378,25 @@ export function ExerciseSheet({ weightKg, hr, exercise, date, onClose }: Props) 
       </div>
     </Sheet>
   )
+}
+
+/** Under the lift name: "Did you mean …?" for a near miss, or a note that a new name joins the list. */
+function LiftNameHint({ name, gym, custom, onPick }: { name: string; gym?: GymId; custom: ReturnType<typeof useCustomLifts>['custom']; onPick: (name: string) => void }) {
+  const all = libraryFor(undefined, custom)
+  if (!name.trim() || findLift(name, all)) return null
+  const near = suggestLift(name, all)
+  if (near)
+    return (
+      <div className="small lift-hint">
+        Did you mean{' '}
+        <button type="button" className="link" onClick={() => onPick(near.name)}>
+          {near.name}
+        </button>
+        ?
+      </div>
+    )
+  const entry = newLibraryEntries([{ name, gym }], all)[0]
+  if (!entry) return null
+  const where = entry.gyms.includes('any') ? 'every gym' : `Gym ${entry.gyms[0]}`
+  return <div className="muted small lift-hint">New lift: "{entry.name}" joins the list for {where} when you save.</div>
 }
