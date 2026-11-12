@@ -8,7 +8,7 @@ export function InstallCard({ compact }: { compact?: boolean }) {
       <section className="card">
         <h2>App</h2>
         <p className="muted small" style={{ margin: 0 }}>
-          Installed. You're using Keto Tracker as an app.
+          Installed. You're using El Santi Grail as an app.
         </p>
       </section>
     )
@@ -19,7 +19,7 @@ export function InstallCard({ compact }: { compact?: boolean }) {
       {state === 'available' ? (
         <>
           <p className="muted small" style={{ marginTop: 0 }}>
-            Get Keto Tracker on your home screen and app drawer. It opens full screen and works offline.
+            Get El Santi Grail on your home screen and app drawer. It opens full screen and works offline.
           </p>
           <button type="button" className="btn" onClick={() => void install()}>
             Install app

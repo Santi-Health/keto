@@ -38,7 +38,7 @@ export function Lock() {
     <div className="lock">
       <form className="card lock-card" onSubmit={signIn}>
         <img src={`${import.meta.env.BASE_URL}favicon.svg`} alt="" width={56} height={56} />
-        <h1>Keto Tracker</h1>
+        <h1>El Santi Grail</h1>
         <p className="muted small" style={{ marginTop: 4 }}>Private. Sign in to continue.</p>
         <div className="field">
           <label htmlFor="lock-email">Email</label>
@@ -72,7 +72,7 @@ export function NotConfigured() {
   return (
     <div className="lock">
       <div className="card lock-card">
-        <h1>Keto Tracker</h1>
+        <h1>El Santi Grail</h1>
         <p className="muted small" style={{ marginBottom: 0 }}>
           This app isn't connected to its database yet. Add the Supabase settings to the GitHub repository and redeploy.
         </p>
