@@ -17,7 +17,8 @@ import { scansOf } from '../lib/bodyScan'
 import { suggestFixes } from '../lib/suggest'
 import { liveFatBudget, localDate, type Targets } from '../lib/targets'
 import { entryDay } from '../lib/time'
-import { groupsDue, hardCardioThisWeek, liftDaysThisWeek, liftPlans, liftStreak, weekCoverage } from '../lib/training'
+import { exercisesFor, groupsDue, hardCardioThisWeek, liftDaysThisWeek, liftPlans, liftStreak, weekCoverage } from '../lib/training'
+import { WeeklySetsBars } from '../components/WeeklySetsCard'
 import { lastDays, type RangeDays } from '../lib/trends'
 import type { Profile, WeightUnit } from '../lib/types'
 import { useKetoModel } from '../lib/useKetoModel'
@@ -29,6 +30,7 @@ interface Props {
   weightUnit: WeightUnit
   onApplyLimit: (g: number) => void
   onOpenReport: (days: RangeDays) => void
+  onUpdateProfile: (changes: Partial<Profile>) => void
 }
 
 const shift = (date: string, days: number) => {
@@ -59,7 +61,8 @@ function Tip({ t }: { t: CoachTip }) {
 }
 
 /** Every recommendation in one place, grouped by topic, each tied to one of your goals. */
-export function Coach({ profile, targets, weightUnit, onApplyLimit, onOpenReport }: Props) {
+export function Coach({ profile, targets, weightUnit, onApplyLimit, onOpenReport, onUpdateProfile }: Props) {
+  const disliked = useMemo(() => profile.dislikedLifts ?? [], [profile.dislikedLifts])
   const { logs, foods, exercises, activity, readings, cgmDays, logsOn, logsWeekEnding, exercisesOn } = useData()
   const { custom } = useCustomLifts()
   const today = localDate()
@@ -90,6 +93,10 @@ export function Coach({ profile, targets, weightUnit, onApplyLimit, onOpenReport
     const ketoOpts = { logs, exercises, netCarbLimit: targets.netCarbsG, proteinTarget: targets.proteinG, model: ketoModel.adjuster }
     const library = libraryFor(undefined, custom)
     const coverage = weekCoverage(exercises, library, today)
+    const due = groupsDue(coverage)
+    // Every group short of its sets, the ones due next first, each with two exercises to fill it.
+    const short = [...due, ...coverage.filter((g) => g.sets < g.target && !due.includes(g))]
+    const picks = short.map((g) => ({ group: g.group, short: g.target - g.sets, picks: exercisesFor(g.group, { exercises, library, today, disliked }) }))
     // Blood sugar: what happened today and yesterday, and foods ranked over 14 days.
     const odd = [yesterday, today].flatMap((d) => {
       const rs = cgmDays[d] && !cgmDays[d].deleted_at ? toReadings([cgmDays[d]]) : []
@@ -121,7 +128,8 @@ export function Coach({ profile, targets, weightUnit, onApplyLimit, onOpenReport
         ketoTomorrow: estimateKetosis({ ...ketoOpts, at: tomorrowMorning() }),
         readiness: readinessFor(today, activity),
         coverage,
-        due: groupsDue(coverage),
+        due,
+        picks: Object.fromEntries(picks.map((p) => [p.group, p.picks.map((x) => x.name)])),
         plans: liftPlans(exercises, library, today),
         daysSinceStrength: daysSinceStrength(exercises),
         liftStreak: liftStreak(exercises, today),
@@ -140,11 +148,12 @@ export function Coach({ profile, targets, weightUnit, onApplyLimit, onOpenReport
       }),
       plans: liftPlans(exercises, library, today),
       coverage,
+      picks,
       spikeFoods,
       pace: weekPace(week),
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [logs, foods, exercises, activity, readings, cgmDays, targets, profile, custom, ketoModel, today])
+  }, [logs, foods, exercises, activity, readings, cgmDays, targets, profile, custom, ketoModel, today, disliked])
 
   const top = topTips(tips.all)
 
@@ -218,19 +227,48 @@ export function Coach({ profile, targets, weightUnit, onApplyLimit, onOpenReport
               {s.id === 'training' && (
                 <>
                   <div className="section-label">Sets this week (last 7 days)</div>
-                  <div className="coach-sets">
-                    {tips.coverage.map((g) => (
-                      <div key={g.group}>
-                        <span>{g.group}</span>
-                        <span className="coach-bar" aria-hidden="true">
-                          <span style={{ width: `${Math.min(100, (g.sets / g.target) * 100)}%`, background: g.sets >= g.target ? 'var(--accent)' : 'var(--protein)' }} />
+                  <WeeklySetsBars coverage={tips.coverage} />
+                  {tips.picks.length > 0 && (
+                    <>
+                      <div className="section-label">Exercises for what's short</div>
+                      {tips.picks.map(({ group, short, picks }) => (
+                        <div key={group} className="coach-lift">
+                          <div className="coach-tip-head">
+                            <b>{group}</b>
+                            <span className="muted small">{short} set{short === 1 ? '' : 's'} to go</span>
+                          </div>
+                          {picks.map((p) => (
+                            <div key={p.name} className="coach-pick">
+                              <span>
+                                {p.name}
+                                <span className="muted small">
+                                  {p.times ? ` · done ${p.times}×, last ${new Date(`${p.lastDay}T12:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}` : p.atYourGym ? ' · new, at your gym' : ' · new'}
+                                </span>
+                              </span>
+                              <button type="button" className="link-btn small" onClick={() => onUpdateProfile({ dislikedLifts: [...disliked, p.name] })}>
+                                Not for me
+                              </button>
+                            </div>
+                          ))}
+                          {!picks.length && <div className="muted small">Nothing left in the list for this group. Undo a "not for me" below, or log one of your own.</div>}
+                        </div>
+                      ))}
+                    </>
+                  )}
+                  {disliked.length > 0 && (
+                    <p className="muted small" style={{ marginBottom: 0 }}>
+                      Not for you:{' '}
+                      {disliked.map((d, i) => (
+                        <span key={d}>
+                          {i > 0 && ', '}
+                          {d}{' '}
+                          <button type="button" className="link-btn small" onClick={() => onUpdateProfile({ dislikedLifts: disliked.filter((x) => x !== d) })}>
+                            undo
+                          </button>
                         </span>
-                        <span className="muted small">
-                          {g.sets}/{g.target}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
+                      ))}
+                    </p>
+                  )}
                 </>
               )}
               {s.id === 'sugar' && (

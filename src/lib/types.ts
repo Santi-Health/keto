@@ -51,6 +51,8 @@ export interface Profile {
   fitbitBurnDays?: number
   /** Lifts you added that aren't in the built-in list, with the gyms they're at. */
   customLifts?: LibraryExercise[]
+  /** Exercises you marked "not for me": the coach suggests something else. */
+  dislikedLifts?: string[]
   /** Latest weigh-in already copied into weightKg. */
   weightReadingId?: string | null
   /** ISO timestamp of the last local edit, used to resolve sync conflicts. */

@@ -2716,3 +2716,16 @@ input.drink-time {
 .glucose-import .btn {
   width: 100%;
 }
+
+.coach-pick {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 10px;
+  font-size: 0.92rem;
+}
+
+.coach-pick .link-btn {
+  flex: none;
+  color: var(--text-2);
+}

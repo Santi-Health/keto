@@ -12,6 +12,7 @@ import { VitaminsCard } from '../components/VitaminsCard'
 import { useOpenSyncState } from '../lib/backgroundSync'
 import { deviceTz, travelDay, zoneLabel } from '../lib/time'
 import { DrinksCard } from '../components/DrinksCard'
+import { WeeklySetsCard } from '../components/WeeklySetsCard'
 import { GlucoseDayCard, GlucoseImport } from '../components/GlucoseDayCard'
 import { ExerciseSheet } from '../components/ExerciseSheet'
 import { TrainingCard } from '../components/TrainingCard'
@@ -432,6 +433,8 @@ export function Today({ profile, targets, onOpenSettings, onToggleRefeed, onNavi
               </button>
             )}
           </section>
+
+          <WeeklySetsCard day={day} onOpenCoach={() => onNavigate('coach')} />
 
           {/* First until something is logged (the morning mate cocido), then the macros lead. Moved with order so its Undo survives. */}
           <div style={{ order: isToday && dayLogs.length === 0 ? -1 : 0 }}>

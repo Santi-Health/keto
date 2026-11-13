@@ -66,6 +66,8 @@ export interface CoachInput {
   readiness: Readiness | null
   coverage: GroupWeek[]
   due: GroupWeek[]
+  /** Suggested exercises per muscle group (ones you've done first, minus ones you don't like). */
+  picks?: Record<string, string[]>
   plans: LiftPlan[]
   daysSinceStrength: number | null
   liftStreak: number
@@ -303,7 +305,12 @@ function training(c: CoachInput): CoachTip[] {
         detail:
           (c.doneToday.strength ? 'You lifted today, so this is for your next session. ' : '') +
           `${week} ` +
-          top.map((g) => `${g.group} ${g.sets} of ${g.target} sets${g.daysSince != null ? `, last ${g.daysSince === 0 ? 'today' : g.daysSince === 1 ? 'yesterday' : `${g.daysSince} days ago`}` : ', not in 3 weeks'}`).join(' · '),
+          top
+            .map((g) => {
+              const ideas = c.picks?.[g.group]?.length ? ` (${c.picks[g.group].join(' or ')})` : ''
+              return `${g.group} ${g.sets} of ${g.target} sets${g.daysSince != null ? `, last ${g.daysSince === 0 ? 'today' : g.daysSince === 1 ? 'yesterday' : `${g.daysSince} days ago`}` : ', not in 3 weeks'}${ideas}`
+            })
+            .join(' · '),
       })
     } else if (c.liftDays < LIFT_DAYS_GOAL && !c.doneToday.strength) {
       out.push({ id: 'next-session', section: 'training', goal: 'muscle', tone: 'do', title: 'Today: a full-body lift', detail: `${week} Every group was hit recently, so keep it moderate and add a rep or two to each lift.` })

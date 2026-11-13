@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { Exercise, Lift } from './exercise'
 import { EXERCISE_LIBRARY } from './library'
-import { groupsDue, liftPlans, nextWeight, weekCoverage } from './training'
+import { exercisesFor, groupsDue, liftPlans, nextWeight, weekCoverage } from './training'
 
 const session = (day: string, lifts: Partial<Lift>[]): Exercise => ({
   id: `${day}-${lifts[0]?.name}`,
@@ -57,5 +57,26 @@ describe('progression', () => {
     const l = { name: 'Barbell bench press', weight: 135, reps: 8, sets: 3 }
     const ps = liftPlans([session('2026-11-05', [l]), session('2026-11-08', [l]), session('2026-11-11', [l])], EXERCISE_LIBRARY, '2026-11-12')
     expect(ps[0].stalled).toBe(true)
+  })
+})
+
+describe('exercise picks', () => {
+  const ex = [
+    session('2026-11-01', [{ name: 'Decline sit-up / ab crunch', sets: 4, reps: 12, gym: 'MP2' }]),
+    session('2026-11-10', [{ name: 'Decline sit-up / ab crunch', sets: 4, reps: 12, gym: 'MP2' }, { name: 'Elbow-to-knee crunch', sets: 2, reps: 18, gym: 'MP2' }]),
+  ]
+  it('puts what you have done first, most often first', () => {
+    const p = exercisesFor('Abs / core', { exercises: ex, library: EXERCISE_LIBRARY, today: '2026-11-12' })
+    expect(p.map((x) => x.name)).toEqual(['Decline sit-up / ab crunch', 'Elbow-to-knee crunch'])
+    expect(p[0].times).toBe(2)
+  })
+  it('skips what you said you do not like and fills from your gym', () => {
+    const p = exercisesFor('Abs / core', { exercises: ex, library: EXERCISE_LIBRARY, today: '2026-11-12', disliked: ['decline sit-up / ab crunch'], n: 3 })
+    expect(p[0].name).toBe('Elbow-to-knee crunch')
+    expect(p.slice(1).every((x) => x.times === 0 && x.atYourGym)).toBe(true)
+  })
+  it('offers list exercises for a group you have never trained', () => {
+    const p = exercisesFor('Shoulders', { exercises: ex, library: EXERCISE_LIBRARY, today: '2026-11-12' })
+    expect(p[0]).toMatchObject({ name: 'Overhead press (barbell)', times: 0, atYourGym: true })
   })
 })

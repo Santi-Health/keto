@@ -164,6 +164,7 @@ function Tracker({ session, recovering = false, onPassphraseChanged = () => {} }
             weightUnit={profile.weightUnit}
             onApplyLimit={(g) => update({ netCarbLimitG: g })}
             onOpenReport={(days) => go(`report/${days}`)}
+            onUpdateProfile={update}
           />
         )}
       </main>

@@ -174,3 +174,52 @@ export function liftDaysThisWeek(exercises: Exercise[], today: string): number {
   const from = shift(today, -6)
   return new Set(exercises.filter((e) => !e.deleted_at && e.kind === 'strength').map((e) => entryDay(e.started_at, e.meta.tz)).filter((d) => d >= from && d <= today)).size
 }
+
+export interface ExercisePick {
+  name: string
+  /** Times logged in the last 90 days (0 = new to you). */
+  times: number
+  lastDay: string | null
+  /** At the gym you used most recently (or anywhere). */
+  atYourGym: boolean
+}
+
+/** The gym of your most recent lift that named one. */
+export function lastGym(exercises: Exercise[]): Lift['gym'] {
+  const lifts = exercises
+    .filter((e) => !e.deleted_at && e.kind === 'strength')
+    .sort((a, b) => b.started_at.localeCompare(a.started_at))
+    .flatMap((e) => e.meta.lifts ?? [])
+  return lifts.find((l) => l.gym)?.gym
+}
+
+/**
+ * Exercises for a muscle group, best first: ones you've done (most often, then most recently), then ones at
+ * your usual gym, then the rest of the list. Anything you marked "not for me" is left out.
+ */
+export function exercisesFor(
+  group: string,
+  opts: { exercises: Exercise[]; library: LibraryExercise[]; today: string; disliked?: string[]; gym?: Lift['gym']; n?: number },
+): ExercisePick[] {
+  const { exercises, library, today, disliked = [], n = 2 } = opts
+  const gym = opts.gym ?? lastGym(exercises)
+  const no = new Set(disliked.map((d) => d.trim().toLowerCase()))
+  const history = liftsSince(exercises, shift(today, -89))
+  const picks = new Map<string, ExercisePick>()
+  for (const d of history) {
+    if (groupOf(d.lift.name, library) !== group) continue
+    const k = d.lift.name.trim().toLowerCase()
+    const p = picks.get(k) ?? { name: d.lift.name.trim(), times: 0, lastDay: null, atYourGym: true }
+    picks.set(k, { ...p, times: p.times + 1, lastDay: d.day })
+  }
+  for (const e of library) {
+    const k = e.name.toLowerCase()
+    if (e.group !== group || picks.has(k)) continue
+    picks.set(k, { name: e.name, times: 0, lastDay: null, atYourGym: !gym || e.gyms.includes('any') || e.gyms.includes(gym) })
+  }
+  return [...picks.entries()]
+    .filter(([k]) => !no.has(k))
+    .map(([, p]) => p)
+    .sort((a, b) => Math.sign(b.times) - Math.sign(a.times) || b.times - a.times || (b.lastDay ?? '').localeCompare(a.lastDay ?? '') || Number(b.atYourGym) - Number(a.atYourGym))
+    .slice(0, n)
+}
