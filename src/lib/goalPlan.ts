@@ -28,6 +28,12 @@ export interface PlanWeek {
   /** Average of that week's weigh-ins, when there are any. */
   weighInLb: number | null
   weighIns: number
+  /** 'done' once the week is over, 'now' for this week, 'ahead' still to come. */
+  state: 'done' | 'now' | 'ahead'
+  /** Fat at the end of the week (or today, for this week) by your logged deficit; null for weeks to come. */
+  actualFatLb: number | null
+  /** At or under the week's target fat (within 0.3 lb). */
+  onTrack: boolean | null
 }
 
 export interface PlanStatus {
@@ -105,6 +111,10 @@ export function planStatus(opts: {
     const end = shiftDay(plan.start, i * 7 + 6)
     const fat = fatAt((i + 1) * 7)
     const w = weights.filter((x) => x.day >= from && x.day <= end)
+    const state = end < today ? 'done' : from <= today ? 'now' : 'ahead'
+    // A finished week is judged at its end; this week so far against where it should be today.
+    const actual = state === 'ahead' ? null : startFatLb - Math.max(0, deficitLb(plan.start, state === 'done' ? shiftDay(end, 1) : today))
+    const targetThen = state === 'done' ? fat : fatAt(Math.max(0, between(plan.start, today)))
     return {
       week: i + 1,
       end,
@@ -113,6 +123,9 @@ export function planStatus(opts: {
       targetBfPct: r1(bf(fat)),
       weighInLb: w.length ? r1(w.reduce((a, x) => a + x.kg, 0) / w.length / KG_PER_LB) : null,
       weighIns: w.length,
+      state,
+      actualFatLb: actual == null ? null : r1(actual),
+      onTrack: actual == null ? null : actual <= targetThen + 0.3,
     }
   })
 

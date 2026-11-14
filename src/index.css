@@ -2783,3 +2783,196 @@ input.drink-time {
   font-size: 0.8rem;
   color: var(--text-2);
 }
+
+.plan-progress {
+  display: grid;
+  gap: 6px;
+  margin: 12px 0 10px;
+}
+
+.plan-big {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.plan-big b {
+  font-size: 2.2rem;
+  font-weight: 800;
+  line-height: 1;
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+}
+
+.plan-big span {
+  color: var(--text-2);
+}
+
+.plan-bar,
+.plan-bf-track {
+  position: relative;
+  height: 14px;
+  border-radius: 7px;
+  background: var(--track);
+}
+
+.plan-bar .fill,
+.plan-bf-track .fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: 7px;
+  background: var(--accent);
+}
+
+.plan-bar .mark,
+.plan-bf-track .mark {
+  position: absolute;
+  top: -4px;
+  bottom: -4px;
+  width: 3px;
+  margin-left: -1.5px;
+  border-radius: 2px;
+  background: var(--text);
+}
+
+.plan-bar-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+}
+
+.key {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  vertical-align: -1px;
+  margin-right: 2px;
+}
+
+.key.fill,
+.key.good {
+  background: var(--accent);
+}
+
+.key.mark {
+  width: 3px;
+  background: var(--text);
+}
+
+.key.behind {
+  background: var(--carbs);
+}
+
+.key.now {
+  background: transparent;
+  border: 2px solid var(--accent);
+  margin-left: 8px;
+}
+
+.key.good,
+.key.behind {
+  margin-left: 8px;
+}
+
+.plan-bf {
+  margin-top: 8px;
+}
+
+.plan-bf-track {
+  height: 10px;
+}
+
+.plan-bf-track .fill {
+  opacity: 0.35;
+}
+
+.plan-bf-track .dot {
+  position: absolute;
+  top: 50%;
+  width: 16px;
+  height: 16px;
+  margin: -8px 0 0 -8px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 3px solid var(--surface);
+}
+
+.plan-bf-track .dot.scale {
+  background: var(--protein);
+}
+
+.plan-bf-ends {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 6px;
+  color: var(--text-2);
+}
+
+.plan-bf-ends b {
+  color: var(--text);
+  text-align: center;
+}
+
+.plan-strip-wrap {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.plan-strip {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: 4px;
+}
+
+.plan-tile {
+  position: relative;
+  aspect-ratio: 1 / 1.25;
+  border-radius: 6px;
+  background: var(--track);
+  display: grid;
+  place-items: center;
+  font-size: 0.78rem;
+  color: var(--text-2);
+}
+
+.plan-tile.done.good {
+  background: var(--accent);
+  color: var(--surface);
+}
+
+.plan-tile.done.behind {
+  background: var(--carbs);
+  color: var(--surface);
+}
+
+.plan-tile.now {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+  color: var(--text);
+  background: var(--accent-soft);
+}
+
+.plan-tile.now.behind {
+  outline-color: var(--carbs);
+}
+
+.plan-dexa {
+  position: absolute;
+  top: 1px;
+  right: 3px;
+  font-size: 0.55rem;
+  line-height: 1;
+}
+
+.plan-dexa-key {
+  margin-left: 8px;
+  font-size: 0.7rem;
+}
+
+.plan-legend {
+  white-space: nowrap;
+}

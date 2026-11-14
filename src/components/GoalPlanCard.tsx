@@ -58,7 +58,7 @@ function PlanChart({ s }: { s: PlanStatus }) {
         </g>
       ))}
       {[1, 6, 12].map((w) => (
-        <text key={w} x={x(w)} y={H - 4} textAnchor="middle" fontSize="8.5" fill="var(--text-2)">
+        <text key={w} x={x(w)} y={H - 4} textAnchor={w === 12 ? 'end' : 'middle'} fontSize="8.5" fill="var(--text-2)">
           wk {w}
         </text>
       ))}
@@ -68,6 +68,99 @@ function PlanChart({ s }: { s: PlanStatus }) {
         <circle key={w.week} cx={x(w.week - 0.5)} cy={y(w.weighInLb!)} r="4.5" fill="var(--protein)" stroke="var(--surface)" strokeWidth="2" />
       ))}
     </svg>
+  )
+}
+
+/** Fat lost toward the goal as a bar with a "should be here" mark, and body fat on a 17% → 12% scale. */
+function PlanProgress({ s, targetLost }: { s: PlanStatus; targetLost: number }) {
+  const total = Math.max(0.1, s.toLoseLb)
+  const pct = (x: number) => `${Math.max(0, Math.min(100, (x / total) * 100))}%`
+  const lost = s.lostByDeficitLb
+  const startBf = (s.startFatLb / (s.fatFreeLb + s.startFatLb)) * 100
+  const goal = s.plan.targetBfPct
+  // Position on the body-fat scale: start at the left, goal at the right.
+  const at = (bf: number) => `${Math.max(0, Math.min(100, ((startBf - bf) / Math.max(0.1, startBf - goal)) * 100))}%`
+  const todayBf = ((s.targetTodayFatLb) / (s.fatFreeLb + s.targetTodayFatLb)) * 100
+  return (
+    <div className="plan-progress">
+      <div className="plan-big">
+        <b>{lost.toFixed(1)}</b>
+        <span>
+          of {s.toLoseLb.toFixed(1)} lb of fat lost · {Math.round((lost / total) * 100)}%
+        </span>
+      </div>
+      <div className="plan-bar" role="img" aria-label={`${lost.toFixed(1)} of ${s.toLoseLb.toFixed(1)} lb lost; ${targetLost.toFixed(1)} lb is the target for today`}>
+        <span className="fill" style={{ width: pct(lost) }} />
+        <span className="mark" style={{ left: pct(targetLost) }} />
+      </div>
+      <div className="plan-bar-legend muted small">
+        <span>
+          <i className="key fill" /> lost (by your logged deficit)
+        </span>
+        <span>
+          <i className="key mark" /> where you should be today: {targetLost.toFixed(1)} lb
+        </span>
+      </div>
+
+      <div className="plan-bf">
+        <div className="plan-bf-track" role="img" aria-label={`Body fat about ${s.bfByDeficit}% now; ${startBf.toFixed(1)}% at the start, ${goal}% goal`}>
+          <span className="fill" style={{ width: at(s.bfByDeficit) }} />
+          <span className="mark" style={{ left: at(todayBf) }} />
+          <span className="dot" style={{ left: at(s.bfByDeficit) }} />
+          {s.bfByScale != null && <span className="dot scale" style={{ left: at(s.bfByScale) }} />}
+        </div>
+        <div className="plan-bf-ends small">
+          <span>
+            {startBf.toFixed(1)}%
+            <br />
+            start
+          </span>
+          <b>
+            {s.bfByDeficit}% now
+            {s.bfByScale != null && (
+              <>
+                <br />
+                <span className="muted">scale {s.bfByScale}%</span>
+              </>
+            )}
+          </b>
+          <span style={{ textAlign: 'right' }}>
+            {goal}%
+            <br />
+            goal
+          </span>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/** The 12 weeks as tiles: green when a week ended on track, amber when behind, outlined for this week. */
+function WeekStrip({ s }: { s: PlanStatus }) {
+  const done = s.weeks.filter((w) => w.state === 'done')
+  const good = done.filter((w) => w.onTrack).length
+  return (
+    <div className="plan-strip-wrap">
+      <div className="plan-strip" role="list" aria-label="Weeks of the plan">
+        {s.weeks.map((w) => (
+          <div
+            key={w.week}
+            role="listitem"
+            className={`plan-tile ${w.state} ${w.onTrack == null ? '' : w.onTrack ? 'good' : 'behind'}`}
+            title={`Week ${w.week} to ${fmtDate(w.end)}: target ${w.targetWeightLb} lb, ${w.targetBfPct}%${w.actualFatLb != null ? ` · fat ${w.actualFatLb} lb vs ${w.targetFatLb}` : ''}`}
+          >
+            <b>{w.week}</b>
+            {RESCAN_WEEKS.includes(w.week) && <span className="plan-dexa" aria-label="DEXA retest">◆</span>}
+          </div>
+        ))}
+      </div>
+      <div className="muted small">
+        {done.length ? `${good} of ${done.length} finished week${done.length === 1 ? '' : 's'} on track. ` : 'Week 1 is under way. '}
+        <span className="plan-legend">
+          <i className="key good" /> on track <i className="key behind" /> behind <i className="key now" /> this week <span className="plan-dexa-key">◆</span> DEXA
+        </span>
+      </div>
+    </div>
   )
 }
 
@@ -120,24 +213,9 @@ export function GoalPlanCard({ plan, targets, weightUnit, onStart }: Props) {
         {s.week === 0 ? 'Starts' : s.week > s.plan.weeks ? 'Ended' : `Week ${s.week} of ${s.plan.weeks}`} · {fmtDate(s.plan.start)} → {fmtDate(end)} · {s.baseline.bfPct}% → {s.plan.targetBfPct}% holding {s.baseline.leanLb} lb lean
       </div>
 
-      <div className="stat-grid plan-stats">
-        <div>
-          <b>{targetLost.toFixed(1)} lb</b>
-          <span>Fat to be lost by today</span>
-        </div>
-        <div>
-          <b>{s.lostByDeficitLb.toFixed(1)} lb</b>
-          <span>Lost, by your logged deficit</span>
-        </div>
-        <div>
-          <b>{s.lostByScaleLb == null ? '—' : `${Math.abs(s.lostByScaleLb).toFixed(1)} lb`}</b>
-          <span>{s.lostByScaleLb == null ? 'Weigh in to check on the scale' : s.lostByScaleLb < 0 ? 'Up on the scale (7-day avg; often water)' : 'Lost, by your weigh-ins (7-day avg)'}</span>
-        </div>
-        <div>
-          <b>{s.bfByDeficit}%</b>
-          <span>Body fat now (est.){s.bfByScale != null ? ` · scale ${s.bfByScale}%` : ''}</span>
-        </div>
-      </div>
+      <PlanProgress s={s} targetLost={targetLost} />
+
+      <WeekStrip s={s} />
 
       <PlanChart s={s} />
       <p className="muted small" style={{ margin: '2px 0 8px' }}>

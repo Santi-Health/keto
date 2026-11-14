@@ -32,11 +32,15 @@ describe('12-week plan', () => {
     expect(p.aheadLb).toBeGreaterThan(0)
     expect(p.predictedBfPct!).toBeLessThan(12)
     expect(p.weeks[2].weighInLb).toBeCloseTo(146.3, 1)
+    expect(p.weeks.slice(0, 4).map((w) => w.state)).toEqual(['done', 'done', 'done', 'now'])
+    expect(p.weeks[0].onTrack).toBe(true)
+    expect(p.weeks[4].actualFatLb).toBeNull()
   })
   it('says how far behind a slow pace is', () => {
     const p = planStatus({ plan, today: '2026-12-05', scan, energy: days('2026-11-14', 21, 150), weights: [] })!
     expect(p.aheadLb).toBeLessThan(0)
     expect(p.predictedBfPct!).toBeGreaterThan(12)
     expect(p.weeksToGoal!).toBeGreaterThan(9)
+    expect(p.weeks[0].onTrack).toBe(false)
   })
 })

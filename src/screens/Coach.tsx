@@ -167,6 +167,8 @@ export function Coach({ profile, targets, weightUnit, onApplyLimit, onOpenReport
         </div>
       </header>
 
+      <GoalPlanCard plan={profile.goalPlan} targets={targets} weightUnit={weightUnit} onStart={(goalPlan) => onUpdateProfile({ goalPlan })} />
+
       <section className="card">
         <div className="page-header" style={{ marginBottom: 6 }}>
           <h2>Focus now</h2>
@@ -184,8 +186,6 @@ export function Coach({ profile, targets, weightUnit, onApplyLimit, onOpenReport
         )}
         {top.length ? top.map((t) => <Tip key={t.id} t={t} />) : <p className="muted small" style={{ margin: 0 }}>Nothing pressing: you're on track across your goals.</p>}
       </section>
-
-      <GoalPlanCard plan={profile.goalPlan} targets={targets} weightUnit={weightUnit} onStart={(goalPlan) => onUpdateProfile({ goalPlan })} />
 
       <div className="grid two">
         {SECTIONS.map((s) => {
