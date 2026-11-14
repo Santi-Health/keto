@@ -14,8 +14,8 @@ export default defineConfig(({ command }) => ({
       manifest: {
         id: '/keto/',
         // id stays /keto/ so the installed app updates in place instead of becoming a new one.
-        name: 'El Santi Grail',
-        short_name: 'Santi Grail',
+        name: 'Santi Grial',
+        short_name: 'Santi Grial',
         description: 'Food, ketosis, glucose, training and a coach, all aimed at 12% body fat without losing muscle.',
         theme_color: '#14524a',
         background_color: '#f6f5f1',

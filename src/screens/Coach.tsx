@@ -210,17 +210,21 @@ export function Coach({ profile, targets, weightUnit, onApplyLimit, onOpenReport
                       <div className="coach-tip-head">
                         <b>{p.name}</b>
                         <span className="muted small">
-                          last {p.last.weight != null && p.last.weight > 0 ? `${p.last.weight} ${p.last.unit}${p.last.bells === 2 ? ' ×2' : ''} · ` : ''}
-                          {p.last.reps ?? '?'}×{p.last.sets ?? '?'}
+                          last{' '}
+                          {p.last.measure === 'min'
+                            ? `${p.last.duration ?? '?'} min${p.last.weight ? ` · level ${p.last.weight}` : ''}`
+                            : p.last.measure === 's'
+                              ? `${p.last.weight ? `${p.last.weight} ${p.last.unit} · ` : ''}${p.last.duration ?? '?'} s×${p.last.sets ?? '?'}`
+                              : `${p.last.weight != null && p.last.weight > 0 ? `${p.last.weight} ${p.last.unit}${p.last.bells === 2 ? ' ×2' : ''} · ` : ''}${p.last.reps ?? '?'}×${p.last.sets ?? '?'}`}
                         </span>
                       </div>
                       <div className="muted small">
-                        {p.text} <span className="coach-goal">{p.next.change === 'weight' ? goalLabel('strength') : goalLabel('muscle')}</span>
+                        {p.text} <span className="coach-goal">{p.group === 'Cardio' ? goalLabel('vo2') : p.next.change === 'weight' ? goalLabel('strength') : goalLabel('muscle')}</span>
                       </div>
                     </div>
                   ))}
                   <p className="muted small" style={{ marginBottom: 0 }}>
-                    Big lifts 6–10 reps, smaller and core 10–15. Add reps until the top of the range, then add weight and drop back down.
+                    Big lifts 6–10 reps, smaller and core 10–15: add reps to the top, then add weight and drop back down. Holds build to 60 s, then get harder.
                   </p>
                 </>
               )}

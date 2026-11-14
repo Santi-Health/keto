@@ -25,9 +25,10 @@ describe('lift weight', () => {
 
 describe('two bells and one side', () => {
   const l: Lift = { name: 'Double kettlebell split squat', weightLb: null, weight: 28, unit: 'kg', reps: 14, sets: 2 }
-  it('doubles the load and halves the reps per arm for two bells', () => {
+  it('doubles the load for two bells; moved together, each arm does every rep', () => {
     expect(liftLoadKg({ ...l, bells: 2 })).toBe(56)
-    expect(repsPerSide({ ...l, bells: 2 })).toBe(7)
+    expect(repsPerSide({ ...l, bells: 2 })).toBe(14)
+    expect(repsPerSide({ ...l, bells: 2, side: 'both' })).toBe(7)
   })
   it('splits reps for one side at a time, and keeps them for a single side', () => {
     expect(repsPerSide({ ...l, side: 'both' })).toBe(7)

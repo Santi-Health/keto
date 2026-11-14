@@ -1,4 +1,4 @@
-# El Santi Grail
+# Santi Grial
 
 A personal app to track food, macros, electrolytes, glucose and ketones. It's built as a PWA, so it installs on Android (Pixel Fold) from Chrome.
 

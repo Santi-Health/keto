@@ -47,3 +47,17 @@ describe('new lifts', () => {
     expect(libraryFor('MP2', mine).map((e) => e.name)).not.toContain('Cable fly')
   })
 })
+
+describe('how lifts are measured', () => {
+  it('times holds in seconds and cardio in minutes, at both gyms', () => {
+    expect(findLift('hollow hold', EXERCISE_LIBRARY)?.measure).toBe('s')
+    expect(libraryFor('41').find((e) => e.name === 'StairMaster')?.measure).toBe('min')
+    expect(libraryFor('MP2').map((e) => e.name)).toContain('Row machine')
+    expect(libraryFor('Home').map((e) => e.name)).not.toContain('Row machine')
+  })
+  it('guesses the measure and group for new names', () => {
+    const [wall, bike] = newLibraryEntries([{ name: 'Wall sit', gym: 'MP2' }, { name: 'Assault bike', gym: 'MP2' }], EXERCISE_LIBRARY)
+    expect(wall.measure).toBe('s')
+    expect(bike).toMatchObject({ group: 'Cardio', measure: 'min' })
+  })
+})

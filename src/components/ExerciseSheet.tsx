@@ -19,6 +19,8 @@ import {
   liftWeight,
   repsPerSide,
   type LiftSide,
+  type LiftMeasure,
+  isTimed,
   type YogaStyle,
 } from '../lib/exercise'
 import { getGoogleToken, heartRateCalories, type HrProfile } from '../lib/googleHealth'
@@ -140,6 +142,11 @@ export function ExerciseSheet({ weightKg, hr, exercise, date, onClose }: Props) 
   }
 
   const setLift = (i: number, change: Partial<Lift>) => setLifts((prev) => prev.map((l, j) => (j === i ? { ...l, ...change } : l)))
+  // Picking a hold or a cardio piece from the list switches it to seconds or minutes.
+  const withMeasure = (name: string): Partial<Lift> => {
+    const known = findLift(name, libraryFor(undefined, custom))
+    return known ? { name, measure: known.measure } : { name }
+  }
   const num = (v: string) => (v === '' ? null : Number(v))
 
   return (
@@ -296,21 +303,30 @@ export function ExerciseSheet({ weightKg, hr, exercise, date, onClose }: Props) 
                   ×
                 </button>
               </div>
-              <input type="text" className="lift-name" aria-label="Lift" list={`lift-options-${i}`} placeholder="Lift name (tap to pick or type)" value={l.name} onChange={(e) => setLift(i, { name: e.target.value })} />
-              <LiftNameHint name={l.name} gym={l.gym} custom={custom} onPick={(name) => setLift(i, { name })} />
+              <input type="text" className="lift-name" aria-label="Lift" list={`lift-options-${i}`} placeholder="Lift name (tap to pick or type)" value={l.name} onChange={(e) => setLift(i, withMeasure(e.target.value))} />
+              <LiftNameHint name={l.name} gym={l.gym} custom={custom} onPick={(name) => setLift(i, withMeasure(name))} />
               <div className="lift-opts">
-                <label className="check">
-                  <input type="checkbox" checked={!!l.assisted} onChange={(e) => setLift(i, { assisted: e.target.checked })} /> Assisted
-                </label>
-                <label className="check">
-                  <input type="checkbox" checked={l.bells === 2} onChange={(e) => setLift(i, { bells: e.target.checked ? 2 : undefined })} /> Two bells
-                </label>
-                <select aria-label="Side" value={l.side ?? ''} onChange={(e) => setLift(i, { side: (e.target.value || undefined) as LiftSide | undefined })}>
-                  <option value="">Both together</option>
-                  <option value="left">Left only</option>
-                  <option value="right">Right only</option>
-                  <option value="both">One side at a time (L + R)</option>
+                <select aria-label="Measured in" value={l.measure ?? 'reps'} onChange={(e) => setLift(i, { measure: e.target.value === 'reps' ? undefined : (e.target.value as LiftMeasure) })}>
+                  <option value="reps">Reps</option>
+                  <option value="s">Seconds</option>
+                  <option value="min">Minutes</option>
                 </select>
+                {l.measure !== 'min' && (
+                  <>
+                    <label className="check">
+                      <input type="checkbox" checked={!!l.assisted} onChange={(e) => setLift(i, { assisted: e.target.checked })} /> Assisted
+                    </label>
+                    <label className="check">
+                      <input type="checkbox" checked={l.bells === 2} onChange={(e) => setLift(i, { bells: e.target.checked ? 2 : undefined })} /> Two bells
+                    </label>
+                    <select aria-label="Side" value={l.side ?? ''} onChange={(e) => setLift(i, { side: (e.target.value || undefined) as LiftSide | undefined })}>
+                      <option value="">Both together</option>
+                      <option value="left">Left only</option>
+                      <option value="right">Right only</option>
+                      <option value="both">Alternating sides (L + R)</option>
+                    </select>
+                  </>
+                )}
               </div>
               <datalist id={`lift-options-${i}`}>
                 {libraryFor(l.gym, custom).map((x) => (
@@ -319,31 +335,44 @@ export function ExerciseSheet({ weightKg, hr, exercise, date, onClose }: Props) 
               </datalist>
               <div className="lift-nums">
                 <label>
-                  <span>{l.assisted ? 'Assist' : l.bells === 2 ? 'Each bell' : 'Weight'}</span>
+                  <span>{l.measure === 'min' ? 'Level' : l.assisted ? 'Assist' : l.bells === 2 ? 'Each bell' : l.measure === 's' ? 'Weight (opt.)' : 'Weight'}</span>
                   <input type="number" inputMode="decimal" value={liftWeight(l) ?? ''} onChange={(e) => setLift(i, { weight: num(e.target.value), weightLb: null })} />
                 </label>
-                <label>
-                  <span>Unit</span>
-                  <select value={liftUnit(l)} onChange={(e) => setLift(i, { unit: e.target.value as WeightUnit })}>
-                    <option value="lb">lb</option>
-                    <option value="kg">kg</option>
-                  </select>
-                </label>
-                <label>
-                  <span>{l.bells === 2 || l.side === 'both' ? 'Reps (total)' : 'Reps'}</span>
-                  <input type="number" inputMode="numeric" value={l.reps ?? ''} onChange={(e) => setLift(i, { reps: num(e.target.value) })} />
-                </label>
+                {l.measure !== 'min' ? (
+                  <label>
+                    <span>Unit</span>
+                    <select value={liftUnit(l)} onChange={(e) => setLift(i, { unit: e.target.value as WeightUnit })}>
+                      <option value="lb">lb</option>
+                      <option value="kg">kg</option>
+                    </select>
+                  </label>
+                ) : (
+                  <span />
+                )}
+                {isTimed(l) ? (
+                  <label>
+                    <span>{l.measure === 'min' ? 'Minutes' : 'Seconds'}</span>
+                    <input type="number" inputMode="decimal" value={l.duration ?? ''} onChange={(e) => setLift(i, { duration: num(e.target.value) })} />
+                  </label>
+                ) : (
+                  <label>
+                    <span>{l.side === 'both' ? 'Reps (total)' : 'Reps'}</span>
+                    <input type="number" inputMode="numeric" value={l.reps ?? ''} onChange={(e) => setLift(i, { reps: num(e.target.value) })} />
+                  </label>
+                )}
                 <label>
                   <span>Sets</span>
                   <input type="number" inputMode="numeric" value={l.sets ?? ''} onChange={(e) => setLift(i, { sets: num(e.target.value) })} />
                 </label>
               </div>
-              {(l.bells === 2 || l.side) && l.reps != null && (
+              {!isTimed(l) && (l.bells === 2 || l.side) && l.reps != null && (
                 <div className="muted small">
                   {l.bells === 2 && liftWeight(l) != null && `${liftWeight(l)! * 2} ${liftUnit(l)} total · `}
                   {l.side === 'left' || l.side === 'right'
                     ? `${l.reps} reps, ${l.side} side`
-                    : `${repsPerSide(l)! % 1 ? repsPerSide(l)!.toFixed(1) : repsPerSide(l)} reps per ${l.side === 'both' && l.bells !== 2 ? 'side' : 'arm'}`}
+                    : l.side === 'both'
+                      ? `${repsPerSide(l)! % 1 ? repsPerSide(l)!.toFixed(1) : repsPerSide(l)} reps per side`
+                      : `${l.reps} reps, both arms each rep`}
                 </div>
               )}
             </div>

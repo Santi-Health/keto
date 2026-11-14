@@ -32,9 +32,9 @@ export interface LiftPlan {
   name: string
   group: string
   /** Last time: weight as entered, unit, reps (total), sets. */
-  last: { day: string; weight: number | null; unit: 'lb' | 'kg'; reps: number | null; sets: number | null; assisted: boolean; bells?: 2; side?: Lift['side'] }
+  last: { day: string; weight: number | null; unit: 'lb' | 'kg'; reps: number | null; sets: number | null; assisted: boolean; bells?: 2; side?: Lift['side']; measure?: Lift['measure']; duration?: number | null }
   range: [number, number]
-  /** What to do next session. */
+  /** What to do next session; `reps` is seconds or minutes for timed lifts. */
   next: { weight: number | null; reps: number; change: 'reps' | 'weight' | 'hold' }
   text: string
   /** Same weight and reps for the last 3 sessions. */
@@ -43,6 +43,10 @@ export interface LiftPlan {
 
 const day0 = (iso: string) => new Date(`${iso}T12:00:00`).getTime()
 const daysBetween = (a: string, b: string) => Math.round((day0(b) - day0(a)) / 86_400_000)
+
+/** Holds (hollow hold, plank) start around 20 s and top out at a minute. */
+export const HOLD_START_S = 20
+export const HOLD_TOP_S = 60
 
 const COMPOUND = /press|squat|row|pull|dip|thrust|lunge|split|step-?up|deadlift|bench|chin|push-?up/i
 /** Big multi-joint lifts work best at 6–10 reps; smaller and core moves at 10–15. */
@@ -119,14 +123,31 @@ export function liftPlans(exercises: Exercise[], library: LibraryExercise[], tod
     const weight = liftWeight(lift)
     const unit = liftUnit(lift)
     const per = repsPerSide(lift) ?? 0
-    // Reps are logged as the total; with two bells or both sides, the range applies per side.
-    const perSide = lift.bells === 2 || lift.side === 'both'
+    // Reps are logged as the total; alternating sides splits them, so the range applies per side.
+    // Two bells moved together count every rep for both arms.
+    const perSide = lift.side === 'both'
     const total = (r: number) => (perSide ? r * 2 : r)
     const repWord = perSide ? ' a side' : ''
     let next: LiftPlan['next']
     let text: string
     const loaded = weight != null && weight > 0
-    if (per >= hi && loaded) {
+    const t = lift.duration ?? 0
+    if (lift.measure === 'min') {
+      // Cardio inside a strength session: a little longer or a level harder each time.
+      const level = loaded ? ` at level ${weight}` : ''
+      next = { weight: loaded ? weight! + 1 : weight, reps: t, change: loaded ? 'weight' : 'reps' }
+      text = loaded ? `Last ${t} min${level}. Next: same ${t} min at level ${weight! + 1}, or 2 more minutes.` : `Last ${t} min. Next: 2 more minutes, or log the level to track it.`
+    } else if (lift.measure === 's') {
+      // Holds: build to a minute, then make it harder rather than longer.
+      if (t >= HOLD_TOP_S) {
+        next = { weight, reps: t, change: 'hold' }
+        text = `${t} s is long enough: make it harder (hold a plate, longer lever) instead of longer.`
+      } else {
+        const aim = Math.min(HOLD_TOP_S, Math.max(HOLD_START_S, Math.ceil((t + 5) / 5) * 5))
+        next = { weight, reps: aim, change: 'reps' }
+        text = `Aim for ${aim} s a set. At ${HOLD_TOP_S} s, make it harder instead of longer.`
+      }
+    } else if (per >= hi && loaded) {
       const w = nextWeight({ name: lift.name, assisted: lift.assisted, bells: lift.bells, weight: weight!, unit })
       next = { weight: w, reps: total(lo), change: 'weight' }
       text = `${lift.assisted ? `Take ${Math.abs(weight! - w)} ${unit} less assist` : `Go up to ${w} ${unit}${lift.bells === 2 ? ' a bell' : ''}`} and drop to ${lo} reps${repWord}; build back up from there.`
@@ -142,11 +163,12 @@ export function liftPlans(exercises: Exercise[], library: LibraryExercise[], tod
       text = loaded ? `Same ${weight} ${unit}, aim for ${aim} reps${repWord}. At ${hi} on every set, add weight.` : `Aim for ${aim} reps${repWord}.`
     }
     const last3 = history.slice(-3)
-    const stalled = last3.length === 3 && last3.every((d) => liftWeight(d.lift) === weight && d.lift.reps === lift.reps)
+    const stalled =
+      last3.length === 3 && lift.measure !== 'min' && last3.every((d) => liftWeight(d.lift) === weight && d.lift.reps === lift.reps && (d.lift.duration ?? null) === (lift.duration ?? null))
     return {
       name: lift.name,
       group,
-      last: { day, weight, unit, reps: lift.reps, sets: lift.sets, assisted: !!lift.assisted, bells: lift.bells, side: lift.side },
+      last: { day, weight, unit, reps: lift.reps, sets: lift.sets, assisted: !!lift.assisted, bells: lift.bells, side: lift.side, measure: lift.measure, duration: lift.duration },
       range,
       next,
       text,
@@ -155,10 +177,20 @@ export function liftPlans(exercises: Exercise[], library: LibraryExercise[], tod
   })
 }
 
-/** Hard cardio (intervals, StairMaster, runs) in the 7 days ending today, for VO2 max. */
+/** Minutes of cardio inside a strength session that count as a hard effort for VO2 max. */
+export const CARDIO_IN_LIFT_MIN = 10
+
+/**
+ * Hard cardio in the 7 days ending today, for VO2 max: hard cardio sessions, plus strength sessions with
+ * 10+ minutes of StairMaster, rowing or similar logged as a lift.
+ */
 export function hardCardioThisWeek(exercises: Exercise[], today: string): number {
   const from = shift(today, -6)
-  return exercises.filter((e) => !e.deleted_at && e.kind === 'cardio' && e.intensity === 'high' && entryDay(e.started_at, e.meta.tz) >= from).length
+  return exercises.filter((e) => {
+    if (e.deleted_at || entryDay(e.started_at, e.meta.tz) < from) return false
+    if (e.kind === 'cardio') return e.intensity === 'high'
+    return e.kind === 'strength' && (e.meta.lifts ?? []).some((l) => l.measure === 'min' && (l.duration ?? 0) * (l.sets ?? 1) >= CARDIO_IN_LIFT_MIN)
+  }).length
 }
 
 /** Lifting days in a row up to today (0 if not today). */

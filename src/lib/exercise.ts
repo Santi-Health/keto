@@ -140,14 +140,22 @@ export interface Lift {
   /** Assisted machine: the weight offsets body weight, so a lower number is harder. */
   assisted?: boolean
   gym?: GymId
-  /** Two kettlebells or dumbbells: the weight is one bell, the load is twice it, and reps (always the total) split between arms. */
+  /** Two kettlebells or dumbbells: the weight is one bell and the load is twice it. Reps split between arms only when alternating (side 'both'). */
   bells?: 2
-  /** One arm or leg at a time: which side, or both with the reps (the total) split evenly. */
+  /** One arm or leg at a time: which side, or alternating sides with the reps (the total) split evenly. */
   side?: LiftSide
+  /** How it's measured: reps (the default), or a hold or cardio piece timed in seconds or minutes. */
+  measure?: LiftMeasure
+  /** Time per set, in `measure` units, for timed lifts. */
+  duration?: number | null
   note?: string
 }
 
 export type LiftSide = 'left' | 'right' | 'both'
+export type LiftMeasure = 'reps' | 's' | 'min'
+
+/** True for holds and cardio pieces logged by time instead of reps. */
+export const isTimed = (l: Pick<Lift, 'measure'>) => l.measure === 's' || l.measure === 'min'
 
 /** Total weight moved per rep: both bells together when there are two. */
 export function liftLoadKg(l: Lift): number | null {
@@ -155,10 +163,13 @@ export function liftLoadKg(l: Lift): number | null {
   return kg == null ? null : kg * (l.bells ?? 1)
 }
 
-/** Reps each arm or leg did: half the total for two bells or both sides, otherwise all of them. */
+/**
+ * Reps each arm or leg did: half the total when alternating sides; otherwise all of them, including two bells
+ * moved together (each arm does every rep).
+ */
 export function repsPerSide(l: Lift): number | null {
   if (l.reps == null) return null
-  return l.bells === 2 || l.side === 'both' ? l.reps / 2 : l.reps
+  return l.side === 'both' ? l.reps / 2 : l.reps
 }
 
 /** Weight as entered; falls back to the legacy lb field for older entries. */

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { Exercise, Lift } from './exercise'
 import { EXERCISE_LIBRARY } from './library'
-import { exercisesFor, groupsDue, liftPlans, nextWeight, weekCoverage } from './training'
+import { exercisesFor, groupsDue, hardCardioThisWeek, liftPlans, nextWeight, weekCoverage } from './training'
 
 const session = (day: string, lifts: Partial<Lift>[]): Exercise => ({
   id: `${day}-${lifts[0]?.name}`,
@@ -48,8 +48,8 @@ describe('progression', () => {
   it('takes assist away on assisted machines', () => {
     expect(plan({ name: 'Assisted pull-up', weight: 30, reps: 10, sets: 4, assisted: true }).next.weight).toBe(25)
   })
-  it('uses reps per arm for two bells and steps one kettlebell size', () => {
-    const p = plan({ name: 'Double kettlebell split squat', weight: 16, unit: 'kg', reps: 20, sets: 2, bells: 2 })
+  it('uses reps per side when alternating and steps one kettlebell size', () => {
+    const p = plan({ name: 'Double kettlebell split squat', weight: 16, unit: 'kg', reps: 20, sets: 2, bells: 2, side: 'both' })
     expect(p.next).toEqual({ weight: 20, reps: 12, change: 'weight' })
     expect(nextWeight({ name: 'Dumbbell curl', weight: 10, unit: 'kg' })).toBe(12.5)
   })
@@ -78,5 +78,27 @@ describe('exercise picks', () => {
   it('offers list exercises for a group you have never trained', () => {
     const p = exercisesFor('Shoulders', { exercises: ex, library: EXERCISE_LIBRARY, today: '2026-11-12' })
     expect(p[0]).toMatchObject({ name: 'Overhead press (barbell)', times: 0, atYourGym: true })
+  })
+})
+
+describe('timed lifts and cardio', () => {
+  const plan = (l: Partial<Lift>) => liftPlans([session('2026-11-12', [l])], EXERCISE_LIBRARY, '2026-11-12')[0]
+  it('builds holds by 5 s up to a minute, then asks for harder', () => {
+    expect(plan({ name: 'Hollow hold', measure: 's', duration: 30, sets: 3 }).next.reps).toBe(35)
+    expect(plan({ name: 'Hollow hold', measure: 's', duration: 60, sets: 3 }).text).toMatch(/harder/)
+  })
+  it('counts hold sets toward abs', () => {
+    const w = weekCoverage([session('2026-11-12', [{ name: 'Hollow hold', measure: 's', duration: 30, sets: 3 }])], EXERCISE_LIBRARY, '2026-11-12')
+    expect(w.find((g) => g.group === 'Abs / core')?.sets).toBe(3)
+  })
+  it('steps cardio up a level, and counts 10+ min toward VO2 max', () => {
+    expect(plan({ name: 'StairMaster', measure: 'min', duration: 12, weight: 8, sets: 1 }).text).toMatch(/level 9/)
+    const ex = [session('2026-11-12', [{ name: 'StairMaster', measure: 'min', duration: 12, sets: 1 }])]
+    expect(hardCardioThisWeek(ex, '2026-11-12')).toBe(1)
+    expect(hardCardioThisWeek([session('2026-11-12', [{ name: 'Row machine', measure: 'min', duration: 5, sets: 1 }])], '2026-11-12')).toBe(0)
+  })
+  it('two bells moved together keep every rep per arm', () => {
+    const p = plan({ name: 'Double kettlebell split squat', weight: 16, unit: 'kg', reps: 10, sets: 2, bells: 2 })
+    expect(p.next).toEqual({ weight: 20, reps: 6, change: 'weight' })
   })
 })
