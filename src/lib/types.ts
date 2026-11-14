@@ -1,3 +1,4 @@
+import type { GoalPlan } from './goalPlan'
 import type { LibraryExercise } from './library'
 import { DEFAULT_YOGA_ROUTINE, type Routine } from './exercise'
 import type { WatchSettings } from './watchlist'
@@ -53,6 +54,8 @@ export interface Profile {
   customLifts?: LibraryExercise[]
   /** Exercises you marked "not for me": the coach suggests something else. */
   dislikedLifts?: string[]
+  /** The 12-week plan to the body-fat goal, from the last DEXA. */
+  goalPlan?: GoalPlan
   /** Latest weigh-in already copied into weightKg. */
   weightReadingId?: string | null
   /** ISO timestamp of the last local edit, used to resolve sync conflicts. */

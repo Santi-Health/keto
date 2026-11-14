@@ -269,10 +269,31 @@ function RoutineCard({ profile, update }: Pick<Props, 'profile' | 'update'>) {
           </div>
           <div className="row">
             <div className="field">
-              <label htmlFor="yr-start">Starts</label>
+              <label htmlFor="yr-start">Usually starts</label>
               <input id="yr-start" type="time" value={r.start} onChange={(e) => e.target.value && set({ start: e.target.value })} />
             </div>
             <NumberField label="Minutes" value={r.minutes} onChange={(minutes) => set({ minutes })} />
+          </div>
+          <div className="field">
+            <span className="label">Start time by day (only where it differs)</span>
+            <div className="routine-times">
+              {r.days.map((d) => (
+                <label key={d}>
+                  <span>{['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][d]}</span>
+                  <input
+                    type="time"
+                    value={r.times?.[d] ?? r.start}
+                    onChange={(e) => {
+                      if (!e.target.value) return
+                      const times = { ...r.times }
+                      if (e.target.value === r.start) delete times[d]
+                      else times[d] = e.target.value
+                      set({ times })
+                    }}
+                  />
+                </label>
+              ))}
+            </div>
           </div>
           <div className="field">
             <label htmlFor="yr-style">Style</label>

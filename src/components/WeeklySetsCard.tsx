@@ -2,6 +2,9 @@ import { useMemo } from 'react'
 import { useData } from '../lib/data'
 import { libraryFor, useCustomLifts } from '../lib/library'
 import { localDate } from '../lib/targets'
+import { shiftDay } from '../lib/goalPlan'
+
+const fmt = (d: string) => new Date(`${d}T12:00:00`).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
 import { weekCoverage, type GroupWeek } from '../lib/training'
 
 /** Bars of hard sets per muscle group against the weekly sets that keep (and build) muscle. */
@@ -37,7 +40,7 @@ export function WeeklySetsCard({ day, onOpenCoach }: { day: string; onOpenCoach:
       </div>
       <WeeklySetsBars coverage={coverage} />
       <p className="muted small" style={{ marginBottom: 0 }}>
-        Hard sets in the 7 days to {day === localDate() ? 'today' : new Date(`${day}T12:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}.{' '}
+        Hard sets from {fmt(shiftDay(day, -6))} to {day === localDate() ? `today (${fmt(day)})` : fmt(day)}.{' '}
         {short > 0 && (
           <button type="button" className="link-btn" onClick={onOpenCoach}>
             Exercises to fill them ›

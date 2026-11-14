@@ -272,9 +272,14 @@ export interface Routine {
   /** 0 = Sunday … 6 = Saturday */
   days: number[]
   start: string // HH:MM
+  /** A different start on some days, e.g. { 2: '11:05' } for Tuesdays. */
+  times?: Partial<Record<number, string>>
   minutes: number
   yogaStyle?: YogaStyle
 }
+
+/** When the routine starts on a given day: that day's own time, or the usual one. */
+export const routineStart = (r: Routine, day = new Date()) => r.times?.[day.getDay()] ?? r.start
 
 export const DEFAULT_YOGA_ROUTINE: Routine = { kind: 'mobility', days: [1, 3, 5], start: '12:05', minutes: 50, yogaStyle: 'flow' }
 
@@ -298,7 +303,7 @@ export function sessionLabel(e: Exercise): string {
 
 /** A ready-to-save session for a routine on the given day. */
 export function routineSession(r: Routine, weightKg: number, day = new Date()): Exercise {
-  const [h, m] = r.start.split(':').map(Number)
+  const [h, m] = routineStart(r, day).split(':').map(Number)
   const start = new Date(day)
   start.setHours(h, m, 0, 0)
   return {

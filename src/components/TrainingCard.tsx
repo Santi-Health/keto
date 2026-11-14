@@ -1,4 +1,4 @@
-import { isHardSession, sessionLabel, type Exercise, type Routine } from '../lib/exercise'
+import { isHardSession, routineStart, sessionLabel, type Exercise, type Routine } from '../lib/exercise'
 
 interface Props {
   today: Exercise[]
@@ -71,7 +71,7 @@ export function TrainingCard({ today, daysSinceStrength, warnings, onLog, period
       <div className="header-actions" style={{ flexWrap: 'wrap' }}>
         {routine && (
           <button type="button" className="btn" onClick={onLogRoutine}>
-            🧘 Log usual yoga ({routine.minutes} min, {formatTime(routine.start)})
+            🧘 Log usual yoga ({routine.minutes} min, {formatTime(routineStart(routine))})
           </button>
         )}
         <button type="button" className="btn secondary" onClick={onImportFitbit} disabled={importing}>

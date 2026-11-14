@@ -19,6 +19,7 @@ import { liveFatBudget, localDate, type Targets } from '../lib/targets'
 import { entryDay } from '../lib/time'
 import { exercisesFor, groupsDue, hardCardioThisWeek, liftDaysThisWeek, liftPlans, liftStreak, weekCoverage } from '../lib/training'
 import { WeeklySetsBars } from '../components/WeeklySetsCard'
+import { GoalPlanCard } from '../components/GoalPlanCard'
 import { lastDays, type RangeDays } from '../lib/trends'
 import type { Profile, WeightUnit } from '../lib/types'
 import { useKetoModel } from '../lib/useKetoModel'
@@ -184,6 +185,8 @@ export function Coach({ profile, targets, weightUnit, onApplyLimit, onOpenReport
         {top.length ? top.map((t) => <Tip key={t.id} t={t} />) : <p className="muted small" style={{ margin: 0 }}>Nothing pressing: you're on track across your goals.</p>}
       </section>
 
+      <GoalPlanCard plan={profile.goalPlan} targets={targets} weightUnit={weightUnit} onStart={(goalPlan) => onUpdateProfile({ goalPlan })} />
+
       <div className="grid two">
         {SECTIONS.map((s) => {
           // Tips already in Focus now aren't repeated below.
@@ -230,7 +233,9 @@ export function Coach({ profile, targets, weightUnit, onApplyLimit, onOpenReport
               )}
               {s.id === 'training' && (
                 <>
-                  <div className="section-label">Sets this week (last 7 days)</div>
+                  <div className="section-label">
+                    Sets {new Date(`${shift(today, -6)}T12:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} – {new Date(`${today}T12:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} (last 7 days)
+                  </div>
                   <WeeklySetsBars coverage={tips.coverage} />
                   {tips.picks.length > 0 && (
                     <>

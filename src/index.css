@@ -2729,3 +2729,57 @@ input.drink-time {
   flex: none;
   color: var(--text-2);
 }
+
+/* 12-week plan */
+.plan-card {
+  margin-bottom: 14px;
+}
+
+.plan-stats {
+  margin: 10px 0;
+}
+
+.plan-chart {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.plan-weeks {
+  display: grid;
+  gap: 2px;
+  margin-top: 10px;
+  font-size: 0.85rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.plan-week {
+  display: grid;
+  grid-template-columns: 1.6fr 1fr 0.9fr 1fr;
+  gap: 6px;
+  padding: 4px 6px;
+  border-radius: 6px;
+}
+
+.plan-week.head {
+  color: var(--text-2);
+  font-size: 0.75rem;
+}
+
+.plan-week.now {
+  background: var(--accent-soft);
+  font-weight: 600;
+}
+
+.routine-times {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.routine-times label {
+  display: grid;
+  gap: 2px;
+  font-size: 0.8rem;
+  color: var(--text-2);
+}
