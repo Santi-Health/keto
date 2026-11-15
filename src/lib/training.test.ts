@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { Exercise, Lift } from './exercise'
 import { EXERCISE_LIBRARY } from './library'
-import { exercisesFor, groupsDue, hardCardioThisWeek, liftPlans, nextWeight, weekCoverage } from './training'
+import { daysLeftInWeek, exercisesFor, groupsDue, hardCardioThisWeek, liftPlans, nextWeight, pastWeeks, weekCoverage, weekStart } from './training'
 
 const session = (day: string, lifts: Partial<Lift>[]): Exercise => ({
   id: `${day}-${lifts[0]?.name}`,
@@ -100,5 +100,42 @@ describe('timed lifts and cardio', () => {
   it('two bells moved together keep every rep per arm', () => {
     const p = plan({ name: 'Double kettlebell split squat', weight: 16, unit: 'kg', reps: 10, sets: 2, bells: 2 })
     expect(p.next).toEqual({ weight: 20, reps: 6, change: 'weight' })
+  })
+})
+
+describe('Monday to Sunday week', () => {
+  const ex = [session('2026-11-14', [{ name: 'Plate-loaded chest press', weight: 95, reps: 8, sets: 4 }])]
+  it('starts on Monday and counts through Sunday', () => {
+    expect(weekStart('2026-11-12')).toBe('2026-11-09')
+    expect(weekStart('2026-11-15')).toBe('2026-11-09')
+    expect(weekStart('2026-11-16')).toBe('2026-11-16')
+    expect(daysLeftInWeek('2026-11-14')).toBe(1)
+    expect(daysLeftInWeek('2026-11-15')).toBe(0)
+  })
+  it('keeps Saturday sets on Sunday and resets on Monday', () => {
+    expect(weekCoverage(ex, EXERCISE_LIBRARY, '2026-11-15').find((g) => g.group === 'Chest')?.sets).toBe(4)
+    expect(weekCoverage(ex, EXERCISE_LIBRARY, '2026-11-16').find((g) => g.group === 'Chest')?.sets).toBe(0)
+  })
+})
+
+describe('past weeks', () => {
+  const full = Object.entries({ 'Plate-loaded chest press': 12, 'Decline sit-up / ab crunch': 12, 'Assisted pull-up': 10, 'Goblet squat (kettlebell)': 10, 'Kettlebell swing': 6, 'Overhead press (barbell)': 6, 'Dumbbell curl': 6 })
+  it('judges each full week, newest first, and counts sets capped at their target', () => {
+    const ex = [
+      session('2026-11-04', full.map(([name, sets]) => ({ name, reps: 8, sets }))),
+      session('2026-10-28', [{ name: 'Plate-loaded chest press', reps: 8, sets: 20 }]),
+    ]
+    const [last, before] = pastWeeks(ex, EXERCISE_LIBRARY, '2026-11-12', 2)
+    expect(last).toMatchObject({ start: '2026-11-02', end: '2026-11-08', verdict: 'good', groupsMet: 7 })
+    expect(before).toMatchObject({ start: '2026-10-26', verdict: 'behind', groupsMet: 1, sets: 12 })
+  })
+  it('starts at the week of your first logged lift', () => {
+    const ex = [session('2026-11-04', [{ name: 'Plate-loaded chest press', reps: 8, sets: 4 }])]
+    expect(pastWeeks(ex, EXERCISE_LIBRARY, '2026-11-26', 6).map((w) => w.start)).toEqual(['2026-11-16', '2026-11-09', '2026-11-02'])
+    expect(pastWeeks([], EXERCISE_LIBRARY, '2026-11-26')).toEqual([])
+  })
+  it('calls 5 of 7 groups close', () => {
+    const ex = [session('2026-11-04', full.slice(0, 5).map(([name, sets]) => ({ name, reps: 8, sets })))]
+    expect(pastWeeks(ex, EXERCISE_LIBRARY, '2026-11-12', 1)[0].verdict).toBe('close')
   })
 })

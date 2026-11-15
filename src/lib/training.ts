@@ -84,16 +84,61 @@ const shift = (day: string, n: number) => {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
-/** Sets per muscle group over the 7 days ending today, and days since each was last trained. */
+/** Monday of the week a day falls in (weeks run Monday to Sunday). */
+export function weekStart(day: string): string {
+  const dow = new Date(`${day}T12:00:00`).getDay()
+  return shift(day, -((dow + 6) % 7))
+}
+
+/** Days left in the Monday–Sunday week after `day` (0 on Sunday). */
+export const daysLeftInWeek = (day: string) => 6 - daysBetween(weekStart(day), day)
+
+/**
+ * Sets per muscle group in the Monday–Sunday week up to `today`, and days since each was last trained.
+ * A fixed week resets on Monday and leaves the weekend to catch up.
+ */
 export function weekCoverage(exercises: Exercise[], library: LibraryExercise[], today: string): GroupWeek[] {
   const recent = liftsSince(exercises, shift(today, -20))
-  const weekFrom = shift(today, -6)
+  const weekFrom = weekStart(today)
   return Object.entries(WEEKLY_SETS).map(([group, target]) => {
     const mine = recent.filter((d) => groupOf(d.lift.name, library) === group)
-    const sets = mine.filter((d) => d.day >= weekFrom).reduce((s, d) => s + (d.lift.sets ?? 1), 0)
+    const sets = mine.filter((d) => d.day >= weekFrom && d.day <= today).reduce((s, d) => s + (d.lift.sets ?? 1), 0)
     const last = mine.length ? mine[mine.length - 1].day : null
     return { group, sets, target, daysSince: last ? daysBetween(last, today) : null }
   })
+}
+
+export type WeekVerdict = 'good' | 'close' | 'behind'
+
+export interface PastWeek {
+  /** Monday and Sunday of the week. */
+  start: string
+  end: string
+  coverage: GroupWeek[]
+  groupsMet: number
+  groups: number
+  sets: number
+  targetSets: number
+  /** Good: every group hit its sets. Close: 5+ of 7 groups, or 80% of all sets. Behind: less. */
+  verdict: WeekVerdict
+}
+
+/** A finished (or current) Monday–Sunday week, judged on its sets. */
+export function judgeWeek(coverage: GroupWeek[], start: string): PastWeek {
+  const groupsMet = coverage.filter((g) => g.sets >= g.target).length
+  const sets = coverage.reduce((a, g) => a + Math.min(g.sets, g.target), 0)
+  const targetSets = coverage.reduce((a, g) => a + g.target, 0)
+  const verdict: WeekVerdict = groupsMet === coverage.length ? 'good' : groupsMet >= coverage.length - 2 || sets >= targetSets * 0.8 ? 'close' : 'behind'
+  return { start, end: shift(start, 6), coverage, groupsMet, groups: coverage.length, sets, targetSets, verdict }
+}
+
+/** Up to `n` full weeks before this one, newest first, starting no earlier than the week of your first logged lift. */
+export function pastWeeks(exercises: Exercise[], library: LibraryExercise[], today: string, n = 6): PastWeek[] {
+  const first = liftsSince(exercises, '0000-01-01')[0]?.day
+  if (!first) return []
+  return Array.from({ length: n }, (_, i) => shift(weekStart(today), -7 * (i + 1)))
+    .filter((start) => shift(start, 6) >= first)
+    .map((start) => judgeWeek(weekCoverage(exercises, library, shift(start, 6)), start))
 }
 
 /**

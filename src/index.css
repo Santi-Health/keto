@@ -2998,3 +2998,54 @@ input.drink-time {
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
+
+/* Past Monday–Sunday weeks on the sets card. */
+.past-weeks {
+  display: grid;
+  gap: 4px;
+}
+
+.past-week {
+  all: unset;
+  box-sizing: border-box;
+  width: 100%;
+  display: grid;
+  grid-template-columns: 1.6em 1fr auto;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  background: var(--track);
+  cursor: pointer;
+  font-variant-numeric: tabular-nums;
+}
+
+.past-week:focus-visible {
+  outline: 2px solid var(--accent);
+}
+
+.past-mark {
+  display: grid;
+  place-items: center;
+  width: 1.5em;
+  height: 1.5em;
+  border-radius: 50%;
+  font-weight: 700;
+  color: var(--surface);
+}
+
+.past-week.good .past-mark {
+  background: var(--accent);
+}
+
+.past-week.close .past-mark {
+  background: var(--carbs);
+}
+
+.past-week.behind .past-mark {
+  background: var(--warn);
+}
+
+.past-week-detail {
+  padding: 8px 4px 4px;
+}
