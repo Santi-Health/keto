@@ -25,7 +25,7 @@ import {
 } from '../lib/exercise'
 import { getGoogleToken, heartRateCalories, type HrProfile } from '../lib/googleHealth'
 import { Segmented } from './Fields'
-import { LIBRARY_GROUPS, findLift, groupForNew, libraryFor, newLibraryEntries, suggestLift, tidyLiftName, useCustomLifts } from '../lib/library'
+import { LIBRARY_GROUPS, findLift, groupForNew, libraryFor, photoFor, newLibraryEntries, suggestLift, tidyLiftName, useCustomLifts } from '../lib/library'
 import { suggestFromHistory } from '../lib/training'
 import { clearDraft, loadDraft, saveDraft } from '../lib/exerciseDraft'
 import { deviceTz } from '../lib/time'
@@ -344,6 +344,7 @@ export function ExerciseSheet({ weightKg, hr, exercise, date, onClose }: Props) 
               </div>
               <input type="text" className="lift-name" aria-label="Lift" list={`lift-options-${i}`} placeholder="Lift name (tap to pick or type)" value={l.name} onChange={(e) => pickName(i, e.target.value)} />
               <LiftNameHint name={l.name} gym={l.gym} custom={custom} group={l.group} onGroup={(group) => setLift(i, { group })} onPick={(name) => pickName(i, name)} />
+              <LiftPicture name={l.name} gym={l.gym} library={library} />
               <div className="lift-opts">
                 <select aria-label="Measured in" value={l.measure ?? 'reps'} onChange={(e) => setLift(i, { measure: e.target.value === 'reps' ? undefined : (e.target.value as LiftMeasure) })}>
                   <option value="reps">Reps</option>
@@ -510,6 +511,24 @@ function LiftNameHint({
         </select>
       </label>
     </div>
+  )
+}
+
+/** The machine or its instruction panel, framed, with the muscle group and the muscles it works. */
+function LiftPicture({ name, gym, library }: { name: string; gym?: GymId; library: ReturnType<typeof libraryFor> }) {
+  const e = findLift(name, library)
+  const [broken, setBroken] = useState(false)
+  if (!e) return null
+  const src = photoFor(e, gym)
+  return (
+    <figure className="lift-photo">
+      {src && !broken && <img src={src} alt={`${e.name}: how it's done`} loading="lazy" onError={() => setBroken(true)} />}
+      <figcaption>
+        <span className="lift-photo-group">{e.group}</span>
+        <span>{e.muscles ?? ''}</span>
+        {!src && <span className="lift-photo-none">no photo yet</span>}
+      </figcaption>
+    </figure>
   )
 }
 

@@ -30,6 +30,14 @@ export default defineConfig(({ command }) => ({
       workbox: {
         // Supabase calls must always hit the network; the app shell is cached for offline use.
         navigateFallbackDenylist: [/^\/auth/],
+        // Exercise pictures aren't in the install download; each is kept once it's been seen, for the gym's bad signal.
+        runtimeCaching: [
+          {
+            urlPattern: /\/exercises\/.*\.webp$/,
+            handler: 'CacheFirst',
+            options: { cacheName: 'exercise-photos', expiration: { maxEntries: 80 } },
+          },
+        ],
       },
     }),
   ],
