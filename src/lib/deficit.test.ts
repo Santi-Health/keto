@@ -24,8 +24,8 @@ describe('deficit so far today', () => {
     expect(d.parts.resting).toBe(15 * 60)
     expect(d.parts.movement).toBe(15 * 12)
     expect(d.parts.workouts.map((w) => w.kcal)).toEqual([500])
-    // Nothing more eaten: another 9 hours of resting burn by midnight.
-    expect(d.byMidnight).toBe(d.deficit + 9 * 72)
+    // Nothing more eaten: another 9 hours of resting burn only (the minimum) by midnight.
+    expect(d.byMidnight).toBe(d.deficit + 9 * 60)
   })
 
   it('counts only the part of a workout done so far', () => {

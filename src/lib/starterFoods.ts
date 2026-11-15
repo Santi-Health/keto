@@ -1,6 +1,6 @@
 import { completeNutrients, type Food, type NewFood } from './foods'
 import type { Nutrients } from './nutrients'
-import { isAvocadoOil, isPepper, isPlainSalt } from './quickFoods'
+import { isCookingOil, isPepper, isPlainSalt } from './quickFoods'
 import { recipeToFood, type RecipeIngredient } from './recipes'
 
 /**
@@ -81,6 +81,7 @@ export const STAPLES: { food: Food; have: (f: Food) => boolean }[] = [
   },
   {
     food: staple('c94d3b57-8e21-4f6a-b0d7-3f5a1e7c9b55', 'Avocado oil', { kcal: 884, fat: 100, satFat: 11.6, omega6: 12.5, omega3: 1 }, { portion: { amount: 1, unit: '1 tsp' } }, [{ unit: '1 tsp', grams: 4.5 }]),
-    have: isAvocadoOil,
+    // Offered until you have a pourable avocado oil; a spray doesn't count for the pan.
+    have: isCookingOil,
   },
 ]

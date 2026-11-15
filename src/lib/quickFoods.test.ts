@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { asPinch, brandsToShow, foodIcon, fruitNutPortion, sectionPortion, nutCountWords, oversizedSeasonings, sizeText, learnedPrefixes, nutCount, unshout, suggestDisplayName, sectionsOf, veryFrequentAt, pairsFor, portionText, saltKind, servingOf, shortName } from './quickFoods'
+import { asPinch, brandsToShow, foodIcon, fruitNutPortion, sectionPortion, nutCountWords, oversizedSeasonings, sizeText, learnedPrefixes, nutCount, unshout, suggestDisplayName, sectionsOf, veryFrequentAt, pairServing, pairsFor, portionText, saltKind, servingOf, shortName } from './quickFoods'
 
 const f = (name: string, brand: string | null = null, meta = {}, id = name) => ({ id, name, brand, meta, source: 'manual' as const })
 
@@ -261,13 +261,20 @@ describe('foods that go with another', () => {
     for (const n of ['Red pepper', 'Red bell pepper', 'Pepper jack cheese', 'Salt and pepper chicken']) expect(servingOf({ name: n, unit_conversions: [], meta: {} })).toEqual({ amount: 100, unit: 'g' })
   })
   it('salts anything you cook, but not cured meats or recipes', () => {
-    for (const n of ['Outside Skirt', 'Chicken thighs', 'Salmon fillet', 'Broccoli', 'Eggplant']) expect(pairsFor(food('x', n), pantry).map((f) => f.id)).toEqual(['nu', 'salt'])
+    for (const n of ['Outside Skirt', 'Chicken thighs', 'Salmon fillet', 'Broccoli', 'Eggplant']) expect(pairsFor(food('x', n), pantry).map((f) => f.id)).toEqual(['nu', 'salt', 'oil'])
     for (const n of ['Canadian Bacon', 'Johnsonville Brats', 'Smoked salmon', 'Avocado']) expect(pairsFor(food('x', n), pantry)).toEqual([])
     expect(pairsFor({ ...food('x', 'Chicken curry'), source: 'recipe' as const }, pantry)).toEqual([])
     expect([saltKind({ name: 'NuSalt' }), saltKind({ name: 'Salt, table' }), saltKind({ name: 'Black pepper' })]).toEqual(['nusalt', 'salt', null])
   })
   it('follows the pairings you chose, even none', () => {
     expect(pairsFor(food('c', 'Chicken thighs', 0, { pairs: ['salt'] }), pantry).map((f) => f.id)).toEqual(['salt'])
+    // The pan gets real oil, not a spray, in either word order, at a tablespoon; eggs keep their own oil.
+    const kitchen = [food('spray', 'Avocado Oil Spray', 9), food('usda', 'Oil, avocado', 0), food('salt', 'Salt, table', 8), food('nu', 'NuSalt', 3)]
+    expect(pairsFor(food('m', 'Shiitake mushrooms (fresh)'), kitchen).map((f) => f.id)).toEqual(['nu', 'salt', 'usda'])
+    expect(pairsFor(food('e', 'Eggs'), kitchen).map((f) => f.id)).toContain('spray')
+    const oil = { ...food('usda', 'Oil, avocado'), unit_conversions: [], per_100g: {}, barcode: null, ingredients_text: null, keto_notes: null, carbs_exclude_fiber: false, confidence: null, fields_estimated: [], favorite: false, last_used_at: null, updated_at: '', deleted_at: null }
+    expect(pairServing(food('s', 'Salmon fillet'), oil)).toMatchObject({ amount: 14, unit: 'g', label: '1 tbsp' })
+    expect(pairServing(food('e', 'Eggs'), oil).amount).not.toBe(14)
     expect(pairsFor(food('c', 'Chicken thighs', 0, { pairs: [] }), pantry)).toEqual([])
   })
 })

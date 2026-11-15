@@ -339,6 +339,7 @@ export function Today({ profile, targets, onOpenSettings, onToggleRefeed, onNavi
               activity={Object.values(activity).find((a) => a.day === today && !a.deleted_at) ?? null}
               // The deficit you asked for; the calorie ceiling can make the real one bigger, never smaller.
               goal={targets.isRefeed ? null : profile.deficitKcal}
+              weightKg={profile.weightKg}
             />
           )}
           {showEnergy && <DayEnergyCard days={energyDays} totals={showTotals} goal={profile.deficitKcal ?? null} />}

@@ -24,7 +24,7 @@ export interface DeficitSoFar {
   fitbitAt: Date | null
   /** What the burn so far is made of: resting (being alive), everyday movement, and each workout. */
   parts: { resting: number; movement: number; workouts: { exercise: Exercise; kcal: number }[] }
-  /** Deficit by midnight if nothing more is eaten and no more workouts happen. */
+  /** Deficit by midnight if nothing more is eaten and the rest of the day burns only the minimum (resting, BMR). */
   byMidnight: number
   hours: DeficitPoint[]
 }
@@ -101,7 +101,8 @@ export function deficitSoFar(opts: {
     deficit: burned - eaten,
     burnSource: useFitbit ? 'fitbit' : 'estimate',
     fitbitAt: useFitbit ? new Date(fitbitAtMs) : null,
-    byMidnight: Math.round(burned + perMin * minutesBetween(nowMs, endOfDay) - eaten),
+    // The floor: the rest of the day at resting burn only, no everyday movement, so it never promises a deficit you won't get.
+    byMidnight: Math.round(burned + (bmr / 1440) * minutesBetween(nowMs, endOfDay) - eaten),
     hours,
   }
 }

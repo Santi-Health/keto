@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useData } from '../lib/data'
 import { MEALS, portionNutrients, type Food, type LogEntry, type Meal } from '../lib/foods'
-import { SECTIONS, nutCount, nutCountWords, pairsFor, portionText, sectionPortion, sectionsOf, servingOf, setPortionOf, shortName, sizeText, unshout, withNote } from '../lib/quickFoods'
+import { SECTIONS, nutCount, nutCountWords, pairServing, pairsFor, portionText, sectionPortion, sectionsOf, servingOf, setPortionOf, shortName, sizeText, unshout, withNote } from '../lib/quickFoods'
 import type { SavedMeal } from '../lib/savedMeals'
 import { STAPLES } from '../lib/starterFoods'
 import { GRAMS_PER_OZ, toGrams, unitsFor } from '../lib/units'
@@ -136,14 +136,18 @@ export function QuickLogSheet({
   // What the whole tap adds, pairings included.
   const n = { ...own }
   for (const p of withIt) {
-    const pn = portionNutrients(p, toGrams({ unitConversions: p.unit_conversions }, servingOf(p).amount, servingOf(p).unit).grams)
+    const ps = pairServing(food, p)
+    const pn = portionNutrients(p, toGrams({ unitConversions: p.unit_conversions }, ps.amount, ps.unit).grams)
     for (const k of ['kcal', 'netCarbs', 'protein', 'fat'] as const) if (pn[k] != null) n[k] = (n[k] ?? 0) + pn[k]
   }
   // Same time for all, so they read as one entry.
   function log() {
     const at = new Date(when)
     const entries = [logFood(food, amount, serving.unit, meal, at)]
-    for (const p of withIt) entries.push(logFood(p, servingOf(p).amount, servingOf(p).unit, meal, at))
+    for (const p of withIt) {
+      const ps = pairServing(food, p)
+      entries.push(logFood(p, ps.amount, ps.unit, meal, at))
+    }
     onLogged(entries, `${portion} ${shortName(food)}${withIt.length ? ` with ${withIt.map((p) => shortName(p)).join(', ')}` : ''}`)
   }
 
@@ -216,7 +220,7 @@ export function QuickLogSheet({
             return (
               <button key={p.id} type="button" className={`chip-btn ${on ? 'on' : ''}`} aria-pressed={on} onClick={() => setSkipped(on ? [...skipped, p.id] : skipped.filter((x) => x !== p.id))}>
                 {on ? '✓ ' : ''}
-                {shortName(p)} · {servingText(p)}
+                {shortName(p)} · {pairServing(food, p).label ?? servingText(p)}
               </button>
             )
           })}

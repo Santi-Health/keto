@@ -1,7 +1,7 @@
 import { useEffect, useId, useState } from 'react'
 import type { ActivityDay } from '../lib/activity'
 import { deficitSoFar } from '../lib/deficit'
-import { sessionLabel, type Exercise } from '../lib/exercise'
+import { estimateExerciseKcal, sessionLabel, type Exercise } from '../lib/exercise'
 import { MEALS, type LogEntry } from '../lib/foods'
 import { unshout } from '../lib/quickFoods'
 
@@ -17,6 +17,8 @@ interface Props {
   calorieLimit: number | null
   /** Opens the Log at a meal or workout. */
   onOpenLog?: (focus: string) => void
+  /** Body weight, to turn a shortfall into minutes of walking or StairMaster. */
+  weightKg?: number
 }
 
 const fmt = (n: number) => Math.abs(n).toLocaleString()
@@ -66,8 +68,39 @@ function Row({ label, sub, kcal, onOpen }: { label: string; sub?: string; kcal: 
   )
 }
 
+/**
+ * Where the day lands by midnight at the minimum burn (resting only, nothing more eaten), and, when that's short of
+ * the goal, how much walking or StairMaster closes the gap.
+ */
+function EndOfDay({ byMidnight, goal, weightKg }: { byMidnight: number; goal: number | null; weightKg?: number }) {
+  const surplus = byMidnight < 0
+  const short = goal != null && goal > 0 ? goal - byMidnight : null
+  const perMin = (kind: 'walking' | 'cardio', intensity: 'moderate' | 'high', details = {}) =>
+    weightKg ? estimateExerciseKcal(kind, intensity, 60, weightKg, details) / 60 : null
+  const walk = perMin('walking', 'high')
+  const stairs = perMin('cardio', 'high', { cardioType: 'stairmaster' })
+  const mins = (kcalPerMin: number | null) => (kcalPerMin && short ? Math.ceil(short / kcalPerMin / 5) * 5 : null)
+  return (
+    <div className="deficit-eod">
+      <div className="deficit-eod-head">
+        <span className="muted small">By midnight, at minimum burn</span>
+        <b style={{ color: surplus ? 'var(--warn)' : 'var(--accent)' }}>
+          {fmt(byMidnight)} kcal {surplus ? 'surplus' : 'deficit'}
+        </b>
+      </div>
+      <div className="small">
+        {short == null
+          ? 'If you eat nothing more and only rest.'
+          : short <= 0
+            ? `Your ${goal!.toLocaleString()} goal is covered even resting the rest of the day, as long as you eat nothing more.`
+            : `${fmt(short)} kcal short of your ${goal!.toLocaleString()} goal${mins(walk) ? `: about ${mins(walk)} min brisk walk or ${mins(stairs)} min StairMaster would close it` : ''}. Eating more widens the gap by what you eat.`}
+      </div>
+    </div>
+  )
+}
+
 /** Burned minus eaten so far today, updated every minute, with how it built up hour by hour. */
-export function DeficitNow({ day, bmr, logs, exercises, activity, goal, calorieLimit, onOpenLog }: Props) {
+export function DeficitNow({ day, bmr, logs, exercises, activity, goal, calorieLimit, onOpenLog, weightKg }: Props) {
   const [now, setNow] = useState(() => new Date())
   useEffect(() => {
     const id = setInterval(() => setNow(new Date()), 60_000)
@@ -168,6 +201,7 @@ export function DeficitNow({ day, bmr, logs, exercises, activity, goal, calorieL
             <span>kcal</span>
           </div>
         </div>
+        <EndOfDay byMidnight={d.byMidnight} goal={goal} weightKg={weightKg} />
         {open === 'burned' && (
           <div className="deficit-detail">
             <Row label="Resting (being alive)" kcal={d.parts.resting} />
@@ -254,7 +288,7 @@ export function DeficitNow({ day, bmr, logs, exercises, activity, goal, calorieL
           {shown
             ? `By ${hourLabel((shown.hour + 1) % 24)}: burned ${shown.burned.toLocaleString()}, eaten ${shown.eaten.toLocaleString()}, ${shown.deficit >= 0 ? 'deficit' : 'surplus'} ${fmt(shown.deficit)} kcal.`
             : <>
-                {d.byMidnight >= 0 ? `About ${fmt(d.byMidnight)} kcal deficit by midnight if you eat nothing more` : `About ${fmt(d.byMidnight)} kcal surplus by midnight even with nothing more`}
+                {d.byMidnight >= 0 ? `At least ${fmt(d.byMidnight)} kcal deficit by midnight if you eat nothing more, counting only resting burn` : `About ${fmt(d.byMidnight)} kcal surplus by midnight at resting burn, even with nothing more`}
                 {goal != null && goal > 0 && ` (today's goal: ${goal.toLocaleString()}, dashed line)`}.{' '}
                 {d.burnSource === 'fitbit'
                   ? `Burn is Fitbit's total at ${time(d.fitbitAt!)}, then estimated since.`

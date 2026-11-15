@@ -422,11 +422,17 @@ export function servingOf(food: Pick<Food, 'unit_conversions'> & Partial<Pick<Fo
 
 const AVOCADO_OIL = /\bavocado oil\b/
 export const isAvocadoOil = (f: Pick<Food, 'name'>) => AVOCADO_OIL.test(f.name.toLowerCase()) && !/\bmayo/i.test(f.name)
+/** Pourable avocado oil for the pan, in either word order ("Avocado oil", "Oil, avocado"); not a spray or mayo. */
+const COOKING_OIL = /\bavocado oil\b|\boil,? avocado\b/
+export const isCookingOil = (f: Pick<Food, 'name'>) => COOKING_OIL.test(f.name.toLowerCase()) && !/\b(mayo|spray)/i.test(f.name)
+/** What cooked meat, fish and vegetables soak up from the pan: 1 tbsp of oil (USDA, 14 g). */
+export const COOKING_OIL_PORTION = { amount: 14, unit: 'g', label: '1 tbsp' } as const
 export const isPlainSalt = (f: Pick<Food, 'name'> & Partial<Pick<Food, 'source'>>) => saltKind(f) === 'salt' && isSeasoning(f) && !FLAVORED_SALT.test(f.name)
 export const isPepper = (f: Pick<Food, 'name'> & Partial<Pick<Food, 'source'>>) => PEPPER.test(f.name.toLowerCase()) && !SALT.test(f.name.toLowerCase()) && isSeasoning(f)
 /** What each pairing finds among your foods, by name, so a food moved out of Condiments still counts. */
 const PAIR_PICK: [RegExp, (f: Pick<Food, 'name' | 'meta' | 'source'>) => boolean][] = [
   [AVOCADO_OIL, isAvocadoOil],
+  [COOKING_OIL, isCookingOil],
   [SALT, isPlainSalt],
   [PEPPER, isPepper],
   [NUSALT, () => true],
@@ -439,12 +445,12 @@ const SALTED_ALREADY = /\b(bacon|ham|sausages?|brats?|bratwurst|jerky|deli|slice
 
 /**
  * Foods that always go in with another: eggs and egg whites in avocado oil with NuSalt, salt and pepper;
- * anything cooked with NuSalt and salt.
+ * anything cooked with NuSalt, salt and a tablespoon of avocado oil from the pan.
  */
 const PAIR_RULES: { match: RegExp; not?: RegExp; with: RegExp[] }[] = [
   { match: /\begg whites?\b/, with: [NUSALT, SALT, AVOCADO_OIL, PEPPER] },
   { match: /\beggs?\b/, not: /\bwhites?\b|eggplant|salad|bites?|noodles?|nog\b/, with: [NUSALT, SALT, AVOCADO_OIL, PEPPER] },
-  { match: COOKED, not: SALTED_ALREADY, with: [NUSALT, SALT] },
+  { match: COOKED, not: SALTED_ALREADY, with: [NUSALT, SALT, COOKING_OIL] },
 ]
 
 /** Salt or NuSalt, or neither. */
@@ -473,6 +479,18 @@ export function pairsFor<F extends Pairable>(food: Pick<Food, 'id' | 'name' | 'b
     if (hit) out.push(hit)
   }
   return [...out, ...chosen.filter((f) => !out.includes(f))]
+}
+
+/** True when a food is cooked in the pan (meat, fish, vegetables), so its oil goes in at a tablespoon. */
+export const isPanCooked = (food: Pick<Food, 'name' | 'brand'> & Partial<Pick<Food, 'source'>>) => {
+  const full = `${food.brand ?? ''} ${food.name}`.toLowerCase()
+  return food.source !== 'recipe' && COOKED.test(full) && !SALTED_ALREADY.test(full) && !PAIR_RULES[0].match.test(full) && !PAIR_RULES[1].match.test(full)
+}
+
+/** How much of a pairing goes in with a food: a tablespoon of oil with anything pan-cooked, otherwise its usual serving. */
+export function pairServing(food: Pick<Food, 'name' | 'brand'> & Partial<Pick<Food, 'source'>>, pair: Food): { amount: number; unit: string; label?: string } {
+  if (isCookingOil(pair) && isPanCooked(food)) return COOKING_OIL_PORTION
+  return servingOf(pair)
 }
 
 /** Adds to what's in brackets, or starts them: "1 serv. (3 slices)" → "1 serv. (3 slices, 56 g)". */

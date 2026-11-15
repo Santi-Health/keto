@@ -2976,3 +2976,25 @@ input.drink-time {
 .plan-legend {
   white-space: nowrap;
 }
+
+/* Today: where the day lands by midnight at the minimum burn. */
+.deficit-eod {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 4px;
+  border-top: 1px solid var(--border);
+  padding-top: 10px;
+}
+
+.deficit-eod-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.deficit-eod-head b {
+  font-size: 1.15rem;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
