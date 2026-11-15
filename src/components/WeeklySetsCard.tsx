@@ -5,7 +5,7 @@ import { localDate } from '../lib/targets'
 import { shiftDay } from '../lib/goalPlan'
 
 const fmt = (d: string) => new Date(`${d}T12:00:00`).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
-import { daysLeftInWeek, pastWeeks, weekCoverage, weekStart, type GroupWeek, type WeekVerdict } from '../lib/training'
+import { daysLeftInWeek, pastWeeks, weekCoverage, type GroupWeek, type WeekVerdict } from '../lib/training'
 
 /** Bars of hard sets per muscle group against the weekly sets that keep (and build) muscle. */
 export function WeeklySetsBars({ coverage }: { coverage: GroupWeek[] }) {
@@ -47,13 +47,13 @@ export function WeeklySetsCard({ day, onOpenCoach }: { day: string; onOpenCoach:
   return (
     <section className="card">
       <div className="page-header" style={{ marginBottom: 8 }}>
-        <h2>Sets this week</h2>
+        <h2>Sets, last 7 days</h2>
         <span className={`badge ${short ? '' : 'ok'}`}>{short ? `${short} group${short === 1 ? '' : 's'} short` : 'All covered'}</span>
       </div>
       <WeeklySetsBars coverage={coverage} />
       <p className="muted small" style={{ marginBottom: 0 }}>
-        Week of {fmt(weekStart(day))} to {fmt(shiftDay(weekStart(day), 6))}
-        {day === localDate() ? (daysLeftInWeek(day) ? ` · ${daysLeftInWeek(day)} day${daysLeftInWeek(day) === 1 ? '' : 's'} left` : ' · last day') : ''}.{' '}
+        Last 7 days, {fmt(shiftDay(day, -6))} to {day === localDate() ? 'today' : fmt(day)}. This week (Mon–Sun) gets its check after Sunday
+        {day === localDate() ? (daysLeftInWeek(day) ? `, ${daysLeftInWeek(day)} day${daysLeftInWeek(day) === 1 ? '' : 's'} away` : ', tonight') : ''}.{' '}
         {short > 0 && (
           <button type="button" className="link-btn" onClick={onOpenCoach}>
             Exercises to fill them ›

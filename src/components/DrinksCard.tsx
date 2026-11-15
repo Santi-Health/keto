@@ -1,6 +1,6 @@
 import { useRef, useState, type ReactNode } from 'react'
 import { useData } from '../lib/data'
-import { ALL_DRINKS, CAFFEINE_FREE_MG, DRINKS, ML_PER_OZ, SPIRIT_OZ, drinkByKey, glasses, liters, MILKS, asksForMilk, isCan, drinkFood, drinkPortion, hydration, milkFood, type Drink, type DrinkKey, type MilkKey, type MixerKey } from '../lib/drinks'
+import { ALL_DRINKS, CAFFEINE_FREE_MG, DRINKS, ML_PER_OZ, SPIRIT_OZ, drinkByKey, glasses, liters, MILKS, asksForMilk, byTheOunce, drinkFood, drinkPortion, hydration, milkFood, type Drink, type DrinkKey, type MilkKey, type MixerKey } from '../lib/drinks'
 import { buildLogEntry, portionNutrients, type Food, type LogEntry } from '../lib/foods'
 import { mealForTime } from '../lib/foods'
 import { portionText, unshout } from '../lib/quickFoods'
@@ -192,8 +192,11 @@ export function DrinksCard({ days, waterTargetOz }: Props) {
       return
     }
     const food = findOrSave(drinkFood(d))
-    const entry = oz === 12 ? logFood(food, 1, 'can', mealForTime(now), now) : logFood(food, oz, 'fl oz', mealForTime(now), now)
-    setUndo({ kind: 'log', ids: [entry.id], label: oz === 12 ? label(d) : `${oz} oz ${label(d)}`, can: oz === 12 ? { entry, food } : undefined })
+    // A whole can or bottle logs as one; anything else by the fluid ounce.
+    const whole = Math.abs(oz - fullOz(d)) < 0.05
+    const unit = d.container ? d.container.unit : 'can'
+    const entry = whole ? logFood(food, 1, unit, mealForTime(now), now) : logFood(food, oz, 'fl oz', mealForTime(now), now)
+    setUndo({ kind: 'log', ids: [entry.id], label: whole ? label(d) : `${oz} oz ${label(d)}`, can: whole && !d.container ? { entry, food } : undefined })
     setByOz(null)
   }
 
@@ -267,7 +270,7 @@ export function DrinksCard({ days, waterTargetOz }: Props) {
       {!isToday && !tally.length && !water.length && <p className="muted small">No drinks logged.</p>}
       {isToday && <div className="drink-grid">
         {DRINKS.map((d) => (
-          <DrinkButton key={d.key} label={`Log ${label(d)}, ${d.serving}`} onTap={() => add(d)} onHold={isCan(d) ? () => setByOz(d) : undefined}>
+          <DrinkButton key={d.key} label={`Log ${label(d)}, ${d.serving}`} onTap={() => add(d)} onHold={byTheOunce(d) ? () => setByOz(d) : undefined}>
             <DrinkIcon drink={d.key} color={d.color} />
             <span className="drink-name">{d.key.startsWith('espresso') ? 'Espresso' : d.label}</span>
             <span className="drink-serving">{d.serving}</span>
@@ -275,7 +278,7 @@ export function DrinksCard({ days, waterTargetOz }: Props) {
           </DrinkButton>
         ))}
       </div>}
-      {isToday && <p className="muted small" style={{ margin: '6px 0 0' }}>Tap a can to log it. Hold it to pick the ounces.</p>}
+      {isToday && <p className="muted small" style={{ margin: '6px 0 0' }}>Tap a can or bottle to log it. Hold it to pick the ounces.</p>}
       {undo && isToday && (
         <div className="row-btns" style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginTop: 8 }}>
         {justLogged && (
@@ -535,12 +538,18 @@ function DrinkButton({ label, onTap, onHold, children }: { label: string; onTap:
 }
 
 /** How many ounces of a can, 12 by default. */
+/** Fluid ounces in a whole can (12) or bottle (Fairlife 340 ml ≈ 11.5). */
+const fullOz = (d: Drink) => (d.container ? Math.round(d.oz * 10) / 10 : 12)
+
 function OuncesSheet({ drink, onLog, onClose }: { drink: Drink; onLog: (d: Drink, oz: number) => void; onClose: () => void }) {
-  const [ozText, setOzText] = useState('12')
+  const full = fullOz(drink)
+  const [ozText, setOzText] = useState(String(full))
   const oz = Number(ozText)
+  const what = drink.container ? drink.container.unit : 'can'
+  const chips = drink.container ? [4, 6, 8, full] : [4, 6, 8, 12, 16, 20]
   return (
     <Sheet title={drink.label} subtitle="How much did you have?" onClose={onClose}>
-      <OzField id="soda-oz" label="Ounces (a can is 12)" value={ozText} onChange={setOzText} chips={[4, 6, 8, 12, 16, 20]} />
+      <OzField id="soda-oz" label={`Ounces (a ${what} is ${full})`} value={ozText} onChange={setOzText} chips={chips} />
       <button type="button" className="btn" disabled={!(oz > 0)} onClick={() => onLog(drink, oz)}>
         Log {oz > 0 ? `${oz} oz ` : ''}
         {drink.label}

@@ -3049,3 +3049,34 @@ input.drink-time {
 .past-week-detail {
   padding: 8px 4px 4px;
 }
+
+.lift-delta {
+  margin-left: 4px;
+  font-size: 0.72rem;
+  padding: 0 4px;
+  border-radius: 6px;
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.lift-delta.down {
+  background: var(--track);
+  color: var(--text-2);
+}
+
+.lift-last {
+  margin-top: -2px;
+}
+
+.lift-flag {
+  color: var(--warn);
+}
+
+.lift-group select {
+  min-height: 32px;
+  margin-left: 2px;
+}
+
+.draft-note {
+  margin-bottom: 10px;
+}

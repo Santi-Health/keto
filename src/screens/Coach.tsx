@@ -17,7 +17,7 @@ import { scansOf } from '../lib/bodyScan'
 import { suggestFixes } from '../lib/suggest'
 import { liveFatBudget, localDate, type Targets } from '../lib/targets'
 import { entryDay } from '../lib/time'
-import { daysLeftInWeek, exercisesFor, groupsDue, weekStart, hardCardioThisWeek, liftDaysThisWeek, liftPlans, liftStreak, weekCoverage } from '../lib/training'
+import { exercisesFor, groupsDue, hardCardioThisWeek, liftDaysThisWeek, liftPlans, liftStreak, weekCoverage } from '../lib/training'
 import { WeeklySetsBars } from '../components/WeeklySetsCard'
 import { GoalPlanCard } from '../components/GoalPlanCard'
 import { lastDays, type RangeDays } from '../lib/trends'
@@ -234,8 +234,7 @@ export function Coach({ profile, targets, weightUnit, onApplyLimit, onOpenReport
               {s.id === 'training' && (
                 <>
                   <div className="section-label">
-                    Sets this week, Mon {new Date(`${weekStart(today)}T12:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} – Sun {new Date(`${shift(weekStart(today), 6)}T12:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                    {daysLeftInWeek(today) ? ` · ${daysLeftInWeek(today)} day${daysLeftInWeek(today) === 1 ? '' : 's'} left` : ' · last day'}
+                    Sets, last 7 days ({new Date(`${shift(today, -6)}T12:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} – today)
                   </div>
                   <WeeklySetsBars coverage={tips.coverage} />
                   {tips.picks.length > 0 && (

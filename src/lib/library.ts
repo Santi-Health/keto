@@ -134,13 +134,13 @@ export function groupForNew(name: string): string {
 }
 
 /** Lifts that aren't in the list yet, made into entries for it (one per name). */
-export function newLibraryEntries(lifts: { name: string; gym?: GymId; measure?: 'reps' | 's' | 'min' }[], list: LibraryExercise[]): LibraryExercise[] {
+export function newLibraryEntries(lifts: { name: string; gym?: GymId; measure?: 'reps' | 's' | 'min'; group?: string }[], list: LibraryExercise[]): LibraryExercise[] {
   const out: LibraryExercise[] = []
   for (const l of lifts) {
     const name = tidyLiftName(l.name)
     if (!name || findLift(name, [...list, ...out])) continue
     const measure = l.measure && l.measure !== 'reps' ? l.measure : measureForNew(name)
-    out.push({ id: `custom-${key(name).replace(/ /g, '-')}`, name, group: groupForNew(name), gyms: gymsForNew(name, l.gym), ...(measure ? { measure } : {}) })
+    out.push({ id: `custom-${key(name).replace(/ /g, '-')}`, name, group: l.group || groupForNew(name), gyms: gymsForNew(name, l.gym), ...(measure ? { measure } : {}) })
   }
   return out
 }

@@ -148,6 +148,8 @@ export interface Lift {
   measure?: LiftMeasure
   /** Time per set, in `measure` units, for timed lifts. */
   duration?: number | null
+  /** Muscle group you picked for a lift the app didn't know. */
+  group?: string
   note?: string
 }
 

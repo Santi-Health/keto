@@ -13,6 +13,7 @@ import { useOpenSyncState } from '../lib/backgroundSync'
 import { deviceTz, travelDay, zoneLabel } from '../lib/time'
 import { DrinksCard } from '../components/DrinksCard'
 import { WeeklySetsCard } from '../components/WeeklySetsCard'
+import { useNewDraft } from '../lib/exerciseDraft'
 import { GlucoseDayCard, GlucoseImport } from '../components/GlucoseDayCard'
 import { ExerciseSheet } from '../components/ExerciseSheet'
 import { TrainingCard } from '../components/TrainingCard'
@@ -67,6 +68,7 @@ export function Today({ profile, targets, onOpenSettings, onToggleRefeed, onNavi
   const hasData = logs.length > 0 || readings.length > 0
   const [weekMode, setWeekMode] = useState<'average' | 'total'>('average')
   const [logExercise, setLogExercise] = useState(false)
+  const draft = useNewDraft()
   const [readingSheet, setReadingSheet] = useState<{ kind?: ReadingKind } | null>(null)
   const [importing, setImporting] = useState(false)
   const [importMessage, setImportMessage] = useState<string | null>(null)
@@ -293,6 +295,11 @@ export function Today({ profile, targets, onOpenSettings, onToggleRefeed, onNavi
       <div className="grid two">
         <div className="grid">
           {isToday && <RelinkBanner />}
+          {isToday && draft && !logExercise && (
+            <button type="button" className="notice coach-link" onClick={() => setLogExercise(true)}>
+              🏋️ Workout in progress{draft.lifts.length ? ` (${draft.lifts.length} lift${draft.lifts.length === 1 ? '' : 's'})` : ''}, not saved yet: <u>resume</u>
+            </button>
+          )}
           {isToday && (
             <button type="button" className="notice coach-link" onClick={() => onNavigate('coach')}>
               🧭 What to do today for your goals: <u>open Coach</u>

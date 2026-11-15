@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useData } from '../lib/data'
 import {
   CARDIO_TYPES,
@@ -25,7 +25,9 @@ import {
 } from '../lib/exercise'
 import { getGoogleToken, heartRateCalories, type HrProfile } from '../lib/googleHealth'
 import { Segmented } from './Fields'
-import { findLift, libraryFor, newLibraryEntries, suggestLift, tidyLiftName, useCustomLifts } from '../lib/library'
+import { LIBRARY_GROUPS, findLift, groupForNew, libraryFor, newLibraryEntries, suggestLift, tidyLiftName, useCustomLifts } from '../lib/library'
+import { suggestFromHistory } from '../lib/training'
+import { clearDraft, loadDraft, saveDraft } from '../lib/exerciseDraft'
 import { deviceTz } from '../lib/time'
 import { Sheet } from './Sheet'
 
@@ -50,22 +52,36 @@ function defaultStart(date?: string): Date {
 }
 
 export function ExerciseSheet({ weightKg, hr, exercise, date, onClose }: Props) {
-  const { saveExercise, deleteExercise } = useData()
+  const { saveExercise, deleteExercise, exercises } = useData()
   const { custom, add: addCustom } = useCustomLifts()
-  const [kind, setKind] = useState<ExerciseKind>(exercise?.kind ?? 'strength')
-  const [cardioType, setCardioType] = useState<CardioType>(exercise?.meta.cardioType ?? 'stairmaster')
-  const [yogaStyle, setYogaStyle] = useState<YogaStyle>(exercise?.meta.yogaStyle ?? 'flow')
-  const [distance, setDistance] = useState(exercise?.meta.distanceMi != null ? String(exercise.meta.distanceMi) : '')
-  const [floors, setFloors] = useState(exercise?.meta.floors != null ? String(exercise.meta.floors) : '')
-  const [level, setLevel] = useState(exercise?.meta.level != null ? String(exercise.meta.level) : '')
-  const [minutes, setMinutes] = useState(String(exercise?.duration_min ?? 45))
-  const [intensity, setIntensity] = useState<Intensity>(exercise?.intensity ?? 'moderate')
-  const [start, setStart] = useState(toLocalInput(exercise ? new Date(exercise.started_at) : defaultStart(date)))
-  const [fasted, setFasted] = useState(exercise?.meta.fasted ?? false)
-  const [note, setNote] = useState(exercise?.note ?? '')
-  const [lifts, setLifts] = useState<Lift[]>(exercise?.meta.lifts ?? [])
+  // An unsaved workout from earlier (left the sheet or the app) picks up where it was.
+  const [draft] = useState(() => loadDraft(exercise?.id))
+  const [restored, setRestored] = useState(!!draft)
+  const [kind, setKind] = useState<ExerciseKind>((draft?.kind as ExerciseKind) ?? exercise?.kind ?? 'strength')
+  const [cardioType, setCardioType] = useState<CardioType>((draft?.cardioType as CardioType) ?? exercise?.meta.cardioType ?? 'stairmaster')
+  const [yogaStyle, setYogaStyle] = useState<YogaStyle>((draft?.yogaStyle as YogaStyle) ?? exercise?.meta.yogaStyle ?? 'flow')
+  const [distance, setDistance] = useState(draft?.distance ?? (exercise?.meta.distanceMi != null ? String(exercise.meta.distanceMi) : ''))
+  const [floors, setFloors] = useState(draft?.floors ?? (exercise?.meta.floors != null ? String(exercise.meta.floors) : ''))
+  const [level, setLevel] = useState(draft?.level ?? (exercise?.meta.level != null ? String(exercise.meta.level) : ''))
+  const [minutes, setMinutes] = useState(draft?.minutes ?? String(exercise?.duration_min ?? 45))
+  const [intensity, setIntensity] = useState<Intensity>((draft?.intensity as Intensity) ?? exercise?.intensity ?? 'moderate')
+  const [start, setStart] = useState(draft?.start ?? toLocalInput(exercise ? new Date(exercise.started_at) : defaultStart(date)))
+  const [fasted, setFasted] = useState(draft?.fasted ?? exercise?.meta.fasted ?? false)
+  const [note, setNote] = useState(draft?.note ?? exercise?.note ?? '')
+  const [lifts, setLifts] = useState<Lift[]>(draft?.lifts ?? exercise?.meta.lifts ?? [])
   // Calories follow the estimate until typed over.
-  const [kcalText, setKcalText] = useState(exercise && !exercise.meta.caloriesEstimated ? String(exercise.calories ?? '') : '')
+  const [kcalText, setKcalText] = useState(draft?.kcalText ?? (exercise && !exercise.meta.caloriesEstimated ? String(exercise.calories ?? '') : ''))
+  // Keep the draft as you type, once anything differs from how the sheet opened.
+  const snapshot = { kind, cardioType, yogaStyle, distance, floors, level, minutes, intensity, start, fasted, note, lifts, kcalText }
+  const json = JSON.stringify(snapshot)
+  const [opened] = useState(json)
+  useEffect(() => {
+    if (json !== opened || restored) saveDraft(exercise?.id, JSON.parse(json))
+  }, [json, opened, restored, exercise?.id])
+  function discardDraft() {
+    clearDraft(exercise?.id)
+    onClose()
+  }
   const [hrResult, setHrResult] = useState<{ avgHr: number; samples: number } | null>(
     exercise?.meta.caloriesSource === 'heart-rate' && exercise.meta.avgHr ? { avgHr: exercise.meta.avgHr, samples: exercise.meta.hrSamples ?? 0 } : null,
   )
@@ -138,16 +154,27 @@ export function ExerciseSheet({ weightKg, hr, exercise, date, onClose }: Props) 
       updated_at: new Date().toISOString(),
       deleted_at: null,
     })
+    clearDraft(exercise?.id)
     onClose()
   }
 
   const setLift = (i: number, change: Partial<Lift>) => setLifts((prev) => prev.map((l, j) => (j === i ? { ...l, ...change } : l)))
-  // Picking a hold or a cardio piece from the list switches it to seconds or minutes.
-  const withMeasure = (name: string): Partial<Lift> => {
-    const known = findLift(name, libraryFor(undefined, custom))
-    return known ? { name, measure: known.measure } : { name }
+  const library = libraryFor(undefined, custom)
+  /**
+   * Picking a lift: holds and cardio pieces switch to seconds or minutes, and one you've done before starts from
+   * the next step after last time (only into fields still empty).
+   */
+  const pickName = (i: number, name: string) => {
+    const l = lifts[i]
+    const known = findLift(name, library)
+    const change: Partial<Lift> = known ? { name, measure: known.measure } : { name }
+    const sug = suggestFromHistory(name, exercises, library, exercise?.id)
+    const empty = liftWeight(l) == null && l.reps == null && l.duration == null && l.sets == null
+    setLift(i, sug && empty ? { ...change, ...sug.fill, gym: l.gym } : change)
   }
   const num = (v: string) => (v === '' ? null : Number(v))
+  /** Last time you did this lift (before this session), for the "last time" line and the +/- marks. */
+  const prev = (l: Lift) => suggestFromHistory(l.name, exercises, library, exercise?.id)
 
   return (
     <Sheet
@@ -159,6 +186,18 @@ export function ExerciseSheet({ weightKg, hr, exercise, date, onClose }: Props) 
       }
       onClose={onClose}
     >
+      {restored && (
+        <div className="notice small draft-note" role="status">
+          Picked up your unsaved workout{lifts.length ? ` (${lifts.length} lift${lifts.length === 1 ? '' : 's'})` : ''}.{' '}
+          <button type="button" className="link-btn" onClick={() => setRestored(false)}>
+            OK
+          </button>{' '}
+          ·{' '}
+          <button type="button" className="link-btn" onClick={discardDraft}>
+            Discard it
+          </button>
+        </div>
+      )}
       <div className="field">
         <span className="label">Type</span>
         <div className="chips">
@@ -303,8 +342,8 @@ export function ExerciseSheet({ weightKg, hr, exercise, date, onClose }: Props) 
                   ×
                 </button>
               </div>
-              <input type="text" className="lift-name" aria-label="Lift" list={`lift-options-${i}`} placeholder="Lift name (tap to pick or type)" value={l.name} onChange={(e) => setLift(i, withMeasure(e.target.value))} />
-              <LiftNameHint name={l.name} gym={l.gym} custom={custom} onPick={(name) => setLift(i, withMeasure(name))} />
+              <input type="text" className="lift-name" aria-label="Lift" list={`lift-options-${i}`} placeholder="Lift name (tap to pick or type)" value={l.name} onChange={(e) => pickName(i, e.target.value)} />
+              <LiftNameHint name={l.name} gym={l.gym} custom={custom} group={l.group} onGroup={(group) => setLift(i, { group })} onPick={(name) => pickName(i, name)} />
               <div className="lift-opts">
                 <select aria-label="Measured in" value={l.measure ?? 'reps'} onChange={(e) => setLift(i, { measure: e.target.value === 'reps' ? undefined : (e.target.value as LiftMeasure) })}>
                   <option value="reps">Reps</option>
@@ -335,7 +374,10 @@ export function ExerciseSheet({ weightKg, hr, exercise, date, onClose }: Props) 
               </datalist>
               <div className="lift-nums">
                 <label>
-                  <span>{l.measure === 'min' ? 'Level' : l.assisted ? 'Assist' : l.bells === 2 ? 'Each bell' : l.measure === 's' ? 'Weight (opt.)' : 'Weight'}</span>
+                  <span>
+                    {l.measure === 'min' ? 'Level' : l.assisted ? 'Assist' : l.bells === 2 ? 'Each bell' : l.measure === 's' ? 'Weight (opt.)' : 'Weight'}
+                    <Delta now={liftWeight(l)} was={prev(l)?.last.weight} />
+                  </span>
                   <input type="number" inputMode="decimal" value={liftWeight(l) ?? ''} onChange={(e) => setLift(i, { weight: num(e.target.value), weightLb: null })} />
                 </label>
                 {l.measure !== 'min' ? (
@@ -351,12 +393,18 @@ export function ExerciseSheet({ weightKg, hr, exercise, date, onClose }: Props) 
                 )}
                 {isTimed(l) ? (
                   <label>
-                    <span>{l.measure === 'min' ? 'Minutes' : 'Seconds'}</span>
+                    <span>
+                      {l.measure === 'min' ? 'Minutes' : 'Seconds'}
+                      <Delta now={l.duration} was={prev(l)?.last.duration} />
+                    </span>
                     <input type="number" inputMode="decimal" value={l.duration ?? ''} onChange={(e) => setLift(i, { duration: num(e.target.value) })} />
                   </label>
                 ) : (
                   <label>
-                    <span>{l.side === 'both' ? 'Reps (total)' : 'Reps'}</span>
+                    <span>
+                      {l.side === 'both' ? 'Reps (total)' : 'Reps'}
+                      <Delta now={l.reps} was={prev(l)?.last.reps} />
+                    </span>
                     <input type="number" inputMode="numeric" value={l.reps ?? ''} onChange={(e) => setLift(i, { reps: num(e.target.value) })} />
                   </label>
                 )}
@@ -365,6 +413,7 @@ export function ExerciseSheet({ weightKg, hr, exercise, date, onClose }: Props) 
                   <input type="number" inputMode="numeric" value={l.sets ?? ''} onChange={(e) => setLift(i, { sets: num(e.target.value) })} />
                 </label>
               </div>
+              {prev(l) && <LastTime s={prev(l)!} />}
               {!isTimed(l) && (l.bells === 2 || l.side) && l.reps != null && (
                 <div className="muted small">
                   {l.bells === 2 && liftWeight(l) != null && `${liftWeight(l)! * 2} ${liftUnit(l)} total · `}
@@ -398,6 +447,7 @@ export function ExerciseSheet({ weightKg, hr, exercise, date, onClose }: Props) 
             className="btn danger"
             onClick={() => {
               deleteExercise(exercise.id)
+              clearDraft(exercise.id)
               onClose()
             }}
           >
@@ -410,7 +460,21 @@ export function ExerciseSheet({ weightKg, hr, exercise, date, onClose }: Props) 
 }
 
 /** Under the lift name: "Did you mean …?" for a near miss, or a note that a new name joins the list. */
-function LiftNameHint({ name, gym, custom, onPick }: { name: string; gym?: GymId; custom: ReturnType<typeof useCustomLifts>['custom']; onPick: (name: string) => void }) {
+function LiftNameHint({
+  name,
+  gym,
+  custom,
+  group,
+  onGroup,
+  onPick,
+}: {
+  name: string
+  gym?: GymId
+  custom: ReturnType<typeof useCustomLifts>['custom']
+  group?: string
+  onGroup: (group: string) => void
+  onPick: (name: string) => void
+}) {
   const all = libraryFor(undefined, custom)
   if (!name.trim() || findLift(name, all)) return null
   const near = suggestLift(name, all)
@@ -427,5 +491,48 @@ function LiftNameHint({ name, gym, custom, onPick }: { name: string; gym?: GymId
   const entry = newLibraryEntries([{ name, gym }], all)[0]
   if (!entry) return null
   const where = entry.gyms.includes('any') ? 'every gym' : `Gym ${entry.gyms[0]}`
-  return <div className="muted small lift-hint">New lift: "{entry.name}" joins the list for {where} when you save.</div>
+  const guess = groupForNew(name)
+  const picked = group ?? (guess === 'Other' ? '' : guess)
+  // Unknown muscle: flagged so it gets picked, since the coach counts sets by muscle group.
+  const unknown = !picked
+  return (
+    <div className={`small lift-hint ${unknown ? 'lift-flag' : 'muted'}`}>
+      New lift: "{entry.name}" joins the list for {where} when you save.{' '}
+      <label className="lift-group">
+        {unknown ? '⚠ Which muscle does it work?' : 'Works:'}{' '}
+        <select value={picked} onChange={(e) => onGroup(e.target.value)} aria-label="Muscle group">
+          {unknown && <option value="">Pick one</option>}
+          {LIBRARY_GROUPS.filter((g) => g !== 'Other').map((g) => (
+            <option key={g} value={g}>
+              {g}
+            </option>
+          ))}
+        </select>
+      </label>
+    </div>
+  )
+}
+
+/** "+5" or "−2" next to a field: the change from last time. */
+function Delta({ now, was }: { now: number | null | undefined; was: number | null | undefined }) {
+  if (now == null || was == null || now === was) return null
+  const d = Math.round((now - was) * 100) / 100
+  return <b className={`lift-delta ${d > 0 ? 'up' : 'down'}`}>{d > 0 ? `+${d}` : `−${Math.abs(d)}`}</b>
+}
+
+/** "Last: Nov 12 · 95 lb × 10 × 4", with the coach's note for this time. */
+function LastTime({ s }: { s: NonNullable<ReturnType<typeof suggestFromHistory>> }) {
+  const l = s.last
+  const when = new Date(`${l.day}T12:00:00`).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
+  const what =
+    l.measure === 'min'
+      ? `${l.duration ?? '?'} min${l.weight ? ` · level ${l.weight}` : ''}`
+      : l.measure === 's'
+        ? `${l.weight ? `${l.weight} ${l.unit} · ` : ''}${l.duration ?? '?'} s × ${l.sets ?? '?'}`
+        : `${l.weight ? `${l.weight} ${l.unit}${l.bells === 2 ? ' ×2' : ''} · ` : ''}${l.reps ?? '?'} reps × ${l.sets ?? '?'}`
+  return (
+    <div className="muted small lift-last">
+      Last: {when} · {what}. {s.text}
+    </div>
+  )
 }

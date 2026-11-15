@@ -53,8 +53,9 @@ const COMPOUND = /press|squat|row|pull|dip|thrust|lunge|split|step-?up|deadlift|
 export const repRange = (name: string, group: string): [number, number] =>
   group !== 'Abs / core' && group !== 'Arms' && COMPOUND.test(name) ? [6, 10] : [10, 15]
 
-export function groupOf(name: string, library: LibraryExercise[]): string {
-  return findLift(name, library)?.group ?? groupForNew(name)
+/** The muscle group of a lift: the list's, else the one you picked when adding it, else a guess from the name. */
+export function groupOf(name: string, library: LibraryExercise[], picked?: string): string {
+  return findLift(name, library)?.group ?? picked ?? groupForNew(name)
 }
 
 /** The next weight up: 5 lb, one kettlebell size (4 kg) or 2.5 kg; on an assisted machine, 5 lb less help. */
@@ -94,14 +95,14 @@ export function weekStart(day: string): string {
 export const daysLeftInWeek = (day: string) => 6 - daysBetween(weekStart(day), day)
 
 /**
- * Sets per muscle group in the Monday–Sunday week up to `today`, and days since each was last trained.
- * A fixed week resets on Monday and leaves the weekend to catch up.
+ * Sets per muscle group from `from` (default: the rolling 7 days ending today) through `today`, and days since
+ * each was last trained. Past weeks are judged on fixed Monday–Sunday weeks instead (see pastWeeks).
  */
-export function weekCoverage(exercises: Exercise[], library: LibraryExercise[], today: string): GroupWeek[] {
+export function weekCoverage(exercises: Exercise[], library: LibraryExercise[], today: string, from?: string): GroupWeek[] {
   const recent = liftsSince(exercises, shift(today, -20))
-  const weekFrom = weekStart(today)
+  const weekFrom = from ?? shift(today, -6)
   return Object.entries(WEEKLY_SETS).map(([group, target]) => {
-    const mine = recent.filter((d) => groupOf(d.lift.name, library) === group)
+    const mine = recent.filter((d) => groupOf(d.lift.name, library, d.lift.group) === group)
     const sets = mine.filter((d) => d.day >= weekFrom && d.day <= today).reduce((s, d) => s + (d.lift.sets ?? 1), 0)
     const last = mine.length ? mine[mine.length - 1].day : null
     return { group, sets, target, daysSince: last ? daysBetween(last, today) : null }
@@ -138,7 +139,7 @@ export function pastWeeks(exercises: Exercise[], library: LibraryExercise[], tod
   if (!first) return []
   return Array.from({ length: n }, (_, i) => shift(weekStart(today), -7 * (i + 1)))
     .filter((start) => shift(start, 6) >= first)
-    .map((start) => judgeWeek(weekCoverage(exercises, library, shift(start, 6)), start))
+    .map((start) => judgeWeek(weekCoverage(exercises, library, shift(start, 6), start), start))
 }
 
 /**
@@ -160,9 +161,14 @@ export function liftPlans(exercises: Exercise[], library: LibraryExercise[], tod
     const k = d.lift.name.trim().toLowerCase()
     byName.set(k, [...(byName.get(k) ?? []), d])
   }
-  return [...byName.values()].map((history) => {
+  return [...byName.values()].map((history) => planFromHistory(history, library))
+}
+
+/** The next session for one lift from its history (oldest first). */
+function planFromHistory(history: Done[], library: LibraryExercise[]): LiftPlan {
+  {
     const { day, lift } = history[history.length - 1]
-    const group = groupOf(lift.name, library)
+    const group = groupOf(lift.name, library, lift.group)
     const range = repRange(lift.name, group)
     const [lo, hi] = range
     const weight = liftWeight(lift)
@@ -219,7 +225,55 @@ export function liftPlans(exercises: Exercise[], library: LibraryExercise[], tod
       text,
       stalled,
     }
-  })
+  }
+}
+
+export interface LiftSuggestion {
+  /** The last time you did it. */
+  last: LiftPlan['last']
+  /** Numbers to start this time from: the progression's next step, or the same as last time. */
+  fill: Partial<Lift>
+  /** Change from last time, for weight and for reps (or seconds/minutes). */
+  delta: { weight: number; amount: number }
+  text: string
+}
+
+/**
+ * What to put in a lift you're logging, from the last time you did it (any time, not counting `excludeId`, the
+ * session being edited): the progression's next numbers and how they differ. Null when you've never done it.
+ */
+export function suggestFromHistory(name: string, exercises: Exercise[], library: LibraryExercise[], excludeId?: string): LiftSuggestion | null {
+  const k = name.trim().toLowerCase()
+  if (!k) return null
+  const history = liftsSince(
+    exercises.filter((e) => e.id !== excludeId),
+    '0000-01-01',
+  ).filter((d) => d.lift.name.trim().toLowerCase() === k)
+  if (!history.length) return null
+  const p = planFromHistory(history, library)
+  const l = p.last
+  const timed = l.measure === 's' || l.measure === 'min'
+  const amountWas = (timed ? l.duration : l.reps) ?? null
+  const fill: Partial<Lift> = {
+    measure: l.measure,
+    weight: p.next.weight,
+    weightLb: null,
+    unit: l.unit,
+    sets: l.sets,
+    assisted: l.assisted,
+    bells: l.bells,
+    side: l.side,
+    ...(timed ? { duration: p.next.reps || amountWas, reps: null } : { reps: p.next.reps || amountWas }),
+  }
+  return {
+    last: l,
+    fill,
+    delta: {
+      weight: p.next.weight != null && l.weight != null ? Math.round((p.next.weight - l.weight) * 100) / 100 : 0,
+      amount: amountWas != null && p.next.reps ? p.next.reps - amountWas : 0,
+    },
+    text: p.text,
+  }
 }
 
 /** Minutes of cardio inside a strength session that count as a hard effort for VO2 max. */
@@ -284,7 +338,7 @@ export function exercisesFor(
   const history = liftsSince(exercises, shift(today, -89))
   const picks = new Map<string, ExercisePick>()
   for (const d of history) {
-    if (groupOf(d.lift.name, library) !== group) continue
+    if (groupOf(d.lift.name, library, d.lift.group) !== group) continue
     const k = d.lift.name.trim().toLowerCase()
     const p = picks.get(k) ?? { name: d.lift.name.trim(), times: 0, lastDay: null, atYourGym: true }
     picks.set(k, { ...p, times: p.times + 1, lastDay: d.day })

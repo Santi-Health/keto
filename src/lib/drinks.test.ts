@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { DRINKS, MILKS, drinkByKey, drinkFood, isCan, drinkPortion, hydration, milkFood, glasses, liters, ML_PER_OZ } from './drinks'
+import { DRINKS, MILKS, drinkByKey, drinkFood, isCan, byTheOunce, drinkPortion, hydration, milkFood, glasses, liters, ML_PER_OZ } from './drinks'
 import { portionNutrients, type Food } from './foods'
 
 const asFood = (f: ReturnType<typeof drinkFood>): Food => ({ ...f, id: 'x', favorite: false, use_count: 0, last_used_at: null, updated_at: '', deleted_at: null })
@@ -197,5 +197,16 @@ describe('beer and spirits', () => {
     }
     expect(isCan(drinkByKey('sparkling_rain')!)).toBe(true)
     for (const key of ['bacardi', 'red_wine', 'fairlife_choc_bottle', 'espresso_double', 'kazar', 'water']) expect(isCan(drinkByKey(key)!)).toBe(false)
+  })
+})
+
+describe('bottles by the ounce', () => {
+  it('lets the Fairlife bottle be held for ounces and logs part of it by fl oz', () => {
+    const f = drinkByKey('fairlife_choc_bottle')!
+    expect(byTheOunce(f)).toBe(true)
+    const conv = drinkFood(f).unit_conversions
+    expect(conv[0].unit).toBe('bottle')
+    const flOz = conv.find((c) => c.unit === 'fl oz')!
+    expect(flOz.grams * f.oz).toBeCloseTo(conv[0].grams, 0)
   })
 })

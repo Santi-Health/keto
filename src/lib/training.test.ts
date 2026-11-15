@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { Exercise, Lift } from './exercise'
 import { EXERCISE_LIBRARY } from './library'
-import { daysLeftInWeek, exercisesFor, groupsDue, hardCardioThisWeek, liftPlans, nextWeight, pastWeeks, weekCoverage, weekStart } from './training'
+import { daysLeftInWeek, exercisesFor, groupsDue, hardCardioThisWeek, liftPlans, nextWeight, pastWeeks, suggestFromHistory, weekCoverage, weekStart } from './training'
 
 const session = (day: string, lifts: Partial<Lift>[]): Exercise => ({
   id: `${day}-${lifts[0]?.name}`,
@@ -112,9 +112,10 @@ describe('Monday to Sunday week', () => {
     expect(daysLeftInWeek('2026-11-14')).toBe(1)
     expect(daysLeftInWeek('2026-11-15')).toBe(0)
   })
-  it('keeps Saturday sets on Sunday and resets on Monday', () => {
-    expect(weekCoverage(ex, EXERCISE_LIBRARY, '2026-11-15').find((g) => g.group === 'Chest')?.sets).toBe(4)
-    expect(weekCoverage(ex, EXERCISE_LIBRARY, '2026-11-16').find((g) => g.group === 'Chest')?.sets).toBe(0)
+  it('bars roll over the last 7 days; a fixed week counts from its Monday', () => {
+    expect(weekCoverage(ex, EXERCISE_LIBRARY, '2026-11-16').find((g) => g.group === 'Chest')?.sets).toBe(4)
+    expect(weekCoverage(ex, EXERCISE_LIBRARY, '2026-11-16', '2026-11-16').find((g) => g.group === 'Chest')?.sets).toBe(0)
+    expect(weekCoverage(ex, EXERCISE_LIBRARY, '2026-11-21').find((g) => g.group === 'Chest')?.sets).toBe(0)
   })
 })
 
@@ -137,5 +138,27 @@ describe('past weeks', () => {
   it('calls 5 of 7 groups close', () => {
     const ex = [session('2026-11-04', full.slice(0, 5).map(([name, sets]) => ({ name, reps: 8, sets })))]
     expect(pastWeeks(ex, EXERCISE_LIBRARY, '2026-11-12', 1)[0].verdict).toBe('close')
+  })
+})
+
+describe('prefill from last time', () => {
+  const ex = [
+    session('2026-11-05', [{ name: 'Plate-loaded chest press', weight: 90, reps: 10, sets: 4 }]),
+    session('2026-11-12', [{ name: 'Plate-loaded chest press', weight: 95, reps: 10, sets: 4 }]),
+  ]
+  it('suggests the next step and the change from last time', () => {
+    const s = suggestFromHistory('plate-loaded chest press', ex, EXERCISE_LIBRARY)!
+    expect(s.last).toMatchObject({ day: '2026-11-12', weight: 95, reps: 10, sets: 4 })
+    expect(s.fill).toMatchObject({ weight: 100, reps: 6, sets: 4, unit: 'lb' })
+    expect(s.delta).toEqual({ weight: 5, amount: -4 })
+  })
+  it('ignores the session being edited and returns null for something new', () => {
+    expect(suggestFromHistory('Plate-loaded chest press', ex, EXERCISE_LIBRARY, ex[1].id)!.last.weight).toBe(90)
+    expect(suggestFromHistory('Hollow hold', ex, EXERCISE_LIBRARY)).toBeNull()
+  })
+  it('adds reps at the same weight below the top of the range', () => {
+    const s = suggestFromHistory('Assisted pull-up', [session('2026-11-12', [{ name: 'Assisted pull-up', weight: 30, reps: 6, sets: 4, assisted: true }])], EXERCISE_LIBRARY)!
+    expect(s.fill).toMatchObject({ weight: 30, reps: 7, assisted: true })
+    expect(s.delta).toEqual({ weight: 0, amount: 1 })
   })
 })

@@ -385,6 +385,9 @@ export const asksForMilk = (d: Drink) => d.key.startsWith('espresso') || d.conta
 export const drinkByKey = (key: string) => ALL.find((d) => d.key === key)
 
 /** A 12 oz can: a tap logs the can, holding the button asks how many ounces. */
+/** Drinks you can hold to log part of: cans, and bottles like the Fairlife (tap still logs the whole thing). */
+export const byTheOunce = (d: Drink) => isCan(d) || (!!d.container && !d.spirit)
+
 export const isCan = (d: Drink) => d.serving.includes('can') && !d.container && !d.flOz && !d.spirit && !d.key.startsWith('espresso')
 
 /** Food row for a soda or espresso (single and double share one food): nutrients per 100 g plus a serving unit. */
@@ -401,8 +404,8 @@ export function drinkFood(d: Drink): NewFood {
     per_100g: per100,
     unit_conversions: [
       d.container ? { unit: d.container.unit, grams: d.container.grams } : d.flOz ? { unit: 'fl oz', grams: flOzG } : { unit: isEspresso ? 'shot' : 'can', grams: isEspresso ? SHOT_G : CAN_G },
-      // A can is 12 fl oz.
-      ...(isCan(d) ? [{ unit: 'fl oz', grams: CAN_G / 12 }] : []),
+      // A can is 12 fl oz; a bottle is its own size, so part of one can be logged by the ounce.
+      ...(isCan(d) ? [{ unit: 'fl oz', grams: CAN_G / 12 }] : d.container ? [{ unit: 'fl oz', grams: Math.round((d.container.grams / d.oz) * 100) / 100 }] : []),
     ],
     ingredients_text: null,
     keto_notes: d.sweeteners?.length ? `${d.perServing?.sugars ? 'No added sugar' : 'Zero sugar'}; sweetened with ${d.sweeteners.join(' and ')}.` : null,
