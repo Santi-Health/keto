@@ -77,7 +77,7 @@ describe('exercise picks', () => {
   })
   it('offers list exercises for a group you have never trained', () => {
     const p = exercisesFor('Shoulders', { exercises: ex, library: EXERCISE_LIBRARY, today: '2026-11-12' })
-    expect(p[0]).toMatchObject({ name: 'Overhead press (barbell)', times: 0, atYourGym: true })
+    expect(p[0]).toMatchObject({ name: 'Seated dumbbell shoulder press', times: 0, atYourGym: true })
   })
 })
 
