@@ -93,7 +93,7 @@ export function Coach({ profile, targets, weightUnit, onApplyLimit, onOpenReport
       : lastDays(7, yesterday).map((d) => dayEnergy({ day: d, bmr: targets.bmr!, logs: logsOn(d), exercises: exercisesOn(d), activity: activity[d] && !activity[d].deleted_at ? activity[d] : null }))
     const ketoOpts = { logs, exercises, netCarbLimit: targets.netCarbsG, proteinTarget: targets.proteinG, model: ketoModel.adjuster }
     const library = libraryFor(undefined, custom)
-    const coverage = weekCoverage(exercises, library, today)
+    const coverage = weekCoverage(exercises, library, today, undefined, profile.weightKg)
     const due = groupsDue(coverage)
     // Every group short of its sets, the ones due next first, each with two exercises to fill it.
     const short = [...due, ...coverage.filter((g) => g.sets < g.target && !due.includes(g))]
@@ -222,7 +222,14 @@ export function Coach({ profile, targets, weightUnit, onApplyLimit, onOpenReport
                         </span>
                       </div>
                       <div className="muted small">
-                        {p.text} <span className="coach-goal">{p.group === 'Cardio' ? goalLabel('vo2') : p.next.change === 'weight' ? goalLabel('strength') : goalLabel('muscle')}</span>
+                        {p.text}{' '}
+                        {p.sinceStart && p.sinceStart.pct !== 0 && (
+                          <b className={p.sinceStart.pct > 0 ? 'since-up' : 'since-down'}>
+                            {p.sinceStart.pct > 0 ? '+' : '−'}
+                            {Math.abs(p.sinceStart.pct)}% since {new Date(`${p.sinceStart.since}T12:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                          </b>
+                        )}{' '}
+                        <span className="coach-goal">{p.group === 'Cardio' ? goalLabel('vo2') : p.next.change === 'weight' ? goalLabel('strength') : goalLabel('muscle')}</span>
                       </div>
                     </div>
                   ))}

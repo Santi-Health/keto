@@ -13,6 +13,11 @@ export interface LibraryExercise {
   muscles?: string
   /** Picture of the machine or its instruction panel, by gym ('any' for one that fits everywhere): a file in public/exercises. */
   photos?: Partial<Record<GymId | 'any', string>>
+  /**
+   * How much one set counts toward its muscle group's weekly sets (1 = the most effective kind for your goals).
+   * Missing means 1; lifts you added yourself count 0.75 (see setCredit).
+   */
+  credit?: number
 }
 
 export const LIBRARY_GROUPS = ['Legs', 'Hamstrings / glutes', 'Chest', 'Shoulders', 'Back', 'Arms', 'Abs / core', 'Cardio', 'Other'] as const
@@ -20,47 +25,61 @@ export const LIBRARY_GROUPS = ['Legs', 'Hamstrings / glutes', 'Chest', 'Shoulder
 const KB = { any: 'kettlebell' }
 
 export const EXERCISE_LIBRARY: LibraryExercise[] = [
-  { id: 'legext', name: 'Leg extension', group: 'Legs', gyms: ['41'], muscles: 'quads', photos: { '41': 'legext-41' } },
+  { id: 'legext', credit: 0.75, name: 'Leg extension', group: 'Legs', gyms: ['41'], muscles: 'quads', photos: { '41': 'legext-41' } },
   { id: 'legpress', name: 'Leg press (Matrix)', group: 'Legs', gyms: ['41'], muscles: 'quads, glutes', photos: { '41': 'legpress-41' } },
   { id: 'bsquat', name: 'Barbell back squat', group: 'Legs', gyms: ['41', 'MP2'], muscles: 'quads, glutes, core', photos: { any: 'bsquat' } },
-  { id: 'kbsquat', name: 'Goblet squat (kettlebell)', group: 'Legs', gyms: ['MP2'], muscles: 'quads, glutes, core', photos: KB },
-  { id: 'kbsplit', name: 'Double kettlebell split squat', group: 'Legs', gyms: ['any'], muscles: 'quads, glutes', photos: KB },
-  { id: 'lunge', name: 'Split squat / lunge', group: 'Legs', gyms: ['any'], muscles: 'quads, glutes' },
-  { id: 'stepup', name: 'Box step-up', group: 'Legs', gyms: ['any'], muscles: 'quads, glutes' },
+  { id: 'kbsquat', credit: 0.75, name: 'Goblet squat (kettlebell)', group: 'Legs', gyms: ['MP2'], muscles: 'quads, glutes, core', photos: KB },
+  { id: 'kbsplit', credit: 0.9, name: 'Double kettlebell split squat', group: 'Legs', gyms: ['any'], muscles: 'quads, glutes', photos: KB },
+  { id: 'lunge', credit: 0.9, name: 'Split squat / lunge', group: 'Legs', gyms: ['any'], muscles: 'quads, glutes' },
+  { id: 'stepup', credit: 0.9, name: 'Box step-up', group: 'Legs', gyms: ['any'], muscles: 'quads, glutes' },
   { id: 'legcurl', name: 'Seated leg curl', group: 'Hamstrings / glutes', gyms: ['41'], muscles: 'hamstrings', photos: { '41': 'legcurl-41' } },
   { id: 'hipthrust', name: 'Barbell hip thrust', group: 'Hamstrings / glutes', gyms: ['41', 'MP2'], muscles: 'glutes, hamstrings', photos: { any: 'hipthrust' } },
-  { id: 'kbswing', name: 'Kettlebell swing', group: 'Hamstrings / glutes', gyms: ['MP2'], muscles: 'glutes, hamstrings, lower back', photos: { any: 'kbswing' } },
-  { id: 'hipabd', name: 'Hip abduction / adduction', group: 'Hamstrings / glutes', gyms: ['41'], muscles: 'outer hips (abductors), inner thighs (adductors)', photos: { '41': 'hipabd-41' } },
-  { id: 'backext', name: 'Back extension / roman chair', group: 'Hamstrings / glutes', gyms: ['41', 'MP2'], muscles: 'lower back, glutes, hamstrings', photos: { '41': 'backext-41', any: 'backext' } },
+  { id: 'kbswing', credit: 0.5, name: 'Kettlebell swing', group: 'Hamstrings / glutes', gyms: ['MP2'], muscles: 'glutes, hamstrings, lower back', photos: { any: 'kbswing' } },
+  { id: 'hipabd', credit: 0.5, name: 'Hip abduction / adduction', group: 'Hamstrings / glutes', gyms: ['41'], muscles: 'outer hips (abductors), inner thighs (adductors)', photos: { '41': 'hipabd-41' } },
+  { id: 'backext', credit: 0.75, name: 'Back extension / roman chair', group: 'Hamstrings / glutes', gyms: ['41', 'MP2'], muscles: 'lower back, glutes, hamstrings', photos: { '41': 'backext-41', any: 'backext' } },
   { id: 'chestpress', name: 'Chest press (Matrix)', group: 'Chest', gyms: ['41'], muscles: 'chest, triceps, front shoulders', photos: { '41': 'chestpress-41' } },
   { id: 'inclpress', name: 'Incline press (Matrix)', group: 'Chest', gyms: ['41'], muscles: 'upper chest, front shoulders, triceps', photos: { '41': 'inclpress-41' } },
-  { id: 'pecfly', name: 'Pec fly (Matrix)', group: 'Chest', gyms: ['41'], muscles: 'chest', photos: { '41': 'pecfly-41' } },
+  { id: 'pecfly', credit: 0.75, name: 'Pec fly (Matrix)', group: 'Chest', gyms: ['41'], muscles: 'chest', photos: { '41': 'pecfly-41' } },
   { id: 'benchbar', name: 'Barbell bench press', group: 'Chest', gyms: ['41', 'MP2'], muscles: 'chest, triceps, front shoulders', photos: { '41': 'benchbar-41', MP2: 'benchbar-mp2' } },
   { id: 'platechest', name: 'Plate-loaded chest press', group: 'Chest', gyms: ['MP2'], muscles: 'chest, triceps, front shoulders', photos: { MP2: 'benchbar-mp2' } },
-  { id: 'pushup', name: 'Push-up', group: 'Chest', gyms: ['any'], muscles: 'chest, triceps, core', photos: { any: 'pushup' } },
+  { id: 'pushup', credit: 0.75, name: 'Push-up', group: 'Chest', gyms: ['any'], muscles: 'chest, triceps, core', photos: { any: 'pushup' } },
   { id: 'shpress', name: 'Shoulder press (Matrix)', group: 'Shoulders', gyms: ['41'], muscles: 'shoulders, triceps', photos: { '41': 'shpress-41' } },
-  { id: 'reardelt', name: 'Rear delt fly (Matrix)', group: 'Shoulders', gyms: ['41'], muscles: 'rear shoulders, upper back', photos: { '41': 'pecfly-41' } },
+  { id: 'reardelt', credit: 0.75, name: 'Rear delt fly (Matrix)', group: 'Shoulders', gyms: ['41'], muscles: 'rear shoulders, upper back', photos: { '41': 'pecfly-41' } },
   { id: 'dbshpress', name: 'Seated dumbbell shoulder press', group: 'Shoulders', gyms: ['any'], muscles: 'shoulders, triceps', photos: { any: 'dbshpress' } },
   { id: 'ohp', name: 'Overhead press (barbell)', group: 'Shoulders', gyms: ['41', 'MP2'], muscles: 'shoulders, triceps, core', photos: { any: 'ohp' } },
   { id: 'latpd', name: 'Lat pulldown (Matrix)', group: 'Back', gyms: ['41'], muscles: 'lats, biceps', photos: { '41': 'latpd-41' } },
   { id: 'keiserlat', name: 'Lat pulldown (Keiser)', group: 'Back', gyms: ['MP2'], muscles: 'lats, biceps', photos: { MP2: 'keiserlat-mp2' } },
   { id: 'seatrow', name: 'Seated row (Matrix)', group: 'Back', gyms: ['41'], muscles: 'mid back, lats, biceps', photos: { '41': 'latpd-41' } },
-  { id: 'trxrow', name: 'TRX row', group: 'Back', gyms: ['any'], muscles: 'mid back, biceps' },
+  { id: 'trxrow', credit: 0.75, name: 'TRX row', group: 'Back', gyms: ['any'], muscles: 'mid back, biceps' },
   { id: 'assistpu', name: 'Assisted pull-up', group: 'Back', gyms: ['41', 'MP2'], muscles: 'lats, biceps', photos: { '41': 'assistpu-41', MP2: 'assistpu-mp2' } },
   { id: 'assistdip', name: 'Assisted dip / triceps', group: 'Arms', gyms: ['41', 'MP2'], muscles: 'triceps, chest, front shoulders', photos: { '41': 'assistdip-41', MP2: 'assistdip-mp2' } },
   { id: 'curl', name: 'Dumbbell curl', group: 'Arms', gyms: ['any'], muscles: 'biceps', photos: { any: 'curl' } },
   { id: 'declab', name: 'Decline sit-up / ab crunch', group: 'Abs / core', gyms: ['41', 'MP2'], muscles: 'abs', photos: { '41': 'declab-41', MP2: 'declab-mp2' } },
-  { id: 'elbowknee', name: 'Elbow-to-knee crunch', group: 'Abs / core', gyms: ['any'], muscles: 'abs, obliques', photos: { any: 'elbowknee' } },
-  { id: 'abkick', name: 'Alternating ab kicks', group: 'Abs / core', gyms: ['any'], muscles: 'lower abs, hip flexors' },
-  { id: 'hangknee', name: 'Hanging knee raise', group: 'Abs / core', gyms: ['any'], muscles: 'lower abs, hip flexors, grip' },
-  { id: 'captain', name: "Captain's chair leg raise", group: 'Abs / core', gyms: ['any'], muscles: 'lower abs, hip flexors', photos: { any: 'captain' } },
-  { id: 'rotation', name: 'Keiser rotation (cable)', group: 'Abs / core', gyms: ['MP2'], muscles: 'obliques, core', photos: { MP2: 'rotation-mp2' } },
-  { id: 'mbshoulder', name: 'Med ball over-the-shoulder toss', group: 'Abs / core', gyms: ['any'], muscles: 'obliques, core, hips' },
-  { id: 'hollow', name: 'Hollow hold', group: 'Abs / core', gyms: ['any'], measure: 's', muscles: 'abs, deep core' },
-  { id: 'plank', name: 'Plank', group: 'Abs / core', gyms: ['any'], measure: 's', muscles: 'abs, deep core, shoulders' },
-  { id: 'stair', name: 'StairMaster', group: 'Cardio', gyms: ['41', 'MP2'], measure: 'min', muscles: 'heart and lungs, glutes, quads', photos: { any: 'stair' } },
-  { id: 'rower', name: 'Row machine', group: 'Cardio', gyms: ['41', 'MP2'], measure: 'min', muscles: 'heart and lungs, back, legs', photos: { any: 'rower' } },
+  { id: 'elbowknee', credit: 0.6, name: 'Elbow-to-knee crunch', group: 'Abs / core', gyms: ['any'], muscles: 'abs, obliques', photos: { any: 'elbowknee' } },
+  { id: 'abkick', credit: 0.5, name: 'Alternating ab kicks', group: 'Abs / core', gyms: ['any'], muscles: 'lower abs, hip flexors' },
+  { id: 'hangknee', credit: 0.9, name: 'Hanging knee raise', group: 'Abs / core', gyms: ['any'], muscles: 'lower abs, hip flexors, grip' },
+  { id: 'captain', credit: 0.9, name: "Captain's chair leg raise", group: 'Abs / core', gyms: ['any'], muscles: 'lower abs, hip flexors', photos: { any: 'captain' } },
+  { id: 'rotation', credit: 0.75, name: 'Keiser rotation (cable)', group: 'Abs / core', gyms: ['MP2'], muscles: 'obliques, core', photos: { MP2: 'rotation-mp2' } },
+  { id: 'mbshoulder', credit: 0.5, name: 'Med ball over-the-shoulder toss', group: 'Abs / core', gyms: ['any'], muscles: 'obliques, core, hips' },
+  { id: 'hollow', credit: 0.6, name: 'Hollow hold', group: 'Abs / core', gyms: ['any'], measure: 's', muscles: 'abs, deep core' },
+  { id: 'plank', credit: 0.5, name: 'Plank', group: 'Abs / core', gyms: ['any'], measure: 's', muscles: 'abs, deep core, shoulders' },
+  { id: 'stair', credit: 0, name: 'StairMaster', group: 'Cardio', gyms: ['41', 'MP2'], measure: 'min', muscles: 'heart and lungs, glutes, quads', photos: { any: 'stair' } },
+  { id: 'rower', credit: 0, name: 'Row machine', group: 'Cardio', gyms: ['41', 'MP2'], measure: 'min', muscles: 'heart and lungs, back, legs', photos: { any: 'rower' } },
 ]
+
+/** Tier credit for exercises you added yourself, which the app can't judge. */
+export const CUSTOM_CREDIT = 0.75
+
+/**
+ * How much one set of an exercise counts toward its muscle's weekly sets, by how well it builds or keeps muscle:
+ * 1 for loaded, full-range lifts you can keep adding weight to; 0.9 a bit harder to load; 0.75 isolation or
+ * load-limited; 0.6 light core; 0.5 mostly power, conditioning or stability; 0 cardio (counted for VO2 max).
+ */
+export function setCredit(name: string, list: LibraryExercise[]): number {
+  const e = findLift(name, list)
+  if (!e) return CUSTOM_CREDIT
+  return e.credit ?? (e.id.startsWith('custom-') ? CUSTOM_CREDIT : 1)
+}
 
 /** The picture for an exercise at a gym: that gym's, else one that fits any gym, else whichever it has. */
 export function photoFor(e: Pick<LibraryExercise, 'photos'>, gym?: GymId): string | null {

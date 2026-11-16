@@ -107,6 +107,8 @@ const SUGGEST_WHY: Record<string, string> = {
 }
 
 const fmt = (n: number) => Math.round(n).toLocaleString()
+/** Effective sets, to one decimal (a set of a lighter-tier exercise or an easier session counts less than 1). */
+const sets1 = (n: number) => String(Math.round(n * 10) / 10)
 
 /** Everything the coach has to say, grouped by section, each tied to a goal. */
 export function buildCoach(c: CoachInput): CoachTip[] {
@@ -361,7 +363,7 @@ function abs(c: CoachInput): CoachTip[] {
             section: 'abs',
             goal: 'abs',
             tone: g.sets === 0 ? 'warn' : 'do',
-            title: `${g.target - g.sets} more ${name} sets this week`,
+            title: `${sets1(g.target - g.sets)} more ${name} sets this week`,
             detail: `${g.sets} of ${g.target} so far.${name === 'core' ? ' Mix weighted crunches or cable crunches (6–15 reps) with hanging knee raises and rotation.' : ' Presses build the shape; keep them heavy (6–10 reps).'}`,
           },
     )

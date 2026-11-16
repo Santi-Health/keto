@@ -656,6 +656,13 @@ export interface ImportResult {
  * same kind starting within 90 minutes → keep the user's details (lifts, fasted, notes) and fill in
  * Fitbit's numbers; otherwise add it.
  */
+/** Two sessions overlap in time (a workout logged at its end against Fitbit's recording of it). */
+const overlaps = (a: Pick<Exercise, 'started_at' | 'duration_min'>, b: Pick<Exercise, 'started_at' | 'duration_min'>) => {
+  const a0 = Date.parse(a.started_at)
+  const b0 = Date.parse(b.started_at)
+  return a0 < b0 + b.duration_min * 60_000 && b0 < a0 + a.duration_min * 60_000
+}
+
 export function mergeImported(
   imported: Omit<Exercise, 'id' | 'updated_at' | 'deleted_at'>[],
   existing: Exercise[],
@@ -680,7 +687,7 @@ export function mergeImported(
         !e.external_id &&
         e.kind === imp.kind &&
         (imp.kind !== 'cardio' || !e.meta.cardioType || !imp.meta.cardioType || e.meta.cardioType === imp.meta.cardioType) &&
-        Math.abs(Date.parse(e.started_at) - Date.parse(imp.started_at)) <= 90 * 60_000,
+        (Math.abs(Date.parse(e.started_at) - Date.parse(imp.started_at)) <= 90 * 60_000 || overlaps(e, imp)),
     )
     if (manual) {
       used.add(manual.id)
@@ -697,6 +704,8 @@ export function mergeImported(
           ...manual.meta,
           distanceMi: imp.meta.distanceMi ?? manual.meta.distanceMi,
           caloriesEstimated: imp.calories == null,
+          // Fitbit's recording now supplies the calories and real start.
+          awaitingFitbit: imp.calories == null ? manual.meta.awaitingFitbit : undefined,
           fitbitTotalKcal: imp.meta.fitbitTotalKcal,
           fitbitType: imp.meta.fitbitType,
         },

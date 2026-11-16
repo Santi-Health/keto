@@ -2,6 +2,7 @@ import { liters } from '../lib/drinks'
 import { useEffect, useMemo, useState } from 'react'
 import { MacroStrip } from '../components/FoodBits'
 import { FoodForm } from '../components/FoodForm'
+import { SessionKcal } from '../components/TrainingCard'
 import { ExerciseSheet } from '../components/ExerciseSheet'
 import { LogCheck } from '../components/LogCheck'
 import { LogFoodSheet } from '../components/LogFoodSheet'
@@ -235,8 +236,7 @@ export function Log({ weightKg, hr, weightUnit, netCarbLimit, proteinTarget, dat
                       </span>
                     </span>
                     <span className="right">
-                      {e.meta.caloriesEstimated ? '~' : ''}
-                      {e.calories ?? 0} kcal
+                      <SessionKcal e={e} />
                     </span>
                   </button>
                 )

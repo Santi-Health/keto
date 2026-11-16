@@ -1,4 +1,4 @@
-import { isHardSession, routineStart, sessionLabel, type Exercise, type Routine } from '../lib/exercise'
+import { fitbitStatus, isHardSession, routineStart, sessionLabel, type Exercise, type Routine } from '../lib/exercise'
 
 interface Props {
   today: Exercise[]
@@ -45,18 +45,20 @@ export function TrainingCard({ today, daysSinceStrength, warnings, onLog, period
                   </span>
                 </span>
                 <span className="session-kcal">
-                  {e.meta.caloriesEstimated ? '~' : ''}+{e.calories ?? 0} kcal
+                  <SessionKcal e={e} />
                 </span>
               </div>
             ))}
             <div className="session-row session-total">
               <span className="grow">Extra burned {period} · {minutes} min</span>
-              <span className="session-kcal">+{active} kcal</span>
+              <span className="session-kcal">
+                +{active} kcal{today.some((e) => fitbitStatus(e) === 'waiting') ? ' so far, waiting for Fitbit' : ''}
+              </span>
             </div>
           </div>
           <p className="muted small" style={{ margin: '6px 0 0' }}>
             Extra = calories above what you'd burn sitting still for that time (your resting burn is already counted).
-            ~ means estimated from the activity type, intensity and your weight.
+            Calories come from Fitbit; ⏳ means it hasn't synced the workout yet, ⚠ that it never recorded it.
           </p>
         </>
       ) : (
@@ -89,4 +91,16 @@ export function TrainingCard({ today, daysSinceStrength, warnings, onLog, period
 function formatTime(hhmm: string): string {
   const [h, m] = hhmm.split(':').map(Number)
   return new Date(2000, 0, 1, h, m).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
+}
+
+/** A session's calories: Fitbit's number, or that it's still waiting for Fitbit, or that Fitbit never recorded it. */
+export function SessionKcal({ e }: { e: Exercise }) {
+  const st = fitbitStatus(e)
+  if (st === 'waiting') return <span className="muted" title="Calories come from Fitbit once it syncs this workout">⏳ Fitbit</span>
+  if (st === 'missing') return <span style={{ color: 'var(--warn)' }} title="Fitbit has no recording of this workout">⚠ no Fitbit data</span>
+  return (
+    <>
+      {e.meta.caloriesEstimated ? '~' : ''}+{e.calories ?? 0} kcal
+    </>
+  )
 }

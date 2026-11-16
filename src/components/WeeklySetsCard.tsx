@@ -36,18 +36,18 @@ const shortDate = (d: string) => new Date(`${d}T12:00:00`).toLocaleDateString('e
 const range = (a: string, b: string) => (a.slice(0, 7) === b.slice(0, 7) ? `${shortDate(a)}–${Number(b.slice(8))}` : `${shortDate(a)} – ${shortDate(b)}`)
 
 /** Today's card: sets per muscle group in the Monday–Sunday week, past weeks with a check, and a link to what to train. */
-export function WeeklySetsCard({ day, onOpenCoach }: { day: string; onOpenCoach: () => void }) {
+export function WeeklySetsCard({ day, onOpenCoach, weightKg }: { day: string; onOpenCoach: () => void; weightKg?: number }) {
   const { exercises } = useData()
   const { custom } = useCustomLifts()
   const library = useMemo(() => libraryFor(undefined, custom), [custom])
-  const coverage = useMemo(() => weekCoverage(exercises, library, day), [exercises, library, day])
-  const history = useMemo(() => pastWeeks(exercises, library, day, 6), [exercises, library, day])
+  const coverage = useMemo(() => weekCoverage(exercises, library, day, undefined, weightKg), [exercises, library, day, weightKg])
+  const history = useMemo(() => pastWeeks(exercises, library, day, 6, weightKg), [exercises, library, day, weightKg])
   const [open, setOpen] = useState<string | null>(null)
   const short = coverage.filter((g) => g.sets < g.target).length
   return (
     <section className="card">
       <div className="page-header" style={{ marginBottom: 8 }}>
-        <h2>Sets, last 7 days</h2>
+        <h2>Effective sets, last 7 days</h2>
         <span className={`badge ${short ? '' : 'ok'}`}>{short ? `${short} group${short === 1 ? '' : 's'} short` : 'All covered'}</span>
       </div>
       <WeeklySetsBars coverage={coverage} />

@@ -219,6 +219,8 @@ export interface Exercise {
     hrSamples?: number
     /** Set when you change an imported session's type; re-imports keep your version. */
     userEdited?: boolean
+    /** Logged in the app: calories (and the real start) come from Fitbit's recording of it once it syncs. */
+    awaitingFitbit?: boolean
   }
   updated_at: string
   deleted_at: string | null
@@ -304,7 +306,7 @@ export function sessionLabel(e: Exercise): string {
 }
 
 /** A ready-to-save session for a routine on the given day. */
-export function routineSession(r: Routine, weightKg: number, day = new Date()): Exercise {
+export function routineSession(r: Routine, day = new Date()): Exercise {
   const [h, m] = routineStart(r, day).split(':').map(Number)
   const start = new Date(day)
   start.setHours(h, m, 0, 0)
@@ -314,12 +316,62 @@ export function routineSession(r: Routine, weightKg: number, day = new Date()): 
     kind: r.kind,
     duration_min: r.minutes,
     intensity: 'moderate',
-    calories: estimateExerciseKcal(r.kind, 'moderate', r.minutes, weightKg, { yogaStyle: r.yogaStyle }),
+    // Calories come from Fitbit's recording of the class, never an estimate.
+    calories: null,
     source: 'manual',
     external_id: null,
     note: null,
-    meta: { yogaStyle: r.yogaStyle, caloriesEstimated: true, tz: deviceTz() },
+    meta: { yogaStyle: r.yogaStyle, awaitingFitbit: true, tz: deviceTz() },
     updated_at: new Date().toISOString(),
     deleted_at: null,
   }
+}
+
+/** Minutes per set of a reps lift, rest included: 5 minutes for every 4 sets. */
+export const MIN_PER_SET = 5 / 4
+/** A logged workout is at least this long. */
+const MIN_SESSION_MIN = 10
+
+/** How long a strength workout took, from what was logged: timed pieces as entered, plus 5 minutes per 4 sets. */
+export function strengthMinutes(lifts: Lift[]): number {
+  let m = 0
+  for (const l of lifts) {
+    const sets = l.sets ?? 1
+    if (l.measure === 'min') m += (l.duration ?? 0) * sets
+    else if (l.measure === 's') m += ((l.duration ?? 0) * sets) / 60 + MIN_PER_SET * sets
+    else m += MIN_PER_SET * sets
+  }
+  return Math.max(MIN_SESSION_MIN, Math.round(m))
+}
+
+/**
+ * When a workout ending at `endMs` started, from heart rate: the run of raised heart rate (resting + 20) leading
+ * up to the end, allowing rests between sets of up to 8 minutes. Null when the heart rate doesn't cover the end
+ * (Fitbit hasn't synced it yet) or shows no workout.
+ */
+export function startFromHeartRate(samples: { t: number; bpm: number }[], endMs: number, restingHr: number): number | null {
+  const before = samples.filter((s) => s.t <= endMs).sort((a, b) => a.t - b.t)
+  if (!before.length || endMs - before[before.length - 1].t > 15 * 60_000) return null
+  const raised = restingHr + 20
+  const GAP = 8 * 60_000
+  let start: number | null = null
+  let lastHigh: number | null = null
+  for (let i = before.length - 1; i >= 0; i--) {
+    const s = before[i]
+    if (s.bpm >= raised) {
+      start = s.t
+      lastHigh = s.t
+    } else if (lastHigh != null && lastHigh - s.t > GAP) break
+    else if (lastHigh == null && endMs - s.t > GAP) return null
+  }
+  if (start == null) return null
+  const minutes = (endMs - start) / 60_000
+  return minutes >= MIN_SESSION_MIN && minutes <= 180 ? start : null
+}
+
+/** A workout logged in the app with no Fitbit calories yet: waiting for a sync, or (after 12 hours) missing. */
+export function fitbitStatus(e: Exercise, now = Date.now()): 'ok' | 'waiting' | 'missing' {
+  if (e.calories != null || !e.meta.awaitingFitbit) return 'ok'
+  const end = Date.parse(e.started_at) + e.duration_min * 60_000
+  return now - end > 12 * 3_600_000 ? 'missing' : 'waiting'
 }

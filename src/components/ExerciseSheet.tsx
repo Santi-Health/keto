@@ -4,7 +4,9 @@ import {
   CARDIO_TYPES,
   EXERCISE_KINDS,
   YOGA_STYLES,
-  estimateExerciseKcal,
+  fitbitStatus,
+  startFromHeartRate,
+  strengthMinutes,
   pace,
   speed,
   type CardioType,
@@ -23,10 +25,11 @@ import {
   isTimed,
   type YogaStyle,
 } from '../lib/exercise'
-import { getGoogleToken, heartRateCalories, type HrProfile } from '../lib/googleHealth'
+import { cachedToken, listHeartRate, type HrProfile } from '../lib/googleHealth'
+import { localDate } from '../lib/targets'
 import { Segmented } from './Fields'
 import { LIBRARY_GROUPS, findLift, groupForNew, libraryFor, photoFor, newLibraryEntries, suggestLift, tidyLiftName, useCustomLifts } from '../lib/library'
-import { suggestFromHistory } from '../lib/training'
+import { scoreLiftDraft, suggestFromHistory } from '../lib/training'
 import { clearDraft, loadDraft, saveDraft } from '../lib/exerciseDraft'
 import { deviceTz } from '../lib/time'
 import { Sheet } from './Sheet'
@@ -51,8 +54,10 @@ function defaultStart(date?: string): Date {
   return d.toDateString() === now.toDateString() ? now : d
 }
 
-export function ExerciseSheet({ weightKg, hr, exercise, date, onClose }: Props) {
-  const { saveExercise, deleteExercise, exercises } = useData()
+export function ExerciseSheet({ weightKg, exercise, date, onClose }: Props) {
+  const { saveExercise, deleteExercise, exercises, activity } = useData()
+  // Your latest resting heart rate, for telling a workout's raised heart rate from rest.
+  const restingHr = Object.values(activity).filter((a) => !a.deleted_at && a.resting_hr).sort((a, b) => b.day.localeCompare(a.day))[0]?.resting_hr ?? null
   const { custom, add: addCustom } = useCustomLifts()
   // An unsaved workout from earlier (left the sheet or the app) picks up where it was.
   const [draft] = useState(() => loadDraft(exercise?.id))
@@ -70,7 +75,7 @@ export function ExerciseSheet({ weightKg, hr, exercise, date, onClose }: Props) 
   const [note, setNote] = useState(draft?.note ?? exercise?.note ?? '')
   const [lifts, setLifts] = useState<Lift[]>(draft?.lifts ?? exercise?.meta.lifts ?? [])
   // Calories follow the estimate until typed over.
-  const [kcalText, setKcalText] = useState(draft?.kcalText ?? (exercise && !exercise.meta.caloriesEstimated ? String(exercise.calories ?? '') : ''))
+  const [kcalText] = useState(draft?.kcalText ?? (exercise && !exercise.meta.caloriesEstimated ? String(exercise.calories ?? '') : ''))
   // Keep the draft as you type, once anything differs from how the sheet opened.
   const snapshot = { kind, cardioType, yogaStyle, distance, floors, level, minutes, intensity, start, fasted, note, lifts, kcalText }
   const json = JSON.stringify(snapshot)
@@ -82,32 +87,6 @@ export function ExerciseSheet({ weightKg, hr, exercise, date, onClose }: Props) 
     clearDraft(exercise?.id)
     onClose()
   }
-  const [hrResult, setHrResult] = useState<{ avgHr: number; samples: number } | null>(
-    exercise?.meta.caloriesSource === 'heart-rate' && exercise.meta.avgHr ? { avgHr: exercise.meta.avgHr, samples: exercise.meta.hrSamples ?? 0 } : null,
-  )
-  const [hrBusy, setHrBusy] = useState(false)
-  const [hrMessage, setHrMessage] = useState<string | null>(null)
-
-  async function useHeartRate() {
-    if (!hr || !(Number(minutes) > 0)) return
-    setHrBusy(true)
-    setHrMessage(null)
-    try {
-      const token = await getGoogleToken()
-      const r = await heartRateCalories(token, new Date(start), Number(minutes), { ...hr, weightKg })
-      if (!r) {
-        setHrMessage('No Fitbit heart rate found for that time. Check the start time, or let the Fitbit app sync first.')
-        return
-      }
-      setKcalText(String(r.kcal))
-      setHrResult({ avgHr: r.avgHr, samples: r.samples })
-    } catch (e) {
-      setHrMessage(`Couldn't read heart rate: ${(e as Error).message}`)
-    } finally {
-      setHrBusy(false)
-    }
-  }
-
   const mins = Number(minutes)
   const details = {
     cardioType: kind === 'cardio' ? cardioType : undefined,
@@ -116,21 +95,29 @@ export function ExerciseSheet({ weightKg, hr, exercise, date, onClose }: Props) 
     level: kind === 'cardio' && cardioType === 'stairmaster' && level !== '' ? Number(level) : null,
     yogaStyle: kind === 'mobility' ? yogaStyle : undefined,
   }
-  const estimate = mins > 0 ? estimateExerciseKcal(kind, intensity, mins, weightKg, details) : 0
-  const calories = kcalText !== '' ? Number(kcalText) : estimate
+  // Today's strength workout needs no clock: it ends when you save it (adding the last lift moves the end),
+  // and it started as far back as your heart rate shows, else your sets say.
+  const logDay = date ?? localDate()
+  const autoTime = kind === 'strength' && exercise?.source !== 'fitbit' && logDay === localDate() && !exercise?.external_id
+  const named = kind === 'strength' ? lifts.filter((l) => l.name.trim()).map((l) => ({ ...l, name: tidyLiftName(l.name) })) : []
+  const autoMinutes = strengthMinutes(named)
+  // Calories only ever come from Fitbit: an imported session's own number, or Fitbit's recording once it syncs.
+  const fitbitKcal = exercise && (exercise.source === 'fitbit' || !exercise.meta.awaitingFitbit) && exercise.calories != null && !exercise.meta.caloriesEstimated ? exercise.calories : null
 
   function save() {
-    if (!(mins > 0)) return
-    const named = kind === 'strength' ? lifts.filter((l) => l.name.trim()).map((l) => ({ ...l, name: tidyLiftName(l.name) })) : []
+    const endMs = Date.now()
+    const minutesNow = autoTime ? autoMinutes : mins
+    if (!(minutesNow > 0)) return
+    const startIso = autoTime ? new Date(endMs - autoMinutes * 60_000).toISOString() : new Date(start).toISOString()
     // Lifts typed in that aren't in the list yet join it, at that gym (or every gym for free weights and bodyweight).
     addCustom(newLibraryEntries(named, libraryFor(undefined, custom)))
-    saveExercise({
+    const row: Exercise = {
       id: exercise?.id ?? crypto.randomUUID(),
-      started_at: new Date(start).toISOString(),
+      started_at: startIso,
       kind,
-      duration_min: mins,
+      duration_min: minutesNow,
       intensity,
-      calories: Number.isFinite(calories) ? calories : estimate,
+      calories: fitbitKcal,
       source: exercise?.source ?? 'manual',
       external_id: exercise?.external_id ?? null,
       note: note.trim() || null,
@@ -145,17 +132,26 @@ export function ExerciseSheet({ weightKg, hr, exercise, date, onClose }: Props) 
           (exercise?.source === 'fitbit' && (kind !== exercise.kind || details.cardioType !== exercise.meta.cardioType)) ||
           undefined,
         lifts: kind === 'strength' ? named : undefined,
-        caloriesEstimated: kcalText === '',
-        // Heart-rate calories stay marked as such only while the number is the one it produced.
-        caloriesSource: hrResult && kcalText !== '' ? 'heart-rate' : undefined,
-        avgHr: hrResult?.avgHr ?? exercise?.meta.avgHr,
-        hrSamples: hrResult?.samples,
+        caloriesEstimated: false,
+        caloriesSource: undefined,
+        awaitingFitbit: fitbitKcal == null ? true : undefined,
       },
       updated_at: new Date().toISOString(),
       deleted_at: null,
-    })
+    }
+    saveExercise(row)
     clearDraft(exercise?.id)
     onClose()
+    // Sharpen the start from heart rate when Google access is already open (no sign-in prompt mid-workout).
+    const token = autoTime ? cachedToken() : null
+    if (token) {
+      void listHeartRate(token, new Date(endMs - 3 * 3_600_000), new Date(endMs))
+        .then((samples) => {
+          const s0 = startFromHeartRate(samples, endMs, restingHr ?? 60)
+          if (s0 != null) saveExercise({ ...row, started_at: new Date(s0).toISOString(), duration_min: Math.round((endMs - s0) / 60_000), updated_at: new Date().toISOString() })
+        })
+        .catch(() => {})
+    }
   }
 
   const setLift = (i: number, change: Partial<Lift>) => setLifts((prev) => prev.map((l, j) => (j === i ? { ...l, ...change } : l)))
@@ -240,19 +236,26 @@ export function ExerciseSheet({ weightKg, hr, exercise, date, onClose }: Props) 
         </div>
       )}
 
-      <div className="row">
-        <div className="field">
-          <label htmlFor="ex-min">Duration</label>
-          <div className="row">
-            <input id="ex-min" type="number" inputMode="numeric" min={1} value={minutes} onChange={(e) => setMinutes(e.target.value)} />
-            <span className="muted small" style={{ flex: 'none' }}>min</span>
+      {autoTime ? (
+        <p className="small muted auto-time">
+          ⏱ Ends when you save. Started about {new Date(Date.now() - autoMinutes * 60_000).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })} ({autoMinutes} min from your sets),
+          sharpened from your heart rate, then set by Fitbit's recording of it.
+        </p>
+      ) : (
+        <div className="row">
+          <div className="field">
+            <label htmlFor="ex-min">Duration</label>
+            <div className="row">
+              <input id="ex-min" type="number" inputMode="numeric" min={1} value={minutes} onChange={(e) => setMinutes(e.target.value)} />
+              <span className="muted small" style={{ flex: 'none' }}>min</span>
+            </div>
+          </div>
+          <div className="field" style={{ flex: 1.4 }}>
+            <label htmlFor="ex-start">Started</label>
+            <input id="ex-start" type="datetime-local" value={start} onChange={(e) => setStart(e.target.value)} />
           </div>
         </div>
-        <div className="field" style={{ flex: 1.4 }}>
-          <label htmlFor="ex-start">Started</label>
-          <input id="ex-start" type="datetime-local" value={start} onChange={(e) => setStart(e.target.value)} />
-        </div>
-      </div>
+      )}
 
       <Segmented
         label="Intensity"
@@ -287,37 +290,13 @@ export function ExerciseSheet({ weightKg, hr, exercise, date, onClose }: Props) 
         </div>
       )}
 
-      <div className="field">
-        <label htmlFor="ex-kcal">Active calories</label>
-        <div className="row">
-          <input
-            id="ex-kcal"
-            type="number"
-            inputMode="numeric"
-            value={kcalText}
-            placeholder={String(estimate)}
-            onChange={(e) => {
-              setKcalText(e.target.value)
-              setHrResult(null)
-            }}
-          />
-          <span className="muted small" style={{ flex: 'none' }}>kcal</span>
-        </div>
-        <div className="hint">
-          {hrResult
-            ? `From your Fitbit heart rate: average ${hrResult.avgHr} bpm over ${minutes} min, minus what you'd burn resting. `
-            : kcalText === ''
-              ? `Estimated ${estimate} kcal from the activity type, intensity and your weight. `
-              : ''}
-          Type your watch's number to use it instead.
-        </div>
-        {hr && exercise?.source !== 'fitbit' && (
-          <button type="button" className="btn secondary small-btn" style={{ marginTop: 6 }} disabled={hrBusy} onClick={() => void useHeartRate()}>
-            {hrBusy ? 'Reading heart rate…' : '♥ Use Fitbit heart rate'}
-          </button>
-        )}
-        {hrMessage && <div className="hint">{hrMessage}</div>}
-      </div>
+      <p className={`small fitbit-kcal ${fitbitKcal == null && exercise && fitbitStatus(exercise) === 'missing' ? 'warn' : ''}`}>
+        {fitbitKcal != null
+          ? `🔥 ${fitbitKcal} active kcal from Fitbit.`
+          : exercise && fitbitStatus(exercise) === 'missing'
+            ? '⚠ Fitbit has no recording of this workout, so it has no calories. Your daily Fitbit burn still counts it.'
+            : '🔥 Calories come from Fitbit once it syncs this workout (no estimate in the meantime).'}
+      </p>
 
       <label className="check">
         <input type="checkbox" checked={fasted} onChange={(e) => setFasted(e.target.checked)} />
@@ -415,6 +394,7 @@ export function ExerciseSheet({ weightKg, hr, exercise, date, onClose }: Props) 
                 </label>
               </div>
               {prev(l) && <LastTime s={prev(l)!} />}
+              <SetScore s={(l.reps != null || l.duration != null) ? scoreLiftDraft(l, exercises, library, exercise?.id, weightKg) : null} />
               {!isTimed(l) && (l.bells === 2 || l.side) && l.reps != null && (
                 <div className="muted small">
                   {l.bells === 2 && liftWeight(l) != null && `${liftWeight(l)! * 2} ${liftUnit(l)} total · `}
@@ -439,7 +419,7 @@ export function ExerciseSheet({ weightKg, hr, exercise, date, onClose }: Props) 
       </div>
 
       <div className="row" style={{ flexWrap: 'wrap' }}>
-        <button type="button" className="btn" onClick={save} disabled={!(mins > 0)}>
+        <button type="button" className="btn" onClick={save} disabled={!(autoTime ? named.length > 0 : mins > 0)}>
           {exercise ? 'Save changes' : 'Log exercise'}
         </button>
         {exercise && (
@@ -529,6 +509,21 @@ function LiftPicture({ name, gym, library }: { name: string; gym?: GymId; librar
         {!src && <span className="lift-photo-none">no photo yet</span>}
       </figcaption>
     </figure>
+  )
+}
+
+/** What each set counts toward its muscle group: the exercise's tier × how it compares with last time. */
+function SetScore({ s }: { s: ReturnType<typeof scoreLiftDraft> }) {
+  if (!s || s.group === 'Cardio' || s.group === 'Other') return null
+  const full = s.perSet >= 1
+  return (
+    <div className={`small set-score ${full ? 'full' : ''}`}>
+      Each set counts <b>{s.perSet}</b> for {s.group}
+      <span className="muted">
+        {' '}
+        · exercise {s.tier.toFixed(2).replace(/0$/, '')} × progress {s.effort.toFixed(2).replace(/0$/, '')} ({s.why})
+      </span>
+    </div>
   )
 }
 

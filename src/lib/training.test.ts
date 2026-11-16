@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { Exercise, Lift } from './exercise'
-import { EXERCISE_LIBRARY } from './library'
-import { daysLeftInWeek, exercisesFor, groupsDue, hardCardioThisWeek, liftPlans, nextWeight, pastWeeks, suggestFromHistory, weekCoverage, weekStart } from './training'
+import { EXERCISE_LIBRARY, setCredit } from './library'
+import { daysLeftInWeek, exercisesFor, groupsDue, hardCardioThisWeek, liftPlans, nextWeight, pastWeeks, progressionScore, progressSinceStart, suggestFromHistory, weekCoverage, weekStart } from './training'
 
 const session = (day: string, lifts: Partial<Lift>[]): Exercise => ({
   id: `${day}-${lifts[0]?.name}`,
@@ -65,15 +65,16 @@ describe('exercise picks', () => {
     session('2026-11-01', [{ name: 'Decline sit-up / ab crunch', sets: 4, reps: 12, gym: 'MP2' }]),
     session('2026-11-10', [{ name: 'Decline sit-up / ab crunch', sets: 4, reps: 12, gym: 'MP2' }, { name: 'Elbow-to-knee crunch', sets: 2, reps: 18, gym: 'MP2' }]),
   ]
-  it('puts what you have done first, most often first', () => {
-    const p = exercisesFor('Abs / core', { exercises: ex, library: EXERCISE_LIBRARY, today: '2026-11-12' })
-    expect(p.map((x) => x.name)).toEqual(['Decline sit-up / ab crunch', 'Elbow-to-knee crunch'])
-    expect(p[0].times).toBe(2)
+  it('puts the most effective first, then what you have done', () => {
+    const p = exercisesFor('Abs / core', { exercises: ex, library: EXERCISE_LIBRARY, today: '2026-11-12', n: 4 })
+    expect(p[0]).toMatchObject({ name: 'Decline sit-up / ab crunch', credit: 1, times: 2 })
+    expect(p.map((x) => x.credit)).toEqual([...p.map((x) => x.credit)].sort((a, b) => b - a))
+    expect(p.find((x) => x.name === 'Elbow-to-knee crunch')).toBeUndefined()
   })
-  it('skips what you said you do not like and fills from your gym', () => {
+  it('skips what you said you do not like', () => {
     const p = exercisesFor('Abs / core', { exercises: ex, library: EXERCISE_LIBRARY, today: '2026-11-12', disliked: ['decline sit-up / ab crunch'], n: 3 })
-    expect(p[0].name).toBe('Elbow-to-knee crunch')
-    expect(p.slice(1).every((x) => x.times === 0 && x.atYourGym)).toBe(true)
+    expect(p.map((x) => x.name)).not.toContain('Decline sit-up / ab crunch')
+    expect(p[0].credit).toBe(0.9)
   })
   it('offers list exercises for a group you have never trained', () => {
     const p = exercisesFor('Shoulders', { exercises: ex, library: EXERCISE_LIBRARY, today: '2026-11-12' })
@@ -89,7 +90,8 @@ describe('timed lifts and cardio', () => {
   })
   it('counts hold sets toward abs', () => {
     const w = weekCoverage([session('2026-11-12', [{ name: 'Hollow hold', measure: 's', duration: 30, sets: 3 }])], EXERCISE_LIBRARY, '2026-11-12')
-    expect(w.find((g) => g.group === 'Abs / core')?.sets).toBe(3)
+    // A hollow hold is light core: each set counts 0.6.
+    expect(w.find((g) => g.group === 'Abs / core')?.sets).toBe(1.8)
   })
   it('steps cardio up a level, and counts 10+ min toward VO2 max', () => {
     expect(plan({ name: 'StairMaster', measure: 'min', duration: 12, weight: 8, sets: 1 }).text).toMatch(/level 9/)
@@ -120,11 +122,12 @@ describe('Monday to Sunday week', () => {
 })
 
 describe('past weeks', () => {
-  const full = Object.entries({ 'Plate-loaded chest press': 12, 'Decline sit-up / ab crunch': 12, 'Assisted pull-up': 10, 'Goblet squat (kettlebell)': 10, 'Kettlebell swing': 6, 'Overhead press (barbell)': 6, 'Dumbbell curl': 6 })
+  const full = Object.entries({ 'Plate-loaded chest press': 12, 'Decline sit-up / ab crunch': 12, 'Assisted pull-up': 10, 'Barbell back squat': 10, 'Seated leg curl': 6, 'Overhead press (barbell)': 6, 'Dumbbell curl': 6 })
   it('judges each full week, newest first, and counts sets capped at their target', () => {
     const ex = [
       session('2026-11-04', full.map(([name, sets]) => ({ name, reps: 8, sets }))),
-      session('2026-10-28', [{ name: 'Plate-loaded chest press', reps: 8, sets: 20 }]),
+      // The week before had fewer reps, so the test week counts as progress (full credit).
+      session('2026-10-28', [{ name: 'Plate-loaded chest press', reps: 6, sets: 20 }]),
     ]
     const [last, before] = pastWeeks(ex, EXERCISE_LIBRARY, '2026-11-12', 2)
     expect(last).toMatchObject({ start: '2026-11-02', end: '2026-11-08', verdict: 'good', groupsMet: 7 })
@@ -160,5 +163,43 @@ describe('prefill from last time', () => {
     const s = suggestFromHistory('Assisted pull-up', [session('2026-11-12', [{ name: 'Assisted pull-up', weight: 30, reps: 6, sets: 4, assisted: true }])], EXERCISE_LIBRARY)!
     expect(s.fill).toMatchObject({ weight: 30, reps: 7, assisted: true })
     expect(s.delta).toEqual({ weight: 0, amount: 1 })
+  })
+})
+
+describe('exercise score: tier × progression', () => {
+  const L = (l: Partial<Lift>): Lift => ({ name: 'Dumbbell curl', weightLb: null, weight: 15, unit: 'lb', reps: 12, sets: 4, ...l })
+  const p = (l: Partial<Lift>, prev: Partial<Lift>[]) => progressionScore(L(l), prev.map(L), EXERCISE_LIBRARY)
+  it('fewer reps at the same weight count less (your curl example)', () => {
+    expect(p({ reps: 10, sets: 3 }, [{}]).effort).toBe(0.83)
+    const ex = [session('2026-11-09', [L({})]), session('2026-11-12', [L({ reps: 10, sets: 3 })])]
+    expect(weekCoverage(ex, EXERCISE_LIBRARY, '2026-11-12', '2026-11-12').find((g) => g.group === 'Arms')?.sets).toBe(2.5)
+  })
+  it('a bit harder counts in full; repeating counts 0.9, then 0.8 on the third time', () => {
+    expect(p({ reps: 13 }, [{}]).effort).toBe(1)
+    expect(p({}, []).effort).toBe(1)
+    expect(p({}, [{}]).effort).toBe(0.9)
+    expect(p({}, [{}, {}]).effort).toBe(0.8)
+  })
+  it('the planned step up in weight counts in full when it reaches the bottom of the range', () => {
+    expect(p({ weight: 20, reps: 10 }, [{ weight: 15, reps: 15 }]).effort).toBe(1)
+    expect(p({ weight: 20, reps: 5 }, [{ weight: 15, reps: 15 }]).effort).toBe(0.5)
+  })
+  it('lighter never gets full credit; holds compare seconds', () => {
+    expect(p({ weight: 10 }, [{}]).effort).toBe(0.67)
+    expect(p({ weight: 10, reps: 20 }, [{}]).effort).toBe(0.85)
+    expect(p({ name: 'Hollow hold', measure: 's', duration: 30, reps: null, weight: null }, [{ name: 'Hollow hold', measure: 's', duration: 40, reps: null, weight: null }]).effort).toBe(0.75)
+  })
+  it('more assist on an assisted machine counts as lighter', () => {
+    const a = (assist: number, reps: number): Partial<Lift> => ({ name: 'Assisted pull-up', assisted: true, weight: assist, reps })
+    expect(p(a(40, 8), [a(30, 8)]).effort).toBe(0.85)
+    expect(p(a(25, 6), [a(30, 10)]).effort).toBe(1)
+  })
+  it('tiers: the best lifts count 1, light core 0.6, your own additions 0.75', () => {
+    expect(setCredit('Barbell bench press', EXERCISE_LIBRARY)).toBe(1)
+    expect(setCredit('Elbow-to-knee crunch', EXERCISE_LIBRARY)).toBe(0.6)
+    expect(setCredit('Farmer carry', EXERCISE_LIBRARY)).toBe(0.75)
+  })
+  it('shows progress since your first session', () => {
+    expect(progressSinceStart([L({ weight: 15, reps: 12 }), L({ weight: 20, reps: 10 })], ['2026-11-09', '2026-11-30'])).toEqual({ pct: 27, since: '2026-11-09' })
   })
 })

@@ -442,7 +442,7 @@ export function Today({ profile, targets, onOpenSettings, onToggleRefeed, onNavi
             )}
           </section>
 
-          <WeeklySetsCard day={day} onOpenCoach={() => onNavigate('coach')} />
+          <WeeklySetsCard day={day} onOpenCoach={() => onNavigate('coach')} weightKg={profile.weightKg} />
 
           {/* First until something is logged (the morning mate cocido), then the macros lead. Moved with order so its Undo survives. */}
           <div style={{ order: isToday && dayLogs.length === 0 ? -1 : 0 }}>
@@ -509,7 +509,7 @@ export function Today({ profile, targets, onOpenSettings, onToggleRefeed, onNavi
             onLog={() => setLogExercise(true)}
             period={isToday ? 'today' : isWeek ? 'in these 7 days' : 'yesterday'}
             routine={isToday && profile.yogaRoutine && routineDue(profile.yogaRoutine, sessionsToday) ? profile.yogaRoutine : null}
-            onLogRoutine={() => profile.yogaRoutine && saveExercise(routineSession(profile.yogaRoutine, profile.weightKg))}
+            onLogRoutine={() => profile.yogaRoutine && saveExercise(routineSession(profile.yogaRoutine))}
             onImportFitbit={() => void importFitbit()}
             importing={importing}
             importMessage={importMessage}

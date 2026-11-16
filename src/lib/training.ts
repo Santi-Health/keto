@@ -1,6 +1,6 @@
 import { entryDay } from './time'
-import { liftUnit, liftWeight, repsPerSide, type Exercise, type Lift } from './exercise'
-import { findLift, groupForNew, type LibraryExercise } from './library'
+import { liftKg, liftUnit, liftWeight, repsPerSide, type Exercise, type Lift } from './exercise'
+import { findLift, groupForNew, setCredit, type LibraryExercise } from './library'
 
 /**
  * What the last week of lifting covered and what each lift should do next.
@@ -39,6 +39,8 @@ export interface LiftPlan {
   text: string
   /** Same weight and reps for the last 3 sessions. */
   stalled: boolean
+  /** Strength now against the first time you logged it. */
+  sinceStart: { pct: number; since: string } | null
 }
 
 const day0 = (iso: string) => new Date(`${iso}T12:00:00`).getTime()
@@ -79,6 +81,119 @@ function liftsSince(exercises: Exercise[], from: string): Done[] {
     .flatMap((x) => x.e.meta.lifts!.filter((l) => l.name.trim()).map((lift) => ({ day: x.day, lift })))
 }
 
+const round1 = (x: number) => Math.round(x * 10) / 10
+const round2 = (x: number) => Math.round(x * 100) / 100
+/** Used for assisted machines (body weight minus the assist) when your weight isn't passed in. */
+export const DEFAULT_BODY_KG = 70
+
+/** Credit for doing exactly what you did last time: steady still counts, but less. */
+export const REPEAT_CREDIT = 0.9
+/** …and once it's the third session in a row at the same numbers, the muscle has adapted. */
+export const STALL_CREDIT = 0.8
+/** Going lighter than last time counts below repeating it, whatever the reps. */
+export const LIGHTER_CAP = 0.85
+/** Never less than this for a set you did. */
+export const MIN_EFFORT = 0.5
+
+/** What a lift moved, in kg: the bells together, or for an assisted machine your weight minus the assist. Null for bodyweight moves. */
+function loadKg(l: Lift, bodyKg: number): number | null {
+  const kg = liftKg(l)
+  if (kg == null || kg <= 0) return l.assisted ? bodyKg : null
+  return l.assisted ? Math.max(1, bodyKg - kg) : kg * (l.bells ?? 1)
+}
+
+/** Reps a side (or seconds/minutes for timed pieces): what the set did besides its load. */
+const amountOf = (l: Lift) => (l.measure === 's' || l.measure === 'min' ? l.duration ?? null : repsPerSide(l))
+
+const sameNumbers = (a: Lift, b: Lift, bodyKg: number) =>
+  Math.abs((loadKg(a, bodyKg) ?? 0) - (loadKg(b, bodyKg) ?? 0)) < 0.01 && amountOf(a) === amountOf(b)
+
+/** Strength from one set (Epley one-rep max), for "progress since your start". */
+const strengthOf = (l: Lift, bodyKg: number) => {
+  const load = loadKg(l, bodyKg)
+  const a = amountOf(l)
+  if (a == null) return null
+  return load == null || l.measure === 's' || l.measure === 'min' ? a : load * (1 + a / 30)
+}
+
+/**
+ * How this lift compares with the same exercise last time (0.5 to 1): 1 when it got a bit harder (more reps, a
+ * longer hold, or the planned step up in weight reaching the bottom of the rep range); 0.9 for exactly the same
+ * numbers, 0.8 once that's three sessions running; less when it was easier than last time. The first time sets
+ * your starting point and counts in full.
+ */
+export function progressionScore(l: Lift, prev: Lift[], library: LibraryExercise[], bodyKg = DEFAULT_BODY_KG): { effort: number; why: string } {
+  const last = prev[prev.length - 1]
+  if (!last) return { effort: 1, why: 'first time: sets your starting point' }
+  if (sameNumbers(l, last, bodyKg)) {
+    const stalled = prev.length >= 2 && sameNumbers(l, prev[prev.length - 2], bodyKg)
+    return stalled ? { effort: STALL_CREDIT, why: 'same as the last 2 sessions' } : { effort: REPEAT_CREDIT, why: 'same as last time' }
+  }
+  const a = amountOf(l)
+  const la = amountOf(last)
+  const unit = l.measure === 's' ? 's' : l.measure === 'min' ? 'min' : 'reps'
+  if (a == null || la == null) return { effort: 1, why: 'new numbers' }
+  const w = loadKg(l, bodyKg)
+  const lw = loadKg(last, bodyKg)
+  if (w == null || lw == null || l.measure === 's' || l.measure === 'min') {
+    return a > la ? { effort: 1, why: `more than last time (${la} ${unit})` } : { effort: Math.max(MIN_EFFORT, round2(a / la)), why: `${a} vs ${la} ${unit} last time` }
+  }
+  if (w > lw + 0.01) {
+    const lo = repRange(l.name, groupOf(l.name, library, l.group))[0]
+    return a >= lo ? { effort: 1, why: 'heavier than last time' } : { effort: Math.max(MIN_EFFORT, round2(a / lo)), why: `heavier, but ${a} of the ${lo} reps to aim for` }
+  }
+  if (Math.abs(w - lw) <= 0.01) {
+    return a > la ? { effort: 1, why: `more reps than last time (${la})` } : { effort: Math.max(MIN_EFFORT, round2(a / la)), why: `${a} vs ${la} reps last time` }
+  }
+  // Lighter: what the set did against last time's, and never full credit.
+  return { effort: Math.min(LIGHTER_CAP, Math.max(MIN_EFFORT, round2((w * a) / (lw * la)))), why: 'lighter than last time' }
+}
+
+export interface ScoredLift extends Done {
+  /** The exercise's tier credit, the progression score, and what one set counts (their product). */
+  tier: number
+  effort: number
+  perSet: number
+  why: string
+}
+
+/** Every lift you've logged, oldest first, each scored against the same exercise before it. */
+export function scoreLifts(exercises: Exercise[], library: LibraryExercise[], bodyKg = DEFAULT_BODY_KG): ScoredLift[] {
+  const history = new Map<string, Lift[]>()
+  return liftsSince(exercises, '0000-01-01').map((d) => {
+    const k = d.lift.name.trim().toLowerCase()
+    const prev = history.get(k) ?? []
+    const p = progressionScore(d.lift, prev, library, bodyKg)
+    history.set(k, [...prev, d.lift])
+    const tier = setCredit(d.lift.name, library)
+    return { ...d, tier, effort: p.effort, perSet: round2(tier * p.effort), why: p.why }
+  })
+}
+
+/**
+ * What each set of a lift you're logging counts toward its group: tier × how it compares with the last time you
+ * did it (before the session being edited, `excludeId`).
+ */
+export function scoreLiftDraft(l: Lift, exercises: Exercise[], library: LibraryExercise[], excludeId?: string, bodyKg = DEFAULT_BODY_KG) {
+  const k = l.name.trim().toLowerCase()
+  if (!k) return null
+  const prev = liftsSince(exercises.filter((e) => e.id !== excludeId), '0000-01-01')
+    .filter((d) => d.lift.name.trim().toLowerCase() === k)
+    .map((d) => d.lift)
+  const tier = setCredit(l.name, library)
+  const p = progressionScore(l, prev, library, bodyKg)
+  return { tier, effort: p.effort, perSet: round2(tier * p.effort), why: p.why, group: groupOf(l.name, library, l.group) }
+}
+
+/** How much stronger you are at an exercise than the first time you logged it, from your best set each time. */
+export function progressSinceStart(history: Lift[], days: string[], bodyKg = DEFAULT_BODY_KG): { pct: number; since: string } | null {
+  if (history.length < 2) return null
+  const first = strengthOf(history[0], bodyKg)
+  const now = strengthOf(history[history.length - 1], bodyKg)
+  if (!first || now == null) return null
+  return { pct: Math.round((now / first - 1) * 100), since: days[0] }
+}
+
 const shift = (day: string, n: number) => {
   const d = new Date(`${day}T12:00:00`)
   d.setDate(d.getDate() + n)
@@ -98,12 +213,14 @@ export const daysLeftInWeek = (day: string) => 6 - daysBetween(weekStart(day), d
  * Sets per muscle group from `from` (default: the rolling 7 days ending today) through `today`, and days since
  * each was last trained. Past weeks are judged on fixed Monday–Sunday weeks instead (see pastWeeks).
  */
-export function weekCoverage(exercises: Exercise[], library: LibraryExercise[], today: string, from?: string): GroupWeek[] {
-  const recent = liftsSince(exercises, shift(today, -20))
+export function weekCoverage(exercises: Exercise[], library: LibraryExercise[], today: string, from?: string, bodyKg = DEFAULT_BODY_KG): GroupWeek[] {
+  const recentFrom = shift(today, -20)
+  const recent = scoreLifts(exercises, library, bodyKg).filter((d) => d.day >= recentFrom)
   const weekFrom = from ?? shift(today, -6)
   return Object.entries(WEEKLY_SETS).map(([group, target]) => {
     const mine = recent.filter((d) => groupOf(d.lift.name, library, d.lift.group) === group)
-    const sets = mine.filter((d) => d.day >= weekFrom && d.day <= today).reduce((s, d) => s + (d.lift.sets ?? 1), 0)
+    // Effective sets: each set counts its exercise's tier times how it compared with last time.
+    const sets = round1(mine.filter((d) => d.day >= weekFrom && d.day <= today).reduce((s, d) => s + (d.lift.sets ?? 1) * d.perSet, 0))
     const last = mine.length ? mine[mine.length - 1].day : null
     return { group, sets, target, daysSince: last ? daysBetween(last, today) : null }
   })
@@ -127,19 +244,19 @@ export interface PastWeek {
 /** A finished (or current) Monday–Sunday week, judged on its sets. */
 export function judgeWeek(coverage: GroupWeek[], start: string): PastWeek {
   const groupsMet = coverage.filter((g) => g.sets >= g.target).length
-  const sets = coverage.reduce((a, g) => a + Math.min(g.sets, g.target), 0)
+  const sets = round1(coverage.reduce((a, g) => a + Math.min(g.sets, g.target), 0))
   const targetSets = coverage.reduce((a, g) => a + g.target, 0)
   const verdict: WeekVerdict = groupsMet === coverage.length ? 'good' : groupsMet >= coverage.length - 2 || sets >= targetSets * 0.8 ? 'close' : 'behind'
   return { start, end: shift(start, 6), coverage, groupsMet, groups: coverage.length, sets, targetSets, verdict }
 }
 
 /** Up to `n` full weeks before this one, newest first, starting no earlier than the week of your first logged lift. */
-export function pastWeeks(exercises: Exercise[], library: LibraryExercise[], today: string, n = 6): PastWeek[] {
+export function pastWeeks(exercises: Exercise[], library: LibraryExercise[], today: string, n = 6, bodyKg = DEFAULT_BODY_KG): PastWeek[] {
   const first = liftsSince(exercises, '0000-01-01')[0]?.day
   if (!first) return []
   return Array.from({ length: n }, (_, i) => shift(weekStart(today), -7 * (i + 1)))
     .filter((start) => shift(start, 6) >= first)
-    .map((start) => judgeWeek(weekCoverage(exercises, library, shift(start, 6), start), start))
+    .map((start) => judgeWeek(weekCoverage(exercises, library, shift(start, 6), start, bodyKg), start))
 }
 
 /**
@@ -155,13 +272,15 @@ export function groupsDue(weeks: GroupWeek[]): GroupWeek[] {
 
 /** The next session for each lift done in the last 3 weeks, using its most recent numbers. */
 export function liftPlans(exercises: Exercise[], library: LibraryExercise[], today: string): LiftPlan[] {
-  const recent = liftsSince(exercises, shift(today, -20))
+  // Full history per lift (for progress since your start), listing only lifts done in the last 3 weeks.
+  const recent = liftsSince(exercises, '0000-01-01')
   const byName = new Map<string, Done[]>()
   for (const d of recent) {
     const k = d.lift.name.trim().toLowerCase()
     byName.set(k, [...(byName.get(k) ?? []), d])
   }
-  return [...byName.values()].map((history) => planFromHistory(history, library))
+  const from = shift(today, -20)
+  return [...byName.values()].filter((h) => h[h.length - 1].day >= from).map((history) => planFromHistory(history, library))
 }
 
 /** The next session for one lift from its history (oldest first). */
@@ -224,6 +343,7 @@ function planFromHistory(history: Done[], library: LibraryExercise[]): LiftPlan 
       next,
       text,
       stalled,
+      sinceStart: progressSinceStart(history.map((d) => d.lift), history.map((d) => d.day)),
     }
   }
 }
@@ -308,6 +428,8 @@ export function liftDaysThisWeek(exercises: Exercise[], today: string): number {
 
 export interface ExercisePick {
   name: string
+  /** What one set counts toward the group (its tier). */
+  credit: number
   /** Times logged in the last 90 days (0 = new to you). */
   times: number
   lastDay: string | null
@@ -340,17 +462,18 @@ export function exercisesFor(
   for (const d of history) {
     if (groupOf(d.lift.name, library, d.lift.group) !== group) continue
     const k = d.lift.name.trim().toLowerCase()
-    const p = picks.get(k) ?? { name: d.lift.name.trim(), times: 0, lastDay: null, atYourGym: true }
+    const p = picks.get(k) ?? { name: d.lift.name.trim(), credit: setCredit(d.lift.name, library), times: 0, lastDay: null, atYourGym: true }
     picks.set(k, { ...p, times: p.times + 1, lastDay: d.day })
   }
   for (const e of library) {
     const k = e.name.toLowerCase()
     if (e.group !== group || picks.has(k)) continue
-    picks.set(k, { name: e.name, times: 0, lastDay: null, atYourGym: !gym || e.gyms.includes('any') || e.gyms.includes(gym) })
+    picks.set(k, { name: e.name, credit: setCredit(e.name, library), times: 0, lastDay: null, atYourGym: !gym || e.gyms.includes('any') || e.gyms.includes(gym) })
   }
   return [...picks.entries()]
-    .filter(([k]) => !no.has(k))
+    .filter(([k, p]) => !no.has(k) && p.credit > 0)
     .map(([, p]) => p)
-    .sort((a, b) => Math.sign(b.times) - Math.sign(a.times) || b.times - a.times || (b.lastDay ?? '').localeCompare(a.lastDay ?? '') || Number(b.atYourGym) - Number(a.atYourGym))
+    // The most effective first, then ones you've done (most often, most recently), then at your gym.
+    .sort((a, b) => b.credit - a.credit || Math.sign(b.times) - Math.sign(a.times) || b.times - a.times || (b.lastDay ?? '').localeCompare(a.lastDay ?? '') || Number(b.atYourGym) - Number(a.atYourGym))
     .slice(0, n)
 }
