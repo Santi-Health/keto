@@ -203,3 +203,16 @@ describe('exercise score: tier × progression', () => {
     expect(progressSinceStart([L({ weight: 15, reps: 12 }), L({ weight: 20, reps: 10 })], ['2026-11-09', '2026-11-30'])).toEqual({ pct: 27, since: '2026-11-09' })
   })
 })
+
+describe('7-day bars by age', () => {
+  it('splits a group’s sets by how many days ago they were done', () => {
+    const ex = [
+      session('2026-11-17', [{ name: 'Barbell bench press', weight: 135, reps: 8, sets: 3 }]),
+      session('2026-11-15', [{ name: 'Barbell bench press', weight: 130, reps: 8, sets: 4 }]),
+      session('2026-11-11', [{ name: 'Barbell bench press', weight: 125, reps: 8, sets: 2 }]),
+    ]
+    const chest = weekCoverage(ex, EXERCISE_LIBRARY, '2026-11-17').find((g) => g.group === 'Chest')!
+    expect(chest.byAge).toEqual([3, 0, 4, 0, 0, 0, 2])
+    expect(chest.sets).toBe(9)
+  })
+})

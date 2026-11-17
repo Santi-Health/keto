@@ -1,14 +1,46 @@
 import { describe, expect, it } from 'vitest'
-import { fitbitStatus, startFromHeartRate, strengthMinutes, type Exercise, type Lift } from './exercise'
+import { durationCheck, fitbitStatus, startFromHeartRate, strengthMinutes, withMinutes, type Exercise, type Lift } from './exercise'
 import { mergeImported } from './googleHealth'
 
 const lift = (l: Partial<Lift>): Lift => ({ name: 'x', weightLb: null, reps: 8, sets: 4, ...l })
 
 describe('workout length from what was logged', () => {
-  it('counts 5 minutes per 4 sets plus timed pieces', () => {
-    expect(strengthMinutes([lift({ sets: 4 }), lift({ sets: 4 }), lift({ sets: 4 }), lift({ sets: 4 })])).toBe(20)
-    expect(strengthMinutes([lift({ sets: 4 }), lift({ measure: 'min', duration: 12, sets: 1, reps: null })])).toBe(17)
-    expect(strengthMinutes([lift({ sets: 2 })])).toBe(10)
+  it('counts 6 minutes per exercise, or a cardio piece\u2019s own minutes if longer', () => {
+    expect(strengthMinutes([lift({}), lift({}), lift({}), lift({}), lift({})])).toBe(30)
+    expect(strengthMinutes([lift({}), lift({ measure: 'min', duration: 12, sets: 1, reps: null })])).toBe(18)
+    expect(strengthMinutes([lift({})])).toBe(10)
+  })
+})
+
+describe('Fitbit\u2019s length against the app\u2019s', () => {
+  const fit = (fitbitMin: number, appMin: number, extra: Partial<Exercise['meta']> = {}): Exercise => ({
+    id: 'w',
+    started_at: '2026-11-17T16:30:00.000Z',
+    kind: 'strength',
+    duration_min: fitbitMin,
+    intensity: 'moderate',
+    calories: 240,
+    source: 'fitbit',
+    external_id: 'f9',
+    note: null,
+    meta: { appMinutes: appMin, ...extra },
+    updated_at: '',
+    deleted_at: null,
+  })
+  it('within 10% uses the longer one, keeping Fitbit\u2019s end time', () => {
+    const c = durationCheck(fit(28, 30))!
+    expect(c).toMatchObject({ status: 'adjust', use: 30 })
+    const e = withMinutes(fit(28, 30), 30, false)
+    expect(e.duration_min).toBe(30)
+    expect(Date.parse(e.started_at) + 30 * 60_000).toBe(Date.parse('2026-11-17T16:30:00.000Z') + 28 * 60_000)
+    expect(durationCheck(e)!.status).toBe('ok')
+  })
+  it('over 10% apart asks you, and keeps your choice through re-imports', () => {
+    expect(durationCheck(fit(30, 40))!.status).toBe('conflict')
+    const chosen = withMinutes(fit(30, 40), 40, true)
+    expect(durationCheck(chosen)!.status).toBe('ok')
+    // Fitbit re-imports its own 30 minutes: your 40 comes back.
+    expect(durationCheck({ ...chosen, duration_min: 30 })).toMatchObject({ status: 'adjust', use: 40 })
   })
 })
 

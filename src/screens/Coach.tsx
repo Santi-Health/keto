@@ -243,7 +243,7 @@ export function Coach({ profile, targets, weightUnit, onApplyLimit, onOpenReport
                   <div className="section-label">
                     Sets, last 7 days ({new Date(`${shift(today, -6)}T12:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} – today)
                   </div>
-                  <WeeklySetsBars coverage={tips.coverage} />
+                  <WeeklySetsBars coverage={tips.coverage} aged />
                   {tips.picks.length > 0 && (
                     <>
                       <div className="section-label">Exercises for what's short</div>

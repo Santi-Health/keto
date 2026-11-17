@@ -7,21 +7,52 @@ import { shiftDay } from '../lib/goalPlan'
 const fmt = (d: string) => new Date(`${d}T12:00:00`).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
 import { daysLeftInWeek, pastWeeks, weekCoverage, type GroupWeek, type WeekVerdict } from '../lib/training'
 
-/** Bars of hard sets per muscle group against the weekly sets that keep (and build) muscle. */
-export function WeeklySetsBars({ coverage }: { coverage: GroupWeek[] }) {
+/** How recent a day is in the 7-day window, by days ago: today, 1–3 days, 4–5 days, and 6 days (gone tomorrow). */
+export const AGE_BANDS = [
+  { label: 'today', cls: 'age-0', from: 0, to: 0 },
+  { label: '1–3 days', cls: 'age-1', from: 1, to: 3 },
+  { label: '4–5 days', cls: 'age-2', from: 4, to: 5 },
+  { label: '6 days ago (goes tomorrow)', cls: 'age-3', from: 6, to: 6 },
+]
+
+/**
+ * Bars of effective sets per muscle group against the weekly sets that keep (and build) muscle. With `aged`, each
+ * bar is split by how recent the sets are, oldest on the left where they'll drop off, today on the right.
+ */
+export function WeeklySetsBars({ coverage, aged = false }: { coverage: GroupWeek[]; aged?: boolean }) {
   return (
     <div className="coach-sets">
-      {coverage.map((g) => (
-        <div key={g.group}>
-          <span>{g.group}</span>
-          <span className="coach-bar" aria-hidden="true">
-            <span style={{ width: `${Math.min(100, (g.sets / g.target) * 100)}%`, background: g.sets >= g.target ? 'var(--accent)' : 'var(--protein)' }} />
-          </span>
-          <span className="muted small">
-            {g.sets}/{g.target}
-          </span>
+      {coverage.map((g) => {
+        const met = g.sets >= g.target
+        const scale = Math.max(g.target, g.sets)
+        return (
+          <div key={g.group}>
+            <span>{g.group}</span>
+            <span className="coach-bar" aria-hidden="true">
+              {aged && g.byAge.length ? (
+                [...AGE_BANDS].reverse().map((b) => {
+                  const v = g.byAge.slice(b.from, b.to + 1).reduce((a, x) => a + x, 0)
+                  return v > 0 ? <span key={b.cls} className={`age ${b.cls}`} style={{ width: `${(v / scale) * 100}%` }} /> : null
+                })
+              ) : (
+                <span style={{ width: `${Math.min(100, (g.sets / g.target) * 100)}%`, background: met ? 'var(--accent)' : 'var(--protein)' }} />
+              )}
+            </span>
+            <span className={`muted small ${aged && met ? 'set-met' : ''}`}>
+              {g.sets}/{g.target}
+            </span>
+          </div>
+        )
+      })}
+      {aged && (
+        <div className="age-legend muted small">
+          {AGE_BANDS.map((b) => (
+            <span key={b.cls}>
+              <i className={`age-key ${b.cls}`} /> {b.label}
+            </span>
+          ))}
         </div>
-      ))}
+      )}
     </div>
   )
 }
@@ -50,7 +81,7 @@ export function WeeklySetsCard({ day, onOpenCoach, weightKg }: { day: string; on
         <h2>Effective sets, last 7 days</h2>
         <span className={`badge ${short ? '' : 'ok'}`}>{short ? `${short} group${short === 1 ? '' : 's'} short` : 'All covered'}</span>
       </div>
-      <WeeklySetsBars coverage={coverage} />
+      <WeeklySetsBars coverage={coverage} aged />
       <p className="muted small" style={{ marginBottom: 0 }}>
         Last 7 days, {fmt(shiftDay(day, -6))} to {day === localDate() ? 'today' : fmt(day)}. This week (Mon–Sun) gets its check after Sunday
         {day === localDate() ? (daysLeftInWeek(day) ? `, ${daysLeftInWeek(day)} day${daysLeftInWeek(day) === 1 ? '' : 's'} away` : ', tonight') : ''}.{' '}

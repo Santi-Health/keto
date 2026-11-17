@@ -706,6 +706,7 @@ export function mergeImported(
           caloriesEstimated: imp.calories == null,
           // Fitbit's recording now supplies the calories and real start.
           awaitingFitbit: imp.calories == null ? manual.meta.awaitingFitbit : undefined,
+          fitbitMinutes: imp.duration_min,
           fitbitTotalKcal: imp.meta.fitbitTotalKcal,
           fitbitType: imp.meta.fitbitType,
         },

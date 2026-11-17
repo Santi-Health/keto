@@ -19,10 +19,10 @@ const base = (over: Partial<CoachInput> = {}): CoachInput => ({
   ketoTomorrow: keto(0.8, 'in'),
   readiness: null,
   coverage: [
-    { group: 'Chest', sets: 4, target: 12, daysSince: 2 },
-    { group: 'Abs / core', sets: 0, target: 12, daysSince: null },
+    { group: 'Chest', sets: 4, target: 12, byAge: [], daysSince: 2 },
+    { group: 'Abs / core', sets: 0, target: 12, byAge: [], daysSince: null },
   ],
-  due: [{ group: 'Abs / core', sets: 0, target: 12, daysSince: null }],
+  due: [{ group: 'Abs / core', sets: 0, target: 12, byAge: [], daysSince: null }],
   plans: [],
   daysSinceStrength: 1,
   liftStreak: 0,

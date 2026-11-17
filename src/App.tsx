@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import { DataProvider, useData } from './lib/data'
+import { durationCheck, withMinutes } from './lib/exercise'
 import { averageBurn } from './lib/activity'
 import { useSyncOnOpen } from './lib/backgroundSync'
 import { recordZone } from './lib/time'
@@ -99,6 +100,7 @@ function Tracker({ session, recovering = false, onPassphraseChanged = () => {} }
     <CustomLiftsContext.Provider value={customLifts}>
     <WeightFromReadings weightKg={profile.weightKg} lastId={profile.weightReadingId ?? null} update={update} />
     <BurnFromActivity kcal={profile.fitbitBurnKcal ?? null} update={update} />
+    <WorkoutLengths />
     <SyncOnOpen enabled={!!session} />
     <ZoneTracker log={profile.zoneLog} update={update} />
     <VitaminFiller />
@@ -191,6 +193,22 @@ function WeightFromReadings({ weightKg, lastId, update }: { weightKg: number; la
     if (!w?.value || key === lastId) return
     update({ weightKg: Math.round(w.value * 100) / 100, weightReadingId: key })
   }, [key, lastId, w?.value, weightKg, update])
+  return null
+}
+
+/**
+ * Once Fitbit's recording of a logged workout arrives: if its length and the app's (6 minutes per exercise) are
+ * within 10%, use the longer one, and keep a length you chose when Fitbit re-imports. Further apart is left for
+ * you to choose (flagged on the workout).
+ */
+function WorkoutLengths() {
+  const { exercises, saveExercise } = useData()
+  useEffect(() => {
+    for (const e of exercises) {
+      const c = durationCheck(e)
+      if (c?.status === 'adjust') saveExercise(withMinutes(e, c.use, e.meta.chosenMinutes != null))
+    }
+  }, [exercises, saveExercise])
   return null
 }
 

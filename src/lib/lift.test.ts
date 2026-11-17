@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { liftKg, liftLoadKg, liftUnit, liftWeight, repsPerSide, type Lift } from './exercise'
+import { liftKg, liftLoadKg, liftUnit, liftWeight, repsPerSide, withSetAmounts, type Lift } from './exercise'
 
 const base: Lift = { name: 'Chest press', weightLb: null, reps: 8, sets: 4 }
 
@@ -34,5 +34,13 @@ describe('two bells and one side', () => {
     expect(repsPerSide({ ...l, side: 'both' })).toBe(7)
     expect(repsPerSide({ ...l, side: 'left' })).toBe(14)
     expect(liftLoadKg(l)).toBe(28)
+  })
+})
+
+describe('different reps per set', () => {
+  it('sets become the count and reps the average', () => {
+    const l = withSetAmounts({ name: 'Dumbbell curl', weightLb: null, weight: 15, reps: 12, sets: 4 }, [12, 12, 10, 9])
+    expect(l).toMatchObject({ sets: 4, reps: 10.8, setAmounts: [12, 12, 10, 9] })
+    expect(withSetAmounts({ name: 'Plank', weightLb: null, reps: null, sets: 3, measure: 's', duration: 45 }, [45, 40, 30])).toMatchObject({ sets: 3, duration: 38.3 })
   })
 })

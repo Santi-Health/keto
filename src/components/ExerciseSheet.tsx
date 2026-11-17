@@ -23,6 +23,9 @@ import {
   type LiftSide,
   type LiftMeasure,
   isTimed,
+  durationCheck,
+  withMinutes,
+  withSetAmounts,
   type YogaStyle,
 } from '../lib/exercise'
 import { cachedToken, listHeartRate, type HrProfile } from '../lib/googleHealth'
@@ -135,6 +138,7 @@ export function ExerciseSheet({ weightKg, exercise, date, onClose }: Props) {
         caloriesEstimated: false,
         caloriesSource: undefined,
         awaitingFitbit: fitbitKcal == null ? true : undefined,
+        appMinutes: kind === 'strength' ? autoMinutes : exercise?.meta.appMinutes,
       },
       updated_at: new Date().toISOString(),
       deleted_at: null,
@@ -238,8 +242,9 @@ export function ExerciseSheet({ weightKg, exercise, date, onClose }: Props) {
 
       {autoTime ? (
         <p className="small muted auto-time">
-          ⏱ Ends when you save. Started about {new Date(Date.now() - autoMinutes * 60_000).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })} ({autoMinutes} min from your sets),
-          sharpened from your heart rate, then set by Fitbit's recording of it.
+          ⏱ Ends when you save. About {autoMinutes} min (6 per exercise), so it started around{' '}
+          {new Date(Date.now() - autoMinutes * 60_000).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}. Fitbit's recording is
+          compared when it syncs: within 10% the longer wins, otherwise you choose.
         </p>
       ) : (
         <div className="row">
@@ -297,6 +302,10 @@ export function ExerciseSheet({ weightKg, exercise, date, onClose }: Props) {
             ? '⚠ Fitbit has no recording of this workout, so it has no calories. Your daily Fitbit burn still counts it.'
             : '🔥 Calories come from Fitbit once it syncs this workout (no estimate in the meantime).'}
       </p>
+
+      {exercise && durationCheck(exercise)?.status === 'conflict' && (
+        <DurationChoice e={exercise} onPick={(m) => { saveExercise(withMinutes(exercise, m, true)); onClose() }} />
+      )}
 
       <label className="check">
         <input type="checkbox" checked={fasted} onChange={(e) => setFasted(e.target.checked)} />
@@ -377,22 +386,23 @@ export function ExerciseSheet({ weightKg, exercise, date, onClose }: Props) {
                       {l.measure === 'min' ? 'Minutes' : 'Seconds'}
                       <Delta now={l.duration} was={prev(l)?.last.duration} />
                     </span>
-                    <input type="number" inputMode="decimal" value={l.duration ?? ''} onChange={(e) => setLift(i, { duration: num(e.target.value) })} />
+                    <input type="number" inputMode="decimal" value={l.duration ?? ''} readOnly={!!l.setAmounts} onChange={(e) => setLift(i, { duration: num(e.target.value) })} />
                   </label>
                 ) : (
                   <label>
                     <span>
-                      {l.side === 'both' ? 'Reps (total)' : 'Reps'}
+                      {l.setAmounts ? 'Avg reps' : l.side === 'both' ? 'Reps (total)' : 'Reps'}
                       <Delta now={l.reps} was={prev(l)?.last.reps} />
                     </span>
-                    <input type="number" inputMode="numeric" value={l.reps ?? ''} onChange={(e) => setLift(i, { reps: num(e.target.value) })} />
+                    <input type="number" inputMode="numeric" value={l.reps ?? ''} readOnly={!!l.setAmounts} onChange={(e) => setLift(i, { reps: num(e.target.value) })} />
                   </label>
                 )}
                 <label>
                   <span>Sets</span>
-                  <input type="number" inputMode="numeric" value={l.sets ?? ''} onChange={(e) => setLift(i, { sets: num(e.target.value) })} />
+                  <input type="number" inputMode="numeric" value={l.sets ?? ''} readOnly={!!l.setAmounts} onChange={(e) => setLift(i, { sets: num(e.target.value) })} />
                 </label>
               </div>
+              <PerSet l={l} onChange={(next) => setLift(i, next)} />
               {prev(l) && <LastTime s={prev(l)!} />}
               <SetScore s={(l.reps != null || l.duration != null) ? scoreLiftDraft(l, exercises, library, exercise?.id, weightKg) : null} />
               {!isTimed(l) && (l.bells === 2 || l.side) && l.reps != null && (
@@ -523,6 +533,76 @@ function SetScore({ s }: { s: ReturnType<typeof scoreLiftDraft> }) {
         {' '}
         · exercise {s.tier.toFixed(2).replace(/0$/, '')} × progress {s.effort.toFixed(2).replace(/0$/, '')} ({s.why})
       </span>
+    </div>
+  )
+}
+
+/**
+ * "All sets the same" (the default). Unticked, one row per set, each starting at the first set's reps (or time) and
+ * editable; the lift's reps become their average and its sets their count.
+ */
+function PerSet({ l, onChange }: { l: Lift; onChange: (next: Partial<Lift>) => void }) {
+  const timed = isTimed(l)
+  const unit = l.measure === 'min' ? 'min' : l.measure === 's' ? 's' : 'reps'
+  const amounts = l.setAmounts
+  const first = (timed ? l.duration : l.reps) ?? 0
+  const split = () => {
+    const n = Math.max(1, Math.round(l.sets ?? 4))
+    onChange(withSetAmounts(l, Array.from({ length: n }, () => Math.round(first))))
+  }
+  const join = () => {
+    const avg = (timed ? l.duration : l.reps) ?? null
+    onChange({ setAmounts: undefined, ...(timed ? { duration: avg != null ? Math.round(avg) : null } : { reps: avg != null ? Math.round(avg) : null }) })
+  }
+  const setAt = (k: number, v: string) => {
+    const next = [...amounts!]
+    next[k] = v === '' ? 0 : Number(v)
+    onChange(withSetAmounts(l, next))
+  }
+  return (
+    <div className="per-set">
+      <label className="check">
+        <input type="checkbox" checked={!amounts} onChange={(e) => (e.target.checked ? join() : split())} /> All sets the same
+      </label>
+      {amounts && (
+        <div className="per-set-rows">
+          {amounts.map((a, k) => (
+            <label key={k}>
+              <span>Set {k + 1}</span>
+              <input type="number" inputMode="numeric" value={a || ''} onChange={(e) => setAt(k, e.target.value)} aria-label={`Set ${k + 1} ${unit}`} />
+            </label>
+          ))}
+          <div className="per-set-btns">
+            <button type="button" className="icon-btn" aria-label="Add a set" onClick={() => onChange(withSetAmounts(l, [...amounts, amounts[amounts.length - 1] ?? first]))}>
+              +
+            </button>
+            {amounts.length > 1 && (
+              <button type="button" className="icon-btn" aria-label="Remove the last set" onClick={() => onChange(withSetAmounts(l, amounts.slice(0, -1)))}>
+                −
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+/** Fitbit's length and the app's are more than 10% apart: pick the right one. */
+export function DurationChoice({ e, onPick }: { e: Exercise; onPick: (minutes: number) => void }) {
+  const c = durationCheck(e)
+  if (!c) return null
+  return (
+    <div className="notice small duration-choice" role="status">
+      <b>How long was this workout?</b> Fitbit recorded {c.fitbit} min; your {e.meta.lifts?.length ?? 0} exercises suggest {c.app} min.
+      <div className="row" style={{ gap: 8, marginTop: 6, flexWrap: 'wrap' }}>
+        <button type="button" className="btn small-btn" onClick={() => onPick(c.fitbit)}>
+          {c.fitbit} min (Fitbit)
+        </button>
+        <button type="button" className="btn secondary small-btn" onClick={() => onPick(c.app)}>
+          {c.app} min (my log)
+        </button>
+      </div>
     </div>
   )
 }

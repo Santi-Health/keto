@@ -1,4 +1,4 @@
-import { fitbitStatus, isHardSession, routineStart, sessionLabel, type Exercise, type Routine } from '../lib/exercise'
+import { durationCheck, fitbitStatus, isHardSession, routineStart, sessionLabel, type Exercise, type Routine } from '../lib/exercise'
 
 interface Props {
   today: Exercise[]
@@ -95,6 +95,7 @@ function formatTime(hhmm: string): string {
 
 /** A session's calories: Fitbit's number, or that it's still waiting for Fitbit, or that Fitbit never recorded it. */
 export function SessionKcal({ e }: { e: Exercise }) {
+  if (durationCheck(e)?.status === 'conflict') return <span style={{ color: 'var(--warn)' }} title="Fitbit's length and yours differ by more than 10%: open it to choose">⚠ pick length</span>
   const st = fitbitStatus(e)
   if (st === 'waiting') return <span className="muted" title="Calories come from Fitbit once it syncs this workout">⏳ Fitbit</span>
   if (st === 'missing') return <span style={{ color: 'var(--warn)' }} title="Fitbit has no recording of this workout">⚠ no Fitbit data</span>

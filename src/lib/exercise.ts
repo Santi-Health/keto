@@ -150,6 +150,11 @@ export interface Lift {
   duration?: number | null
   /** Muscle group you picked for a lift the app didn't know. */
   group?: string
+  /**
+   * Reps (or seconds/minutes for timed pieces) for each set, when they weren't all the same. `reps`/`duration` then
+   * hold their average and `sets` their count.
+   */
+  setAmounts?: number[]
   note?: string
 }
 
@@ -221,6 +226,12 @@ export interface Exercise {
     userEdited?: boolean
     /** Logged in the app: calories (and the real start) come from Fitbit's recording of it once it syncs. */
     awaitingFitbit?: boolean
+    /** How long the app worked out the workout took (6 minutes per exercise), to compare with Fitbit's recording. */
+    appMinutes?: number
+    /** How long Fitbit recorded it. */
+    fitbitMinutes?: number
+    /** The length you (or the 10% rule) settled on, kept when Fitbit re-imports. */
+    chosenMinutes?: number
   }
   updated_at: string
   deleted_at: string | null
@@ -327,21 +338,46 @@ export function routineSession(r: Routine, day = new Date()): Exercise {
   }
 }
 
-/** Minutes per set of a reps lift, rest included: 5 minutes for every 4 sets. */
-export const MIN_PER_SET = 5 / 4
+/** Minutes per exercise in a workout, sets and rest included. */
+export const MIN_PER_EXERCISE = 6
 /** A logged workout is at least this long. */
 const MIN_SESSION_MIN = 10
+/** Fitbit's length and the app's within this share of each other: the longer one is used without asking. */
+export const DURATION_TOLERANCE = 0.1
 
-/** How long a strength workout took, from what was logged: timed pieces as entered, plus 5 minutes per 4 sets. */
+/** How long a strength workout took, from what was logged: 6 minutes per exercise, or a cardio piece's own minutes if longer. */
 export function strengthMinutes(lifts: Lift[]): number {
   let m = 0
-  for (const l of lifts) {
-    const sets = l.sets ?? 1
-    if (l.measure === 'min') m += (l.duration ?? 0) * sets
-    else if (l.measure === 's') m += ((l.duration ?? 0) * sets) / 60 + MIN_PER_SET * sets
-    else m += MIN_PER_SET * sets
-  }
+  for (const l of lifts) m += l.measure === 'min' ? Math.max(MIN_PER_EXERCISE, (l.duration ?? 0) * (l.sets ?? 1)) : MIN_PER_EXERCISE
   return Math.max(MIN_SESSION_MIN, Math.round(m))
+}
+
+/**
+ * The app's length against Fitbit's recording of a workout: 'ok' when settled, 'adjust' when they're within 10%
+ * (use the longer, `use`), 'conflict' when further apart (you choose).
+ */
+export function durationCheck(e: Exercise): { status: 'ok' | 'adjust' | 'conflict'; app: number; fitbit: number; use: number } | null {
+  const app = e.meta.appMinutes
+  if (!app || !e.external_id || e.kind !== 'strength') return null
+  const fitbit = e.meta.fitbitMinutes ?? e.duration_min
+  const chosen = e.meta.chosenMinutes
+  if (chosen != null) return { status: chosen === e.duration_min ? 'ok' : 'adjust', app, fitbit, use: chosen }
+  const longer = Math.max(app, fitbit)
+  if (Math.abs(app - fitbit) / longer <= DURATION_TOLERANCE) return { status: longer === e.duration_min ? 'ok' : 'adjust', app, fitbit, use: longer }
+  return { status: 'conflict', app, fitbit, use: e.duration_min }
+}
+
+/** A workout set to a length, keeping Fitbit's end time and remembering Fitbit's own length. */
+export function withMinutes(e: Exercise, minutes: number, chosen: boolean): Exercise {
+  const fitbit = e.meta.fitbitMinutes ?? e.duration_min
+  const end = Date.parse(e.started_at) + e.duration_min * 60_000
+  return {
+    ...e,
+    started_at: new Date(end - minutes * 60_000).toISOString(),
+    duration_min: minutes,
+    meta: { ...e.meta, fitbitMinutes: fitbit, chosenMinutes: chosen ? minutes : e.meta.chosenMinutes },
+    updated_at: new Date().toISOString(),
+  }
 }
 
 /**
@@ -374,4 +410,12 @@ export function fitbitStatus(e: Exercise, now = Date.now()): 'ok' | 'waiting' | 
   if (e.calories != null || !e.meta.awaitingFitbit) return 'ok'
   const end = Date.parse(e.started_at) + e.duration_min * 60_000
   return now - end > 12 * 3_600_000 ? 'missing' : 'waiting'
+}
+
+/** A lift with different reps per set: its sets become the count and its reps (or time) the average, to one decimal. */
+export function withSetAmounts(l: Lift, amounts: number[]): Lift {
+  const done = amounts.filter((a) => Number.isFinite(a) && a > 0)
+  const avg = done.length ? Math.round((done.reduce((s, a) => s + a, 0) / done.length) * 10) / 10 : null
+  const timed = l.measure === 's' || l.measure === 'min'
+  return { ...l, setAmounts: amounts, sets: amounts.length, ...(timed ? { duration: avg } : { reps: avg }) }
 }

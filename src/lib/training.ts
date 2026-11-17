@@ -23,6 +23,8 @@ const SHOW_GROUPS = new Set(['Chest', 'Abs / core'])
 export interface GroupWeek {
   group: string
   sets: number
+  /** The same sets split by how many days ago they were done (index 0 = the last day of the window). */
+  byAge: number[]
   target: number
   /** Whole days since this group was last trained, or null if not in the last 3 weeks. */
   daysSince: number | null
@@ -220,9 +222,12 @@ export function weekCoverage(exercises: Exercise[], library: LibraryExercise[], 
   return Object.entries(WEEKLY_SETS).map(([group, target]) => {
     const mine = recent.filter((d) => groupOf(d.lift.name, library, d.lift.group) === group)
     // Effective sets: each set counts its exercise's tier times how it compared with last time.
-    const sets = round1(mine.filter((d) => d.day >= weekFrom && d.day <= today).reduce((s, d) => s + (d.lift.sets ?? 1) * d.perSet, 0))
+    const inWindow = mine.filter((d) => d.day >= weekFrom && d.day <= today)
+    const sets = round1(inWindow.reduce((s, d) => s + (d.lift.sets ?? 1) * d.perSet, 0))
+    const byAge = Array.from({ length: daysBetween(weekFrom, today) + 1 }, () => 0)
+    for (const d of inWindow) byAge[daysBetween(d.day, today)] += (d.lift.sets ?? 1) * d.perSet
     const last = mine.length ? mine[mine.length - 1].day : null
-    return { group, sets, target, daysSince: last ? daysBetween(last, today) : null }
+    return { group, sets, target, byAge: byAge.map(round1), daysSince: last ? daysBetween(last, today) : null }
   })
 }
 
