@@ -3144,7 +3144,7 @@ input.drink-time {
   color: var(--warn);
 }
 
-/* 7-day bars split by how recent the sets are: today green, then yellow, orange, and red about to drop off. */
+/* 7-day bars split by how recent the sets are: today green, then light green, yellow, and orange about to drop off. */
 .coach-bar {
   display: flex;
 }
@@ -3172,15 +3172,15 @@ input.drink-time {
 }
 
 .age-1 {
-  background: #e3b341;
+  background: #8fd3a3;
 }
 
 .age-2 {
-  background: #e07b39;
+  background: #e3b341;
 }
 
 .age-3 {
-  background: #d64545;
+  background: #e07b39;
 }
 
 .coach-sets > .age-legend,
