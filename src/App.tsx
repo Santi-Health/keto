@@ -103,7 +103,7 @@ function Tracker({ session, recovering = false, onPassphraseChanged = () => {} }
     <WorkoutLengths />
     <SyncOnOpen enabled={!!session} />
     <ZoneTracker log={profile.zoneLog} update={update} />
-    <YogaScheduleFix profile={profile} update={update} ready={sync === 'synced' || sync === 'local-only'} />
+    <YogaScheduleFix profile={profile} update={update} ready={sync !== 'syncing' && sync !== 'signed-out'} />
     <VitaminFiller />
     <div className="app">
       <main className="main">

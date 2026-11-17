@@ -86,6 +86,8 @@ export function ExerciseSheet({ weightKg, exercise, date, onClose }: Props) {
   useEffect(() => {
     if (json !== opened || restored) saveDraft(exercise?.id, JSON.parse(json))
   }, [json, opened, restored, exercise?.id])
+  // Asked in the sheet, not with a browser pop-up: an installed app on Android can block those silently.
+  const [confirmDiscard, setConfirmDiscard] = useState(false)
   function discardDraft() {
     clearDraft(exercise?.id)
     onClose()
@@ -432,17 +434,22 @@ export function ExerciseSheet({ weightKg, exercise, date, onClose }: Props) {
         <button type="button" className="btn" onClick={save} disabled={!(autoTime ? named.length > 0 : mins > 0)}>
           {exercise ? 'Save changes' : 'Log exercise'}
         </button>
-        {(json !== opened || restored) && (
-          <button
-            type="button"
-            className="btn secondary"
-            onClick={() => {
-              if (window.confirm(exercise ? 'Throw away your unsaved changes to this workout?' : 'Throw away this unsaved workout?')) discardDraft()
-            }}
-          >
-            {exercise ? 'Discard changes' : 'Discard workout'}
-          </button>
-        )}
+        {(json !== opened || restored || confirmDiscard) &&
+          (confirmDiscard ? (
+            <span className="discard-confirm">
+              {exercise ? 'Throw away your changes?' : 'Throw away this workout?'}{' '}
+              <button type="button" className="btn danger" onClick={discardDraft}>
+                Yes, discard
+              </button>{' '}
+              <button type="button" className="btn secondary" onClick={() => setConfirmDiscard(false)}>
+                Keep
+              </button>
+            </span>
+          ) : (
+            <button type="button" className="btn secondary" onClick={() => setConfirmDiscard(true)}>
+              {exercise ? 'Discard changes' : 'Discard workout'}
+            </button>
+          ))}
         {exercise && (
           <button
             type="button"

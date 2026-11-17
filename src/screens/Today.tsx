@@ -68,6 +68,8 @@ export function Today({ profile, targets, onOpenSettings, onToggleRefeed, onNavi
   const hasData = logs.length > 0 || readings.length > 0
   const [weekMode, setWeekMode] = useState<'average' | 'total'>('average')
   const [logExercise, setLogExercise] = useState(false)
+  // Asked inline, not with a browser pop-up: an installed app on Android can block those silently.
+  const [confirmDiscard, setConfirmDiscard] = useState(false)
   const draft = useNewDraft()
   const [readingSheet, setReadingSheet] = useState<{ kind?: ReadingKind } | null>(null)
   const [importing, setImporting] = useState(false)
@@ -301,15 +303,29 @@ export function Today({ profile, targets, onOpenSettings, onToggleRefeed, onNavi
                 {draftLabel(draft)} in progress{draft.lifts.length ? ` (${draft.lifts.length} lift${draft.lifts.length === 1 ? '' : 's'})` : ''}, not saved yet: <u>resume</u>
               </button>{' '}
               ·{' '}
-              <button
-                type="button"
-                className="link-btn"
-                onClick={() => {
-                  if (window.confirm('Throw away this unsaved workout?')) clearDraft()
-                }}
-              >
-                discard
-              </button>
+              {confirmDiscard ? (
+                <>
+                  throw it away?{' '}
+                  <button
+                    type="button"
+                    className="link-btn"
+                    onClick={() => {
+                      clearDraft()
+                      setConfirmDiscard(false)
+                    }}
+                  >
+                    yes, discard
+                  </button>{' '}
+                  ·{' '}
+                  <button type="button" className="link-btn" onClick={() => setConfirmDiscard(false)}>
+                    keep
+                  </button>
+                </>
+              ) : (
+                <button type="button" className="link-btn" onClick={() => setConfirmDiscard(true)}>
+                  discard
+                </button>
+              )}
             </div>
           )}
           {isToday && (
