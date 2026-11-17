@@ -432,6 +432,17 @@ export function ExerciseSheet({ weightKg, exercise, date, onClose }: Props) {
         <button type="button" className="btn" onClick={save} disabled={!(autoTime ? named.length > 0 : mins > 0)}>
           {exercise ? 'Save changes' : 'Log exercise'}
         </button>
+        {(json !== opened || restored) && (
+          <button
+            type="button"
+            className="btn secondary"
+            onClick={() => {
+              if (window.confirm(exercise ? 'Throw away your unsaved changes to this workout?' : 'Throw away this unsaved workout?')) discardDraft()
+            }}
+          >
+            {exercise ? 'Discard changes' : 'Discard workout'}
+          </button>
+        )}
         {exercise && (
           <button
             type="button"

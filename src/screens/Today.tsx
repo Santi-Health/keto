@@ -1,5 +1,5 @@
 import { useMemo, useState, type ReactNode } from 'react'
-import { daysSinceStrength, routineDue, routineSession, sessionLabel } from '../lib/exercise'
+import { EXERCISE_KINDS, daysSinceStrength, routineDue, routineSession, sessionLabel } from '../lib/exercise'
 import { catchUpDays, hasVitals, mergeActivity, weightReadings } from '../lib/activity'
 import { DRIVE_SCOPE, cachedToken, fetchActivity, getGoogleToken, heartRateCalories, learnTypes, listExercises, mergeImported, toAppExercise } from '../lib/googleHealth'
 import { useInstall } from '../lib/install'
@@ -13,7 +13,7 @@ import { useOpenSyncState } from '../lib/backgroundSync'
 import { deviceTz, travelDay, zoneLabel } from '../lib/time'
 import { DrinksCard } from '../components/DrinksCard'
 import { WeeklySetsCard } from '../components/WeeklySetsCard'
-import { useNewDraft } from '../lib/exerciseDraft'
+import { clearDraft, useNewDraft, type ExerciseDraft } from '../lib/exerciseDraft'
 import { GlucoseDayCard, GlucoseImport } from '../components/GlucoseDayCard'
 import { ExerciseSheet } from '../components/ExerciseSheet'
 import { TrainingCard } from '../components/TrainingCard'
@@ -296,9 +296,21 @@ export function Today({ profile, targets, onOpenSettings, onToggleRefeed, onNavi
         <div className="grid">
           {isToday && <RelinkBanner />}
           {isToday && draft && !logExercise && (
-            <button type="button" className="notice coach-link" onClick={() => setLogExercise(true)}>
-              🏋️ Workout in progress{draft.lifts.length ? ` (${draft.lifts.length} lift${draft.lifts.length === 1 ? '' : 's'})` : ''}, not saved yet: <u>resume</u>
-            </button>
+            <div className="notice draft-note">
+              <button type="button" className="link-btn" onClick={() => setLogExercise(true)}>
+                {draftLabel(draft)} in progress{draft.lifts.length ? ` (${draft.lifts.length} lift${draft.lifts.length === 1 ? '' : 's'})` : ''}, not saved yet: <u>resume</u>
+              </button>{' '}
+              ·{' '}
+              <button
+                type="button"
+                className="link-btn"
+                onClick={() => {
+                  if (window.confirm('Throw away this unsaved workout?')) clearDraft()
+                }}
+              >
+                discard
+              </button>
+            </div>
           )}
           {isToday && (
             <button type="button" className="notice coach-link" onClick={() => onNavigate('coach')}>
@@ -651,4 +663,10 @@ function PastReadings({ points, weightUnit, week }: { points: ReturnType<typeof 
       {sleep != null && <p className="muted small" style={{ margin: '6px 0 0' }}>Sleep {week ? 'average' : ''} {formatSleep(sleep)}.</p>}
     </section>
   )
+}
+
+/** "🧘 Yoga", "🏋️ Strength"… for the unsaved-workout note. */
+function draftLabel(d: ExerciseDraft): string {
+  const k = EXERCISE_KINDS.find((x) => x.value === d.kind)
+  return k ? `${k.emoji} ${k.label}` : '🏋️ Workout'
 }
