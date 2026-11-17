@@ -56,6 +56,8 @@ export interface Profile {
   dislikedLifts?: string[]
   /** The 12-week plan to the body-fat goal, from the last DEXA. */
   goalPlan?: GoalPlan
+  /** One-time fixes already applied to this profile, so they never run twice. */
+  fixesApplied?: string[]
   /** Latest weigh-in already copied into weightKg. */
   weightReadingId?: string | null
   /** ISO timestamp of the last local edit, used to resolve sync conflicts. */

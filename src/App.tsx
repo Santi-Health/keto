@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import { DataProvider, useData } from './lib/data'
-import { durationCheck, withMinutes } from './lib/exercise'
+import { DEFAULT_YOGA_ROUTINE, durationCheck, withMinutes } from './lib/exercise'
 import { averageBurn } from './lib/activity'
 import { useSyncOnOpen } from './lib/backgroundSync'
 import { recordZone } from './lib/time'
@@ -103,6 +103,7 @@ function Tracker({ session, recovering = false, onPassphraseChanged = () => {} }
     <WorkoutLengths />
     <SyncOnOpen enabled={!!session} />
     <ZoneTracker log={profile.zoneLog} update={update} />
+    <YogaScheduleFix profile={profile} update={update} ready={sync === 'synced' || sync === 'local-only'} />
     <VitaminFiller />
     <div className="app">
       <main className="main">
@@ -209,6 +210,24 @@ function WorkoutLengths() {
       if (c?.status === 'adjust') saveExercise(withMinutes(e, c.use, e.meta.chosenMinutes != null))
     }
   }, [exercises, saveExercise])
+  return null
+}
+
+/**
+ * One time only: your yoga classes, Mon/Wed/Fri at 12:05 and Tue at 11:05, 50 minutes each. A sync bug had dropped
+ * the Tuesday class from the saved routine; after this, Settings → Yoga routine is the place to change it.
+ */
+const YOGA_FIX = 'yoga-2026-11-17'
+function YogaScheduleFix({ profile, update, ready }: { profile: Profile; update: (p: Partial<Profile>) => void; ready: boolean }) {
+  const done = profile.fixesApplied?.includes(YOGA_FIX)
+  useEffect(() => {
+    // Wait for the server copy, so a phone that already has it (or a later change) isn't overwritten.
+    if (done || !ready) return
+    update({
+      yogaRoutine: { ...(profile.yogaRoutine ?? DEFAULT_YOGA_ROUTINE), days: [1, 2, 3, 5], start: '12:05', times: { 2: '11:05' }, minutes: 50 },
+      fixesApplied: [...(profile.fixesApplied ?? []), YOGA_FIX],
+    })
+  }, [done, ready, profile.yogaRoutine, profile.fixesApplied, update])
   return null
 }
 
