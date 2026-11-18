@@ -79,12 +79,22 @@ export function KetoModelCard({ model, netCarbLimit, onApplyLimit }: Props) {
           {model.n >= 3 && model.populationError != null && model.personalError != null ? (
             <p className="small" style={{ marginTop: 0 }}>
               Typical miss: general estimate <b>{model.populationError.toFixed(2)}</b> mmol/L, your model <b>{model.personalError.toFixed(2)}</b>{' '}
-              mmol/L. Each reading is predicted by a model that hadn't seen it, so this is an honest score.
+              mmol/L. Each reading is predicted by a model that hadn't seen it, so this is an honest score.{' '}
+              {model.usingPersonal ? (
+                <b>Your model is more accurate, so your estimates use it.</b>
+              ) : (
+                <b>Until your model misses by less, estimates use the general one; it switches over by itself once yours does better.</b>
+              )}
             </p>
           ) : (
             <p className="small" style={{ marginTop: 0 }}>
               {model.n} reading{model.n > 1 ? 's' : ''} so far. With so few, the model moves only part of the way toward them; accuracy shows
               from 3 readings.
+            </p>
+          )}
+          {model.findings.length > 0 && !model.usingPersonal && (
+            <p className="muted small" style={{ margin: '0 0 4px' }}>
+              What your readings hint at so far (not used yet):
             </p>
           )}
           {model.findings.length > 0 && (

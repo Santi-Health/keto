@@ -66,6 +66,11 @@ export interface KetoModel {
   findings: string[]
   advice: CarbLimitAdvice
   confidence: 'none' | 'learning' | 'early' | 'solid'
+  /**
+   * Whether estimates use your personal model. Only once it misses your readings by less than the general
+   * estimate does (each reading predicted without it); until then the general estimate is used as is.
+   */
+  usingPersonal: boolean
 }
 
 /** Solves A·x = b by Gaussian elimination with partial pivoting (A is small and well conditioned). */
@@ -194,8 +199,23 @@ export function fitKetoModel(opts: {
   const overallSd = Math.sqrt(solve(full.A, [1, 0, 0, 0, 0, 0])[0])
   const sigma = Math.min(0.6, Math.max(0.2, Math.sqrt(residualSd ** 2 + overallSd ** 2)))
 
-  const adjuster: KetoAdjuster | null = n
-    ? {
+  // How far your readings scatter around the general estimate itself, for its range when it's the one used.
+  const generalSigma = Math.min(0.6, Math.max(0.2, Math.sqrt((POPULATION_SIGMA ** 2 * 3 + rows.reduce((a, p) => a + p.r ** 2, 0)) / (3 + n))))
+  const populationError = mae((p) => p.population)
+  const personalError = mae((p) => p.personal)
+  const usingPersonal = n > 0 && (personalError == null || populationError == null || personalError < populationError)
+  const adjuster: KetoAdjuster | null = !n
+    ? null
+    : !usingPersonal
+      ? {
+          // The general estimate, with the range your readings actually scatter by.
+          adjust: () => 0,
+          sigma: generalSigma,
+          n,
+          reason: () =>
+            `Checked against your ${n} blood readings: the general estimate still misses them by less than a personal model would (${populationError?.toFixed(2)} vs ${personalError?.toFixed(2)} mmol/L), so it's used as is.`,
+        }
+      : {
         adjust: (f) => capped(dot(full.beta, toX(f))),
         sigma,
         n,
@@ -205,7 +225,6 @@ export function fitKetoModel(opts: {
           return `Personalized from your ${n} blood reading${n > 1 ? 's' : ''}: ${Math.abs(p)}% ${p > 0 ? 'higher' : 'lower'} than the general estimate for a day like this.`
         },
       }
-    : null
 
   // Plain-language findings, only once there's enough data and the effect is meaningful.
   const findings: string[] = []
@@ -223,9 +242,9 @@ export function fitKetoModel(opts: {
     effect(0.3 * weights.protein, (p, up) => `30% more protein than your target ${up ? 'does not seem to hurt' : `lowers your ketones about ${p}%`}.`)
   }
 
-  const advice = carbLimitAdvice(n, days, full.beta, sigma, rows.map((p) => p.features.fastH), netCarbLimit)
+  const advice = carbLimitAdvice(n, days, usingPersonal ? full.beta : full.beta.map(() => 0), usingPersonal ? sigma : generalSigma, rows.map((p) => p.features.fastH), netCarbLimit)
   const confidence = n === 0 ? 'none' : n < 3 ? 'learning' : n < SOLID_READINGS ? 'early' : 'solid'
-  return { n, days, weights, adjuster, points, populationError: mae((p) => p.population), personalError: mae((p) => p.personal), findings, advice, confidence }
+  return { n, days, weights, adjuster, points, populationError, personalError, findings, advice, confidence, usingPersonal }
 }
 
 const MIN_READINGS = 10

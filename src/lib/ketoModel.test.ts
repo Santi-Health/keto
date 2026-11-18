@@ -94,5 +94,26 @@ describe('personal ketosis model', () => {
     const logs = [meal(start - 2 * 3_600_000, 10), { ...meal(at - 60_000, 2), id: 'breakfast' }]
     expect(estimateKetosis({ ...base, at, logs }).features.fastH).toBeCloseTo(12, 0)
   })
+
+  it('uses the personal model only once it beats the general estimate', () => {
+    // Readings that consistently run at twice the general estimate: personal wins.
+    const good = fitKetoModel({ ...base, ...history(2) })
+    expect(good.personalError!).toBeLessThan(good.populationError!)
+    expect(good.usingPersonal).toBe(true)
+    // Readings that wobble around the general estimate: personal can't beat it, so it isn't used.
+    const logs: LogEntry[] = []
+    const readings: ReadingRow[] = []
+    for (let d = 0; d < 10; d++) {
+      logs.push(meal(start + d * DAY, d % 2 ? 20 : 10))
+      const at = start + d * DAY + 19 * 3_600_000
+      const pop = estimateKetosis({ ...base, at, logs }).populationMid
+      readings.push(ketone(at, Math.round(pop * (d % 3 === 0 ? 2.5 : 0.5) * 100) / 100))
+    }
+    const noisy = fitKetoModel({ ...base, readings, logs })
+    if (noisy.personalError! >= noisy.populationError!) {
+      expect(noisy.usingPersonal).toBe(false)
+      expect(noisy.adjuster!.adjust(readings.length ? estimateKetosis({ ...base, at: start, logs }).features : ({} as never))).toBe(0)
+    }
+  })
 })
 

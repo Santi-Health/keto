@@ -606,7 +606,9 @@ export function Today({ profile, targets, onOpenSettings, onToggleRefeed, onNavi
             <p className="muted small" style={{ marginBottom: 0 }}>
               {ketoModel.n === 0
                 ? 'Estimate from general research (carbs, fasting, exercise, protein). Ketosis means about 0.5+ mmol/L. Add blood ketone readings and it learns your own pattern.'
-                : `Personal model from ${ketoModel.n} blood reading${ketoModel.n > 1 ? 's' : ''} (${ketoModel.confidence === 'solid' ? 'solid' : 'still learning'}). Ketosis means about 0.5+ mmol/L. `}
+                : ketoModel.usingPersonal
+                  ? `Personal model from ${ketoModel.n} blood reading${ketoModel.n > 1 ? 's' : ''} (${ketoModel.confidence === 'solid' ? 'solid' : 'still learning'}). Ketosis means about 0.5+ mmol/L. `
+                  : `General estimate, checked against your ${ketoModel.n} blood readings: your personal model takes over once it's more accurate. Ketosis means about 0.5+ mmol/L. `}
               {ketoModel.n > 0 && (
                 <button type="button" className="link-btn" onClick={() => onNavigate('coach')}>
                   See how it's doing
