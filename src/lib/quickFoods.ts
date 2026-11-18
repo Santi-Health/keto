@@ -133,7 +133,7 @@ export const YOGURT = /\b(yogh?urt|oikos|skyr|chobani|fage|siggi'?s?|kefir|activ
 // --- Condiments ----------------------------------------------------------------------------
 
 const CONDIMENT =
-  /\b(mayo(nnaise)?|aioli|ketchup|catsup|mustard|hot sauce|sriracha|tabasco|cholula|buffalo sauce|bbq sauce|barbecue sauce|soy sauce|tamari|coconut aminos|fish sauce|worcestershire|teriyaki|salsa|pico de gallo|chimichurri|pesto|tahini|relish|horseradish|wasabi|ranch|dressing|vinaigrette|vinegar|lemon juice|lime juice|salt|nusalt|pepper(corns)?|seasoning|spices?|everything bagel|garlic powder|onion powder|paprika|cumin|oregano|cinnamon|chili flakes|red pepper flakes|sweetener|stevia|monk fruit|allulose|erythritol|(olive|avocado|coconut|mct|sesame|canola|sunflower|cooking|vegetable) oil)\b/i
+  /\b(mayo(nnaise)?|aioli|ketchup|catsup|mustard|hot sauce|sriracha|tabasco|cholula|buffalo sauce|bbq sauce|barbecue sauce|soy sauce|tamari|coconut aminos|fish sauce|worcestershire|teriyaki|salsa|pico de gallo|chimichurri|pesto|tahini|relish|horseradish|wasabi|ranch|dressing|vinaigrette|vinegar|lemon juice|lime juice|salt|nusalt|pepper(corns)?|seasoning|spices?|everything bagel|garlic powder|onion powder|paprika|cumin|oregano|cinnamon|chili flakes|red pepper flakes|sweetener|syrup|caramel sauce|stevia|monk fruit|allulose|erythritol|(olive|avocado|coconut|mct|sesame|canola|sunflower|cooking|vegetable) oil)\b/i
 /** "Pepper" the seasoning, not bell or jalapeño peppers; olive oil, not tuna in olive oil. */
 const NOT_CONDIMENT = /\bin (\w+ )?oil\b|\b(bell|jalape[nñ]o|poblano|sweet|stuffed|roasted|chicken|steak|beef|salmon|pork|bread|chips|nuts|almonds)\b/i
 /** Butter and spreads that go on or in things; "sweet cream butter" counts, nut butters and baked goods don't. */
@@ -147,11 +147,23 @@ const PICADA =
 /** Cheese and meats that aren't for a picada: spreads, cheese in dishes, cooked ham steaks. */
 const NOT_PICADA = /\b(cream cheese|cottage|ricotta|mascarpone|sauce|dressing|crackers|chips|crisps|bites|puffs|curls|whisps|pizza|burger|omelet|quesadilla|soup|bread|oil|steak|hamburger|powder|grated)\b/i
 
-export type FoodSection = 'fruits_nuts' | 'picada' | 'condiments'
+// --- Keto desserts ---------------------------------------------------------------------------
+
+/** Sweet things eaten as dessert: Oikos cups, keto Mantecol, keto ice cream and the like. */
+const DESSERT =
+  /\b(oikos|mantecol|keto (dessert|ice cream|brownies?|cookies?|cheesecake|mousse|flan|alfajor(es)?)|ice cream|halo top|rebel creamery|enlightened|cheesecake|mousse|brownies?|flan|panna cotta|gelatin|jell-?o)\b/i
+/** Not a dessert on its own: toppings, bars eaten as snacks, protein powders. */
+const NOT_DESSERT = /\b(syrup|sauce|topping|powder|protein bar|whey)\b/i
+/** Sweet toppings that go with a dessert ("ChocZero caramel"), not a caramel-flavored yogurt. */
+const CARAMEL = /\bcaramel\b/
+const isTopping = (f: Pick<Food, 'name'>) => CARAMEL.test(f.name.toLowerCase()) && !YOGURT.test(f.name) && !DESSERT.test(f.name)
+
+export type FoodSection = 'fruits_nuts' | 'picada' | 'desserts' | 'condiments'
 /** Bottom sections, top to bottom; Condiments is last. */
 export const SECTIONS: { key: FoodSection; title: string }[] = [
   { key: 'fruits_nuts', title: 'Fruits & nuts' },
   { key: 'picada', title: 'Picada' },
+  { key: 'desserts', title: 'Keto desserts' },
   { key: 'condiments', title: 'Condiments' },
 ]
 
@@ -170,6 +182,7 @@ export function sectionsOf(food: Pick<Food, 'name' | 'meta' | 'source'>): FoodSe
   if (!condiment && FRUIT_NUT.test(n) && !NOT_FRUIT_NUT.test(n)) out.push('fruits_nuts')
   // The short name too, for USDA order: "Cheese, cream" is cream cheese.
   if (PICADA.test(n) && !NOT_PICADA.test(n) && !NOT_PICADA.test(shortName({ name: n, brand: null, meta: {} }))) out.push('picada')
+  if (!condiment && DESSERT.test(n) && !NOT_DESSERT.test(n)) out.push('desserts')
   if (condiment) out.push('condiments')
   return out
 }
@@ -198,6 +211,8 @@ export function veryFrequentAt(
 const ICONS: [RegExp, string][] = [
   // Before the fruits, so a banana yogurt is a yogurt.
   [YOGURT, '🥣'],
+  // Peanut nougat, like the Argentine Mantecol.
+  [/\bmantecol\b/i, '🥜'],
   [/mayo|aioli|ketchup|mustard|sauce|sriracha|tabasco|salsa|dressing|vinaigrette|ranch|pesto|vinegar|aminos|relish|tahini|horseradish/, '🫙'],
   [/salt|black pepper|peppercorn|seasoning|spice|paprika|cumin|oregano|cinnamon|flakes/, '🧂'],
   [/blueberr|blackberr/, '🫐'],
@@ -436,6 +451,7 @@ const PAIR_PICK: [RegExp, (f: Pick<Food, 'name' | 'meta' | 'source'>) => boolean
   [SALT, isPlainSalt],
   [PEPPER, isPepper],
   [NUSALT, () => true],
+  [CARAMEL, isTopping],
 ]
 
 /** Meat, fish and vegetables you cook and salt; not cured or ready-made foods, which come salted. */
@@ -451,6 +467,8 @@ const PAIR_RULES: { match: RegExp; not?: RegExp; with: RegExp[] }[] = [
   { match: /\begg whites?\b/, with: [NUSALT, SALT, AVOCADO_OIL, PEPPER] },
   { match: /\beggs?\b/, not: /\bwhites?\b|eggplant|salad|bites?|noodles?|nog\b/, with: [NUSALT, SALT, AVOCADO_OIL, PEPPER] },
   { match: COOKED, not: SALTED_ALREADY, with: [NUSALT, SALT, COOKING_OIL] },
+  // Oikos with ChocZero caramel on top; tap it off when you have it plain.
+  { match: /\boikos\b/, with: [CARAMEL] },
 ]
 
 /** Salt or NuSalt, or neither. */

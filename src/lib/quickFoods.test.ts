@@ -169,13 +169,13 @@ describe('food buttons', () => {
     expect(suggestDisplayName(f('Smoked salmon'), prefixes)).toBe('Smoked salmon')
     expect(suggestDisplayName(f('Heinz Tomato Ketchup', 'Heinz'), prefixes)).toBe('Heinz Ketchup')
   })
-  it('treats Oikos and other yogurts as yogurt, not fruit, whatever the flavor', () => {
+  it('treats Oikos and other yogurts as yogurt, not fruit, whatever the flavor; Oikos is a keto dessert', () => {
     expect(foodIcon(f('Oikos Triple Zero Banana Cream', 'Dannon'))).toBe('🥣')
     expect(shortName(f('Oikos Triple Zero Banana Cream', 'Dannon'))).toBe('Oikos Banana Cream')
     expect(shortName(f('Oikos Triple Zero Strawberry Greek Yogurt', 'Dannon'))).toBe('Oikos Strawberry')
     expect(foodIcon(f('Banana yogurt'))).toBe('🥣')
     expect(foodIcon(f('Banana'))).toBe('🍌')
-    expect(sectionsOf(f('Oikos Triple Zero Banana Cream', 'Dannon'))).toEqual([])
+    expect(sectionsOf(f('Oikos Triple Zero Banana Cream', 'Dannon'))).toEqual(['desserts'])
     expect(sectionsOf(f('Strawberry Greek yogurt'))).toEqual([])
   })
   it('keeps servings short: the count, without the weight', () => {

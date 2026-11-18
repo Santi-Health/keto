@@ -46,6 +46,32 @@ const guacamole = recipeToFood('Guacamole', {
   ],
 })
 
+/**
+ * Keto Mantecol, homemade: 1 cup natural peanut butter, 140 g allulose, 1 egg white and 2 tbsp whey isolate,
+ * 435 g for the batch (10 bars). Batch: 1,610 kcal, 79 g protein, 125 g fat, 188 g carbs, 22 g fiber, 140 g
+ * allulose, 26 g net carbs. Stored per 100 g.
+ */
+const BATCH_G = 435
+const perBatch = (g: number) => Math.round((g / BATCH_G) * 1000) / 10
+const MANTECOL: NewFood = {
+  name: 'Keto Mantecol',
+  brand: null,
+  barcode: null,
+  per_100g: completeNutrients(
+    { kcal: Math.round((1610 / BATCH_G) * 100), protein: perBatch(79), fat: perBatch(125), carbs: perBatch(188), fiber: perBatch(22), sugarAlcohols: perBatch(140) },
+    false,
+    'allulose',
+  ),
+  unit_conversions: [{ unit: '1 bar', grams: 43.5 }],
+  ingredients_text: 'Natural unsweetened peanut butter, allulose, egg white, unflavored whey isolate',
+  keto_notes: 'Homemade. The allulose (32 g per 100 g) is left out of net carbs.',
+  carbs_exclude_fiber: false,
+  source: 'manual',
+  confidence: 'medium',
+  fields_estimated: [],
+  meta: { externalId: 'starter:keto-mantecol', sugarAlcoholType: 'allulose', sections: ['desserts'], portion: { amount: 50, unit: 'g' }, lastAmount: 50, lastUnit: 'g' },
+}
+
 export const STARTER_FOODS: Food[] = [
   asStarter('6f1d2c3a-9b4e-4c7a-8e21-5a0c7d3b1e42', {
     ...guacamole,
@@ -54,6 +80,7 @@ export const STARTER_FOODS: Food[] = [
     keto_notes: 'Avocado is 14 oz of flesh. The vinegar’s 6 g of sugar comes from one listing for Kosterina Crushed Tangerine.',
     meta: { ...guacamole.meta, externalId: 'starter:guacamole', meals: ['dinner'], portion: { amount: 4, unit: 'oz' }, lastAmount: 4, lastUnit: 'oz' },
   }),
+  asStarter('d3a5e8b1-7c42-4f19-9e6d-2b8c0f4a7e63', MANTECOL),
 ]
 
 const staple = (id: string, name: string, per100g: Nutrients, meta: NewFood['meta'], unitConversions: NewFood['unit_conversions'] = []): Food =>
