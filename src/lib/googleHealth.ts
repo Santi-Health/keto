@@ -122,22 +122,26 @@ export async function getGoogleToken(forceConsent = false, scope = SCOPE): Promi
   })
 }
 
+/** Where Google sends you back after linking background sync (must be listed on the OAuth client in Google Cloud). */
+export const linkRedirectUri = (origin = window.location.origin, base = import.meta.env.BASE_URL) => `${origin}${base}google-link.html`
+
 /**
- * Asks Google for a one-time code (popup) that the server trades for background access, so it can
- * sync every few hours without the app open. Must run from a tap.
+ * Google's consent page for background sync, opened in the same tab instead of a popup: the popup's answer
+ * stopped reaching the app (Google closes it and the code is lost), so Google sends you back to
+ * google-link.html with the one-time code instead.
  */
-export async function getGoogleCode(withDrive = true): Promise<string> {
-  await loadGis()
-  return new Promise((resolve, reject) => {
-    const client = window.google!.accounts.oauth2.initCodeClient({
-      client_id: GOOGLE_CLIENT_ID,
-      scope: withDrive ? `${SCOPE} ${DRIVE_SCOPE}` : SCOPE,
-      ux_mode: 'popup',
-      callback: (r) => (r.code ? resolve(r.code) : reject(new Error(r.error_description || r.error || 'Google sign-in was cancelled.'))),
-      error_callback: (e) => reject(new Error(e.type === 'popup_closed' ? 'Google sign-in was closed.' : e.message || e.type)),
-    })
-    client.requestCode()
+export function googleLinkUrl(state: string, redirectUri = linkRedirectUri()): string {
+  const q = new URLSearchParams({
+    client_id: GOOGLE_CLIENT_ID,
+    redirect_uri: redirectUri,
+    response_type: 'code',
+    scope: `${SCOPE} ${DRIVE_SCOPE}`,
+    // A refresh token, so the server can sync without the app open.
+    access_type: 'offline',
+    prompt: 'consent',
+    state,
   })
+  return `https://accounts.google.com/o/oauth2/v2/auth?${q}`
 }
 
 /** Google's own explanation from an error response, e.g. "(Google: Request had insufficient authentication scopes.)". */

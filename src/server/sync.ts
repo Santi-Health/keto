@@ -90,11 +90,18 @@ export const localDateIn = (tz: string, t = Date.now()) => dayIn(tz, t)
 
 export class RelinkNeeded extends Error {}
 
-export async function exchangeCode(env: Env, code: string): Promise<{ refreshToken: string; accessToken: string; scopes: string }> {
+/**
+ * Where Google may have sent the code: 'postmessage' for the old popup, or the app's return page (the code must be
+ * traded with the same address it was sent to). Anything else is refused.
+ */
+export const LINK_REDIRECTS = ['postmessage', 'https://santi-health.github.io/keto/google-link.html', 'http://localhost:5174/google-link.html']
+
+export async function exchangeCode(env: Env, code: string, redirectUri = 'postmessage'): Promise<{ refreshToken: string; accessToken: string; scopes: string }> {
+  if (!LINK_REDIRECTS.includes(redirectUri)) throw new Error('Unknown return address for the Google link.')
   const res = await fetch('https://oauth2.googleapis.com/token', {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({ code, client_id: env.googleClientId, client_secret: env.googleClientSecret, redirect_uri: 'postmessage', grant_type: 'authorization_code' }),
+    body: new URLSearchParams({ code, client_id: env.googleClientId, client_secret: env.googleClientSecret, redirect_uri: redirectUri, grant_type: 'authorization_code' }),
   })
   const j = (await res.json()) as { refresh_token?: string; access_token?: string; scope?: string; error?: string; error_description?: string }
   if (!res.ok || !j.access_token) throw new Error(`Google sign-in failed: ${j.error_description ?? j.error ?? res.status}`)
@@ -246,11 +253,11 @@ export async function runAll(env: Env, minGapMs = 50 * 60_000): Promise<{ user: 
 }
 
 /** Links a user: checks their app sign-in, trades Google's one-time code for background access, and syncs right away. */
-export async function link(env: Env, appJwt: string, code: string, tz: string): Promise<string> {
+export async function link(env: Env, appJwt: string, code: string, tz: string, redirectUri = 'postmessage'): Promise<string> {
   const who = await fetch(`${env.supabaseUrl}/auth/v1/user`, { headers: { apikey: env.anonKey, Authorization: `Bearer ${appJwt}` } })
   if (!who.ok) throw new Error('Not signed in to the app.')
   const userId = ((await who.json()) as { id: string }).id
-  const g = await exchangeCode(env, code)
+  const g = await exchangeCode(env, code, redirectUri)
   const d = db(env)
   const now = new Date().toISOString()
   await d.upsert('google_tokens', [{ user_id: userId, refresh_token: g.refreshToken, scopes: g.scopes, linked_at: now }], 'user_id')

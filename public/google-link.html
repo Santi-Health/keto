@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="referrer" content="no-referrer" />
+    <title>Linking Google…</title>
+    <style>
+      body { font: 16px system-ui, sans-serif; background: #f6f5f1; color: #1d2b28; display: grid; place-items: center; min-height: 100vh; margin: 0; }
+    </style>
+  </head>
+  <body>
+    <p>Linking Google…</p>
+    <script>
+      // Google sends you back here after re-linking background sync. Hand its one-time answer to the app
+      // (which sends the code to the server) and go back to Settings. Nothing is kept in the address bar.
+      var p = new URLSearchParams(location.search)
+      try {
+        localStorage.setItem(
+          'keto.googleLink.result',
+          JSON.stringify({ code: p.get('code'), error: p.get('error'), state: p.get('state'), at: Date.now() }),
+        )
+      } catch (e) {}
+      location.replace('./#settings')
+    </script>
+  </body>
+</html>

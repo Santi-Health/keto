@@ -29,7 +29,8 @@ export default defineConfig(({ command }) => ({
       },
       workbox: {
         // Supabase calls must always hit the network; the app shell is cached for offline use.
-        navigateFallbackDenylist: [/^\/auth/],
+        // google-link.html is where Google sends you back after re-linking; it must load itself, not the app shell.
+        navigateFallbackDenylist: [/^\/auth/, /google-link\.html/],
         // Exercise pictures aren't in the install download; each is kept once it's been seen, for the gym's bad signal.
         runtimeCaching: [
           {

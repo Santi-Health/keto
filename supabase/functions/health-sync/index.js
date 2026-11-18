@@ -788,6 +788,12 @@ function duplicateExercises(rows) {
 * same kind starting within 90 minutes → keep the user's details (lifts, fasted, notes) and fill in
 * Fitbit's numbers; otherwise add it.
 */
+/** Two sessions overlap in time (a workout logged at its end against Fitbit's recording of it). */
+const overlaps = (a, b) => {
+	const a0 = Date.parse(a.started_at);
+	const b0 = Date.parse(b.started_at);
+	return a0 < b0 + b.duration_min * 6e4 && b0 < a0 + a.duration_min * 6e4;
+};
 function mergeImported(imported, existing, now = (/* @__PURE__ */ new Date()).toISOString()) {
 	const result = {
 		added: [],
@@ -822,7 +828,7 @@ function mergeImported(imported, existing, now = (/* @__PURE__ */ new Date()).to
 			});
 			continue;
 		}
-		const manual = existing.find((e) => !used.has(e.id) && !e.external_id && e.kind === imp.kind && (imp.kind !== "cardio" || !e.meta.cardioType || !imp.meta.cardioType || e.meta.cardioType === imp.meta.cardioType) && Math.abs(Date.parse(e.started_at) - Date.parse(imp.started_at)) <= 54e5);
+		const manual = existing.find((e) => !used.has(e.id) && !e.external_id && e.kind === imp.kind && (imp.kind !== "cardio" || !e.meta.cardioType || !imp.meta.cardioType || e.meta.cardioType === imp.meta.cardioType) && (Math.abs(Date.parse(e.started_at) - Date.parse(imp.started_at)) <= 54e5 || overlaps(e, imp)));
 		if (manual) {
 			used.add(manual.id);
 			result.matched.push({
@@ -838,6 +844,8 @@ function mergeImported(imported, existing, now = (/* @__PURE__ */ new Date()).to
 					...manual.meta,
 					distanceMi: imp.meta.distanceMi ?? manual.meta.distanceMi,
 					caloriesEstimated: imp.calories == null,
+					awaitingFitbit: imp.calories == null ? manual.meta.awaitingFitbit : void 0,
+					fitbitMinutes: imp.duration_min,
 					fitbitTotalKcal: imp.meta.fitbitTotalKcal,
 					fitbitType: imp.meta.fitbitType
 				},
@@ -1054,7 +1062,17 @@ const forUser = (userId, rows) => rows.map((r) => {
 /** The user's local date, computed on a UTC server. */
 const localDateIn = (tz, t = Date.now()) => dayIn(tz, t);
 var RelinkNeeded = class extends Error {};
-async function exchangeCode(env, code) {
+/**
+* Where Google may have sent the code: 'postmessage' for the old popup, or the app's return page (the code must be
+* traded with the same address it was sent to). Anything else is refused.
+*/
+const LINK_REDIRECTS = [
+	"postmessage",
+	"https://santi-health.github.io/keto/google-link.html",
+	"http://localhost:5174/google-link.html"
+];
+async function exchangeCode(env, code, redirectUri = "postmessage") {
+	if (!LINK_REDIRECTS.includes(redirectUri)) throw new Error("Unknown return address for the Google link.");
 	const res = await fetch("https://oauth2.googleapis.com/token", {
 		method: "POST",
 		headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -1062,7 +1080,7 @@ async function exchangeCode(env, code) {
 			code,
 			client_id: env.googleClientId,
 			client_secret: env.googleClientSecret,
-			redirect_uri: "postmessage",
+			redirect_uri: redirectUri,
 			grant_type: "authorization_code"
 		})
 	});
@@ -1274,14 +1292,14 @@ async function runAll(env, minGapMs = 3e6) {
 	return out;
 }
 /** Links a user: checks their app sign-in, trades Google's one-time code for background access, and syncs right away. */
-async function link(env, appJwt, code, tz) {
+async function link(env, appJwt, code, tz, redirectUri = "postmessage") {
 	const who = await fetch(`${env.supabaseUrl}/auth/v1/user`, { headers: {
 		apikey: env.anonKey,
 		Authorization: `Bearer ${appJwt}`
 	} });
 	if (!who.ok) throw new Error("Not signed in to the app.");
 	const userId = (await who.json()).id;
-	const g = await exchangeCode(env, code);
+	const g = await exchangeCode(env, code, redirectUri);
 	const d = db(env);
 	const now = (/* @__PURE__ */ new Date()).toISOString();
 	await d.upsert("google_tokens", [{
@@ -1397,7 +1415,7 @@ async function unlink(env, appJwt) {
 /**
 * Supabase Edge Function "health-sync" (bundled into supabase/functions/health-sync/index.js by `npm run build:sync`).
 *   POST …/health-sync/run     every 4 hours from pg_cron (no sign-in; recently synced users are skipped)
-*   POST …/health-sync/link    from the app: { code, tz } with the app's sign-in token
+*   POST …/health-sync/link    from the app: { code, tz, redirect_uri? } with the app's sign-in token
 *   POST …/health-sync/unlink  from the app, with the app's sign-in token
 *   POST …/health-sync/sync-me from the app when it opens (skipped if synced in the last 10 minutes)
 * Deploy with "Enforce JWT verification" off, since the scheduled call has no sign-in.
@@ -1452,11 +1470,11 @@ Deno.serve(async (req) => {
 		});
 		const appJwt = (req.headers.get("Authorization") ?? "").replace(/^Bearer\s+/i, "");
 		if (path.endsWith("/link")) {
-			const { code, tz } = await req.json();
+			const { code, tz, redirect_uri } = await req.json();
 			if (!code) return json({ error: "Missing code" }, 400);
 			return json({
 				ok: true,
-				result: await link(env(), appJwt, code, tz || "America/Los_Angeles")
+				result: await link(env(), appJwt, code, tz || "America/Los_Angeles", redirect_uri || "postmessage")
 			});
 		}
 		if (path.endsWith("/sync-me")) {
