@@ -43,4 +43,29 @@ describe('12-week plan', () => {
     expect(p.weeksToGoal!).toBeGreaterThan(9)
     expect(p.weeks[0].onTrack).toBe(false)
   })
+  it('blends the scale in, up to half with 4+ weigh-ins in the last 7 days', () => {
+    const energy = days('2026-11-14', 21, 500)
+    const none = planStatus({ plan, today: '2026-12-05', scan, energy, weights: [] })!
+    expect(none.scaleWeight).toBe(0)
+    expect(none.lostLb).toBe(none.lostByDeficitLb)
+    // Scale says 1 lb lost; deficit says 3.
+    const two = [{ day: '2026-12-02', kg: 149.2 * KG }, { day: '2026-12-04', kg: 149.2 * KG }]
+    const p2 = planStatus({ plan, today: '2026-12-05', scan, energy, weights: two })!
+    expect(p2.scaleWeight).toBe(0.25)
+    const four = ['2026-11-30', '2026-12-01', '2026-12-03', '2026-12-04'].map((day) => ({ day, kg: 149.2 * KG }))
+    const p4 = planStatus({ plan, today: '2026-12-05', scan, energy, weights: four })!
+    expect(p4.scaleWeight).toBe(0.5)
+    expect(p4.lostLb).toBeCloseTo((p4.lostByDeficitLb + p4.lostByScaleLb!) / 2, 1)
+    expect(p4.lostLb).toBeLessThan(p2.lostLb)
+    expect(p4.aheadLb).toBeLessThan(none.aheadLb)
+  })
+  it("lets a week's own weigh-ins pull its check", () => {
+    const energy = days('2026-11-14', 21, 500)
+    // Week 3 (Nov 28 – Dec 4): scale shows no loss at all, four times.
+    const flat = ['2026-11-28', '2026-11-30', '2026-12-02', '2026-12-04'].map((day) => ({ day, kg: 150.2 * KG }))
+    const p = planStatus({ plan, today: '2026-12-05', scan, energy, weights: flat })!
+    const plain = planStatus({ plan, today: '2026-12-05', scan, energy, weights: [] })!
+    expect(p.weeks[2].actualFatLb!).toBeGreaterThan(plain.weeks[2].actualFatLb!)
+    expect(p.weeks[0].actualFatLb).toBe(plain.weeks[0].actualFatLb)
+  })
 })

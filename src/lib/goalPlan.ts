@@ -17,6 +17,14 @@ export const KCAL_PER_LB_FAT = 3500
 const KG_PER_LB = 0.45359237
 /** DEXA retests: halfway, to check lean mass held, and at the end. */
 export const RESCAN_WEEKS = [6, 12]
+/**
+ * How much the scale counts next to the logged deficit: up to half, once there are this many weigh-ins in the
+ * window (7 days for progress now, the week itself for a week's check). Fewer weigh-ins count for less, since
+ * keto water moves the scale 2–3 lb.
+ */
+export const SCALE_MAX_SHARE = 0.5
+export const FULL_SCALE_WEIGH_INS = 4
+export const scaleShare = (weighIns: number) => SCALE_MAX_SHARE * Math.min(1, weighIns / FULL_SCALE_WEIGH_INS)
 
 export interface PlanWeek {
   week: number
@@ -30,7 +38,7 @@ export interface PlanWeek {
   weighIns: number
   /** 'done' once the week is over, 'now' for this week, 'ahead' still to come. */
   state: 'done' | 'now' | 'ahead'
-  /** Fat at the end of the week (or today, for this week) by your logged deficit; null for weeks to come. */
+  /** Fat at the end of the week (or today, for this week): logged deficit blended with that week's weigh-ins; null for weeks to come. */
   actualFatLb: number | null
   /** At or under the week's target fat (within 0.3 lb). */
   onTrack: boolean | null
@@ -63,6 +71,10 @@ export interface PlanStatus {
   /** Body fat % now by each estimate. */
   bfByDeficit: number
   bfByScale: number | null
+  /** Progress counted: the deficit blended with the scale (see scaleShare), and how much the scale counted (0–0.5). */
+  lostLb: number
+  bfNow: number
+  scaleWeight: number
   /** Recent pace (last 14 logged days) and where it lands at the end. */
   paceLbPerWeek: number | null
   predictedBfPct: number | null
@@ -103,6 +115,7 @@ export function planStatus(opts: {
   const goalFatLb = (fatFreeLb / (1 - plan.targetBfPct / 100)) * (plan.targetBfPct / 100)
   const toLoseLb = Math.max(0, startFatLb - goalFatLb)
   const perWeekLb = toLoseLb / plan.weeks
+  const startWeight = fatFreeLb + startFatLb
   const fatAt = (days: number) => startFatLb - perWeekLb * (days / 7)
   const bf = (fat: number) => (fat / (fatFreeLb + fat)) * 100
 
@@ -113,7 +126,11 @@ export function planStatus(opts: {
     const w = weights.filter((x) => x.day >= from && x.day <= end)
     const state = end < today ? 'done' : from <= today ? 'now' : 'ahead'
     // A finished week is judged at its end; this week so far against where it should be today.
-    const actual = state === 'ahead' ? null : startFatLb - Math.max(0, deficitLb(plan.start, state === 'done' ? shiftDay(end, 1) : today))
+    const byDeficit = state === 'ahead' ? null : startFatLb - Math.max(0, deficitLb(plan.start, state === 'done' ? shiftDay(end, 1) : today))
+    // The week's weigh-ins against the plan's starting weight, all of the change counted as fat (lean held).
+    const byScale = w.length ? startFatLb - (startWeight - w.reduce((a, x) => a + x.kg, 0) / w.length / KG_PER_LB) : null
+    const share = byScale == null ? 0 : scaleShare(w.length)
+    const actual = byDeficit == null ? null : byDeficit * (1 - share) + (byScale ?? 0) * share
     const targetThen = state === 'done' ? fat : fatAt(Math.max(0, between(plan.start, today)))
     return {
       week: i + 1,
@@ -135,17 +152,19 @@ export function planStatus(opts: {
   const lostByDeficitLb = Math.max(0, deficitLb(plan.start, today))
   // The scale: last 7 days' average against the plan's starting weight, all of it counted as fat (lean held).
   const recent = weights.filter((x) => x.day > shiftDay(today, -7) && x.day <= today)
-  const startWeight = fatFreeLb + startFatLb
   const lostByScaleLb = recent.length ? startWeight - recent.reduce((a, x) => a + x.kg, 0) / recent.length / KG_PER_LB : null
   const fatNowDeficit = startFatLb - lostByDeficitLb
   const fatNowScale = lostByScaleLb == null ? null : startFatLb - lostByScaleLb
+  const scaleWeight = lostByScaleLb == null ? 0 : scaleShare(recent.length)
+  const lostLb = lostByDeficitLb * (1 - scaleWeight) + (lostByScaleLb ?? 0) * scaleWeight
+  const fatNow = startFatLb - lostLb
 
   // Pace from the last 14 days with food logged.
   const last = energy.filter((d) => d.logged && d.day >= shiftDay(today, -14) && d.day < today)
   const paceLbPerWeek = last.length >= 5 ? (last.reduce((a, d) => a + d.deficit, 0) / last.length / KCAL_PER_LB_FAT) * 7 : null
   const daysLeft = Math.max(0, plan.weeks * 7 - day)
-  const remaining = fatNowDeficit - goalFatLb
-  const predictedFat = paceLbPerWeek == null ? null : fatNowDeficit - paceLbPerWeek * (daysLeft / 7)
+  const remaining = fatNow - goalFatLb
+  const predictedFat = paceLbPerWeek == null ? null : fatNow - paceLbPerWeek * (daysLeft / 7)
   return {
     plan,
     week,
@@ -164,9 +183,12 @@ export function planStatus(opts: {
     lostByScaleLb: lostByScaleLb == null ? null : r1(lostByScaleLb),
     bfByDeficit: r1(bf(fatNowDeficit)),
     bfByScale: fatNowScale == null ? null : r1(bf(fatNowScale)),
+    lostLb: r1(lostLb),
+    bfNow: r1(bf(fatNow)),
+    scaleWeight: Math.round(scaleWeight * 100) / 100,
     paceLbPerWeek: paceLbPerWeek == null ? null : Math.round(paceLbPerWeek * 100) / 100,
     predictedBfPct: predictedFat == null ? null : r1(bf(Math.max(0, predictedFat))),
     weeksToGoal: paceLbPerWeek && paceLbPerWeek > 0.05 ? r1(Math.max(0, remaining) / paceLbPerWeek) : null,
-    aheadLb: r1(targetTodayFatLb - fatNowDeficit),
+    aheadLb: r1(targetTodayFatLb - fatNow),
   }
 }

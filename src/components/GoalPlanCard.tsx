@@ -75,7 +75,8 @@ function PlanChart({ s }: { s: PlanStatus }) {
 function PlanProgress({ s, targetLost }: { s: PlanStatus; targetLost: number }) {
   const total = Math.max(0.1, s.toLoseLb)
   const pct = (x: number) => `${Math.max(0, Math.min(100, (x / total) * 100))}%`
-  const lost = s.lostByDeficitLb
+  const lost = s.lostLb
+  const scalePct = Math.round(s.scaleWeight * 100)
   const startBf = (s.startFatLb / (s.fatFreeLb + s.startFatLb)) * 100
   const goal = s.plan.targetBfPct
   // Position on the body-fat scale: start at the left, goal at the right.
@@ -95,7 +96,7 @@ function PlanProgress({ s, targetLost }: { s: PlanStatus; targetLost: number }) 
       </div>
       <div className="plan-bar-legend muted small">
         <span>
-          <i className="key fill" /> lost (by your logged deficit)
+          <i className="key fill" /> lost: {scalePct ? `deficit ${100 - scalePct}% + scale ${scalePct}%` : 'by your logged deficit (no weigh-ins this week)'}
         </span>
         <span>
           <i className="key mark" /> where you should be today: {targetLost.toFixed(1)} lb
@@ -103,11 +104,10 @@ function PlanProgress({ s, targetLost }: { s: PlanStatus; targetLost: number }) 
       </div>
 
       <div className="plan-bf">
-        <div className="plan-bf-track" role="img" aria-label={`Body fat about ${s.bfByDeficit}% now; ${startBf.toFixed(1)}% at the start, ${goal}% goal`}>
-          <span className="fill" style={{ width: at(s.bfByDeficit) }} />
+        <div className="plan-bf-track" role="img" aria-label={`Body fat about ${s.bfNow}% now; ${startBf.toFixed(1)}% at the start, ${goal}% goal`}>
+          <span className="fill" style={{ width: at(s.bfNow) }} />
           <span className="mark" style={{ left: at(todayBf) }} />
-          <span className="dot" style={{ left: at(s.bfByDeficit) }} />
-          {s.bfByScale != null && <span className="dot scale" style={{ left: at(s.bfByScale) }} />}
+          <span className="dot" style={{ left: at(s.bfNow) }} />
         </div>
         <div className="plan-bf-ends small">
           <span>
@@ -116,13 +116,11 @@ function PlanProgress({ s, targetLost }: { s: PlanStatus; targetLost: number }) 
             start
           </span>
           <b>
-            {s.bfByDeficit}% now
-            {s.bfByScale != null && (
-              <>
-                <br />
-                <span className="muted">scale {s.bfByScale}%</span>
-              </>
-            )}
+            {s.bfNow}% now
+            <br />
+            <span className="muted">
+              deficit {s.bfByDeficit}%{s.bfByScale != null ? ` · scale ${s.bfByScale}%` : ''}
+            </span>
           </b>
           <span style={{ textAlign: 'right' }}>
             {goal}%
@@ -239,7 +237,8 @@ export function GoalPlanCard({ plan, targets, weightUnit, onStart }: Props) {
             : `at your last-2-weeks pace (${s.paceLbPerWeek.toFixed(2)} lb of fat a week) you'd finish week ${s.plan.weeks} at about ${s.predictedBfPct}%${s.weeksToGoal != null ? `, reaching ${s.plan.targetBfPct}% in about ${Math.ceil(s.weeksToGoal)} more week${Math.ceil(s.weeksToGoal) === 1 ? '' : 's'}` : ''}.`}
       </p>
       <p className="muted small" style={{ margin: '0 0 10px' }}>
-        Weigh in 2–3 times a week, mornings before food: keto water moves the scale 2–3 lb, so the weekly average is what counts.{' '}
+        Progress blends your logged deficit with your weigh-ins. The scale counts more the more often you weigh in, up to half at 4 or more
+        mornings a week (before food), since keto water moves it 2–3 lb from day to day.{' '}
         {nextScan && `DEXA retest around ${fmtDate(nextScan.day)} (week ${nextScan.week}) to confirm the loss is fat, not muscle.`}
       </p>
 
