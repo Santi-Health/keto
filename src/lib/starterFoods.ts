@@ -72,6 +72,32 @@ const MANTECOL: NewFood = {
   meta: { externalId: 'starter:keto-mantecol', sugarAlcoholType: 'allulose', sections: ['desserts'], portion: { amount: 50, unit: 'g' }, lastAmount: 50, lastUnit: 'g' },
 }
 
+/**
+ * Keto Lemon Meringue Pie, homemade, 9 inches: almond flour crust, lemon curd filling and meringue, sweetened
+ * with allulose. Per slice (1/8 pie): 285 kcal, 26 g fat, 7.4 g protein, 29.5 g carbs, 2.1 g fiber, 23.8 g
+ * allulose, 3.6 g net carbs. A slice wasn't weighed, so its 120 g is an estimate; per slice the numbers are exact.
+ */
+const PIE_SLICE_G = 120
+const perSlice = (g: number) => Math.round((g / PIE_SLICE_G) * 10000) / 100
+const LEMON_PIE: NewFood = {
+  name: 'Keto Lemon Meringue Pie',
+  brand: null,
+  barcode: null,
+  per_100g: completeNutrients(
+    { kcal: perSlice(285), protein: perSlice(7.4), fat: perSlice(26), carbs: perSlice(29.5), fiber: perSlice(2.1), sugarAlcohols: perSlice(23.8) },
+    false,
+    'allulose',
+  ),
+  unit_conversions: [{ unit: '1 slice', grams: PIE_SLICE_G }],
+  ingredients_text: 'Almond flour crust, lemon curd filling, meringue; sweetened with allulose',
+  keto_notes: 'Homemade, 8 slices per 9-inch pie. The allulose (23.8 g a slice) is left out of net carbs. Slice weight estimated at 120 g.',
+  carbs_exclude_fiber: false,
+  source: 'manual',
+  confidence: 'medium',
+  fields_estimated: ['slice weight'],
+  meta: { externalId: 'starter:keto-lemon-pie', sugarAlcoholType: 'allulose', sections: ['desserts'], portion: { amount: 1, unit: '1 slice' }, lastAmount: 1, lastUnit: '1 slice' },
+}
+
 export const STARTER_FOODS: Food[] = [
   asStarter('6f1d2c3a-9b4e-4c7a-8e21-5a0c7d3b1e42', {
     ...guacamole,
@@ -81,6 +107,7 @@ export const STARTER_FOODS: Food[] = [
     meta: { ...guacamole.meta, externalId: 'starter:guacamole', meals: ['dinner'], portion: { amount: 4, unit: 'oz' }, lastAmount: 4, lastUnit: 'oz' },
   }),
   asStarter('d3a5e8b1-7c42-4f19-9e6d-2b8c0f4a7e63', MANTECOL),
+  asStarter('8e2b6f14-c3d9-4a75-b1e8-5f0a9c7d2e84', LEMON_PIE),
 ]
 
 const staple = (id: string, name: string, per100g: Nutrients, meta: NewFood['meta'], unitConversions: NewFood['unit_conversions'] = []): Food =>

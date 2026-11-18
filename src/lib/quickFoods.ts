@@ -213,6 +213,7 @@ const ICONS: [RegExp, string][] = [
   [YOGURT, '🥣'],
   // Peanut nougat, like the Argentine Mantecol.
   [/\bmantecol\b/i, '🥜'],
+  [/\bmeringue pie\b|\blemon pie\b/i, '🥧'],
   [/mayo|aioli|ketchup|mustard|sauce|sriracha|tabasco|salsa|dressing|vinaigrette|ranch|pesto|vinegar|aminos|relish|tahini|horseradish/, '🫙'],
   [/salt|black pepper|peppercorn|seasoning|spice|paprika|cumin|oregano|cinnamon|flakes/, '🧂'],
   [/blueberr|blackberr/, '🫐'],

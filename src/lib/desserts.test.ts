@@ -28,4 +28,15 @@ describe('keto desserts', () => {
     expect(m.per_100g.netCarbs).toBeCloseTo(6, 0)
     expect(m.meta.portion).toEqual({ amount: 50, unit: 'g' })
   })
+
+  it('logs the lemon meringue pie by the slice with the approved numbers', () => {
+    const pie = STARTER_FOODS.find((f) => f.name === 'Keto Lemon Meringue Pie')!
+    const g = pie.unit_conversions.find((u) => u.unit === '1 slice')!.grams
+    const slice = (k: keyof typeof pie.per_100g) => ((pie.per_100g[k] as number) * g) / 100
+    expect(slice('kcal')).toBeCloseTo(285, 0)
+    expect(slice('fat')).toBeCloseTo(26, 1)
+    expect(slice('protein')).toBeCloseTo(7.4, 1)
+    expect(slice('netCarbs')).toBeCloseTo(3.6, 1)
+    expect(pie.meta.portion).toEqual({ amount: 1, unit: '1 slice' })
+  })
 })
