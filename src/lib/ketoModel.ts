@@ -16,8 +16,21 @@ type Weight = (typeof NAMES)[number]
 /** Feature scaling: one unit = 25 g carbs, 50 g carry-over, 12 h fasting, a hard session, +100% protein. */
 const toX = (f: KetoFeatures): number[] => [1, f.carbs24h / 25, f.carryOver / 50, f.fastH / 12, f.hardExercise, f.proteinRatio - 1]
 
-/** Prior SD of each weight (log scale). The overall offset may move more than the specific effects. */
-const PRIOR_SD = [0.7, 0.35, 0.35, 0.35, 0.35, 0.35]
+/**
+ * Prior SD of each weight (log scale). The overall offset may move more than the specific effects, which stay
+ * close to the general estimate until about 20 readings back them up (with 6 effects, 10 readings can't).
+ */
+const PRIOR_SD = [0.7, 0.2, 0.2, 0.2, 0.2, 0.2]
+/**
+ * Directions the research is clear on, held whatever a few readings say: more carbs (today or carried over)
+ * can only lower ketones, a longer fast can only raise them. -1 = at most 0, +1 = at least 0.
+ */
+const SIGN: Partial<Record<number, 1 | -1>> = { 1: -1, 2: -1, 3: 1 }
+/** The personal model moves the general estimate at most this many times up or down. */
+const MAX_FACTOR = 4
+const MAX_LOG_ADJ = Math.log(MAX_FACTOR)
+/** Readings before the model is called solid. */
+const SOLID_READINGS = 20
 /** Reading-to-reading noise (meter error and day-to-day variation), log scale. */
 const NOISE_SD = 0.35
 
@@ -78,7 +91,21 @@ interface Fit {
   A: number[][]
 }
 
+/**
+ * The fit with the sign rules held: any weight that lands on the wrong side is fixed at 0 (= the general
+ * estimate's own effect) and the rest refit, until none do.
+ */
 function fit(xs: number[][], rs: number[]): Fit {
+  const fixed = new Set<number>()
+  for (;;) {
+    const f = fitFree(xs, rs, fixed)
+    const wrong = Object.entries(SIGN).map(([i, sg]) => [Number(i), sg!] as const).filter(([i, sg]) => !fixed.has(i) && f.beta[i] * sg < 0)
+    if (!wrong.length) return f
+    for (const [i] of wrong) fixed.add(i)
+  }
+}
+
+function fitFree(xs: number[][], rs: number[], fixed: Set<number>): Fit {
   const k = PRIOR_SD.length
   const A = PRIOR_SD.map((sd, i) => PRIOR_SD.map((_, j) => (i === j ? 1 / sd ** 2 : 0)))
   const b = new Array(k).fill(0)
@@ -88,8 +115,17 @@ function fit(xs: number[][], rs: number[]): Fit {
       for (let j = 0; j < k; j++) A[i][j] += (x[i] * x[j]) / NOISE_SD ** 2
     }
   })
+  // A fixed weight is pinned at 0: no data reaches it and a very tight prior holds it there.
+  for (const i of fixed) {
+    for (let j = 0; j < k; j++) A[i][j] = A[j][i] = 0
+    A[i][i] = 1e9
+    b[i] = 0
+  }
   return { beta: solve(A, b), A }
 }
+
+/** The log adjustment, capped so a personal estimate never runs away from the general one. */
+const capped = (x: number) => Math.max(-MAX_LOG_ADJ, Math.min(MAX_LOG_ADJ, x))
 
 const dot = (a: number[], b: number[]) => a.reduce((s, v, i) => s + v * b[i], 0)
 const pct = (logEffect: number) => Math.round((Math.exp(logEffect) - 1) * 100)
@@ -143,7 +179,7 @@ export function fitKetoModel(opts: {
       actual: p.actual,
       predictedThen: p.predictedThen,
       population: p.population,
-      personal: f ? Math.round(p.population * Math.exp(dot(f.beta, p.x)) * 100) / 100 : null,
+      personal: f ? Math.round(p.population * Math.exp(capped(dot(f.beta, p.x))) * 100) / 100 : null,
       features: p.features,
     }
   })
@@ -160,7 +196,7 @@ export function fitKetoModel(opts: {
 
   const adjuster: KetoAdjuster | null = n
     ? {
-        adjust: (f) => dot(full.beta, toX(f)),
+        adjust: (f) => capped(dot(full.beta, toX(f))),
         sigma,
         n,
         reason: (_f, logAdj) => {
@@ -188,7 +224,7 @@ export function fitKetoModel(opts: {
   }
 
   const advice = carbLimitAdvice(n, days, full.beta, sigma, rows.map((p) => p.features.fastH), netCarbLimit)
-  const confidence = n === 0 ? 'none' : n < 3 ? 'learning' : n < 10 ? 'early' : 'solid'
+  const confidence = n === 0 ? 'none' : n < 3 ? 'learning' : n < SOLID_READINGS ? 'early' : 'solid'
   return { n, days, weights, adjuster, points, populationError: mae((p) => p.population), personalError: mae((p) => p.personal), findings, advice, confidence }
 }
 

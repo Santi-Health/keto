@@ -19,6 +19,8 @@ interface Data {
   logs: LogEntry[]
   pending: number
   syncError: string | null
+  /** Foods and food logs have been read from the server (always true without one). */
+  loaded: boolean
   /** Saves a food, reusing an existing one with the same barcode or source id. */
   saveFood: (food: NewFood | Food) => Food
   updateFood: (food: Food) => void
@@ -160,6 +162,7 @@ export function DataProvider({ session, children }: { session: Session | null; c
       logs: logsTable.rows,
       // Without a database (local development) nothing is waiting to sync.
       pending: supabase ? foodsTable.pending + logsTable.pending + exerciseTable.pending + cgmTable.pending + readingTable.pending + mealTable.pending + activityTable.pending : 0,
+      loaded: !supabase || (foodsTable.pulled && logsTable.pulled),
       syncError: foodsTable.error ?? logsTable.error ?? exerciseTable.error ?? cgmTable.error ?? readingTable.error ?? mealTable.error ?? activityTable.error,
       saveFood,
       updateFood: foodsTable.upsert,

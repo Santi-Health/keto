@@ -66,6 +66,11 @@ export const statusFor = (mmol: number): KetoStatus => (mmol >= 1.5 ? 'deep' : m
  * Population estimate (mmol/L) from the features alone; estimateKetosis adds the explanations.
  * `fastedWorkout` adds the small extra bump a fasted session gives.
  */
+/** Below this a log doesn't end a fast (black coffee, a splash of milk, diet soda). */
+const FAST_BREAKING_KCAL = 15
+/** Food logged this close before a reading is taken as eaten after it. */
+const JUST_EATEN_MS = 20 * 60_000
+
 export function populationFromFeatures(f: KetoFeatures, netCarbLimit: number, fastedWorkout = false): number {
   let mid = Math.max(0.1, 1.3 - 0.022 * f.carbs24h)
   if (f.carryOver > 10) mid *= Math.exp(-0.006 * f.carryOver)
@@ -118,8 +123,14 @@ export function estimateKetosis(opts: {
     )
   }
 
-  // Hours without food.
-  const lastMeal = Math.max(-Infinity, ...[...last24, ...day2].map((l) => Date.parse(l.eaten_at)))
+  // Hours without food. Food from the last 20 minutes doesn't count yet (a morning reading is often logged with
+  // the breakfast right after it), nor do near-zero-calorie drinks like espresso or Coke Zero.
+  const lastMeal = Math.max(
+    -Infinity,
+    ...[...last24, ...day2]
+      .filter((l) => (l.nutrients.kcal ?? 0) >= FAST_BREAKING_KCAL && Date.parse(l.eaten_at) <= at - JUST_EATEN_MS)
+      .map((l) => Date.parse(l.eaten_at)),
+  )
   const fastH = Number.isFinite(lastMeal) ? (at - lastMeal) / H : null
   if (fastH != null && fastH >= 12 && carbs24h <= 2 * netCarbLimit) {
     reasons.push(`${Math.floor(fastH)} h since your last food: fasting raises ketones.`)

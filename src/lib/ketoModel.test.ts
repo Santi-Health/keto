@@ -71,4 +71,28 @@ describe('personal ketosis model', () => {
     const m = fitKetoModel({ ...base, readings, logs })
     expect(m.advice).toMatchObject({ ready: false, readingsNeeded: 6, daysNeeded: 11 })
   })
+
+  it('never learns that carbs raise ketones or fasting lowers them, and caps how far it moves', () => {
+    // Ketones that go up with carbs: high readings on the 20 g days, low on the 10 g days.
+    const logs: LogEntry[] = []
+    const readings: ReadingRow[] = []
+    for (let d = 0; d < 12; d++) {
+      const carbs = d % 2 ? 120 : 10
+      logs.push(meal(start + d * DAY, carbs))
+      readings.push(ketone(start + d * DAY + 2 * 3_600_000, carbs > 50 ? 1.2 : 0.1))
+    }
+    const m = fitKetoModel({ ...base, readings, logs })
+    expect(m.weights.carbs).toBeLessThanOrEqual(0)
+    expect(m.weights.carryOver).toBeLessThanOrEqual(0)
+    expect(m.weights.fasting).toBeGreaterThanOrEqual(0)
+    for (const p of m.points) if (p.personal != null) expect(p.personal).toBeLessThanOrEqual(p.population * 4 + 0.01)
+    expect(m.confidence).toBe('early')
+  })
+
+  it('counts a fast up to a reading taken just before breakfast', () => {
+    const at = start + 10 * 3_600_000
+    const logs = [meal(start - 2 * 3_600_000, 10), { ...meal(at - 60_000, 2), id: 'breakfast' }]
+    expect(estimateKetosis({ ...base, at, logs }).features.fastH).toBeCloseTo(12, 0)
+  })
 })
+

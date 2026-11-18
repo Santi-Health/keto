@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import { DataProvider, useData } from './lib/data'
+import { DATA_FIX, dataFixes } from './lib/dataFixes'
 import { DEFAULT_YOGA_ROUTINE, durationCheck, withMinutes } from './lib/exercise'
 import { averageBurn } from './lib/activity'
 import { useSyncOnOpen } from './lib/backgroundSync'
@@ -103,6 +104,7 @@ function Tracker({ session, recovering = false, onPassphraseChanged = () => {} }
     <WorkoutLengths />
     <SyncOnOpen enabled={!!session} />
     <ZoneTracker log={profile.zoneLog} update={update} />
+    <DataFixes profile={profile} update={update} />
     <YogaScheduleFix profile={profile} update={update} ready={sync !== 'syncing' && sync !== 'signed-out'} />
     <VitaminFiller />
     <div className="app">
@@ -210,6 +212,21 @@ function WorkoutLengths() {
       if (c?.status === 'adjust') saveExercise(withMinutes(e, c.use, e.meta.chosenMinutes != null))
     }
   }, [exercises, saveExercise])
+  return null
+}
+
+/** One time only: corrects three foods saved with wrong numbers (and their past logs) and adds the missed Nov 6 dinner. */
+function DataFixes({ profile, update }: { profile: Profile; update: (p: Partial<Profile>) => void }) {
+  const { foods, logs, loaded, updateFood, updateLog } = useData()
+  const done = profile.fixesApplied?.includes(DATA_FIX)
+  useEffect(() => {
+    // After the yoga fix, so the two never write their done-marks over each other in the same moment.
+    if (done || !loaded || !profile.fixesApplied?.includes(YOGA_FIX)) return
+    const r = dataFixes(foods, logs)
+    r.foods.forEach(updateFood)
+    r.logs.forEach(updateLog)
+    update({ fixesApplied: [...(profile.fixesApplied ?? []), DATA_FIX] })
+  }, [done, loaded, foods, logs, updateFood, updateLog, update, profile.fixesApplied])
   return null
 }
 
