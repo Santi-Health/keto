@@ -13,6 +13,7 @@ import { useOpenSyncState } from '../lib/backgroundSync'
 import { deviceTz, travelDay, zoneLabel } from '../lib/time'
 import { DrinksCard } from '../components/DrinksCard'
 import { WeeklySetsCard } from '../components/WeeklySetsCard'
+import { NutritionWeekCard } from '../components/NutritionWeekCard'
 import { clearDraft, useNewDraft, type ExerciseDraft } from '../lib/exerciseDraft'
 import { GlucoseDayCard, GlucoseImport } from '../components/GlucoseDayCard'
 import { ExerciseSheet } from '../components/ExerciseSheet'
@@ -469,6 +470,8 @@ export function Today({ profile, targets, onOpenSettings, onToggleRefeed, onNavi
               </button>
             )}
           </section>
+
+          <NutritionWeekCard day={day} profile={profile} targets={targets} />
 
           <WeeklySetsCard day={day} onOpenCoach={() => onNavigate('coach')} weightKg={profile.weightKg} />
 
