@@ -1,12 +1,15 @@
-import { useMemo, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { useData } from '../lib/data'
 import { dayEnergy } from '../lib/deficit'
 import { shiftDay } from '../lib/goalPlan'
+import { libraryFor, useCustomLifts } from '../lib/library'
 import { addNutrients } from '../lib/nutrients'
-import { judgeNutrition, nutritionRows, planWeekVerdict, windowDays, type NutritionDay, type NutritionGoals, type NutritionRow, type NutritionVerdict } from '../lib/nutritionWeek'
+import { foodRows, judgePlanWeek, windowDays, type FoodRow, type NutritionDay, type WeekVerdict } from '../lib/nutritionWeek'
 import { localDate, type Targets } from '../lib/targets'
+import { weekCoverage } from '../lib/training'
 import type { Profile } from '../lib/types'
 import { usePlanStatus } from './GoalPlanCard'
+import { WeeklySetsBars } from './WeeklySetsCard'
 
 /** How long ago a finished day was: yesterday, 2–3 days, 4–6 days, and 7 days ago (drops off tomorrow). */
 const BANDS = [
@@ -17,33 +20,49 @@ const BANDS = [
 ]
 
 const fmtNum = (n: number) => Math.round(n).toLocaleString()
+const shortDate = (d: string) => new Date(`${d}T12:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+const range = (a: string, b: string) => (a.slice(0, 7) === b.slice(0, 7) ? `${shortDate(a)}–${Number(b.slice(8))}` : `${shortDate(a)} – ${shortDate(b)}`)
+const fmtDay = (d: string) => new Date(`${d}T12:00:00`).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
 
-/** Bars of days on target per goal; with `aged`, split by how long ago each day was, oldest on the left. */
-function NutritionBars({ rows, aged = false }: { rows: NutritionRow[]; aged?: boolean }) {
+/** A day's deficit and protein, for any day (memoized per render of the data). */
+function useNutritionDay(bmr: number | null, refeedDate: string | null | undefined) {
+  const { logsOn, exercisesOn, activity } = useData()
+  return useCallback(
+    (d: string): NutritionDay => {
+      const logs = logsOn(d)
+      const e = bmr == null ? null : dayEnergy({ day: d, bmr, logs, exercises: exercisesOn(d), activity: activity[d] && !activity[d].deleted_at ? activity[d] : null })
+      return { day: d, logged: logs.length > 0, refeed: refeedDate === d, deficit: e?.deficit ?? 0, protein: addNutrients(logs.map((l) => l.nutrients)).protein }
+    },
+    [logsOn, exercisesOn, activity, bmr, refeedDate],
+  )
+}
+
+/** Average deficit and protein against their goals; with `aged`, each bar is split by how long ago its days were. */
+function FoodBars({ rows, aged = false }: { rows: FoodRow[]; aged?: boolean }) {
   return (
     <div className="coach-sets">
       {rows.map((r) => {
-        const met = r.hits >= r.need
+        const scale = Math.max(r.goal, r.avg ?? 0)
         return (
           <div key={r.key}>
             <span>
               {r.label}
               <span className="muted" style={{ display: 'block', fontSize: '0.72rem', textAlign: 'left' }}>
-                {r.avg == null ? 'nothing logged' : `avg ${fmtNum(r.avg)} ${r.unit}`} · {r.goal}
+                {r.avg == null ? 'nothing logged' : `avg a day, ${r.unit}`}
               </span>
             </span>
             <span className="coach-bar" aria-hidden="true">
               {aged ? (
                 [...BANDS].reverse().map((b) => {
                   const v = r.byAge.slice(b.from, b.to + 1).reduce((a, x) => a + x, 0)
-                  return v > 0 ? <span key={b.cls} className={`age ${b.cls}`} style={{ width: `${(v / r.days) * 100}%` }} /> : null
+                  return v > 0 ? <span key={b.cls} className={`age ${b.cls}`} style={{ width: `${(v / scale) * 100}%` }} /> : null
                 })
               ) : (
-                <span style={{ width: `${(r.hits / r.days) * 100}%`, background: met ? 'var(--accent)' : 'var(--protein)' }} />
+                <span style={{ width: `${Math.min(100, ((r.avg ?? 0) / r.goal) * 100)}%`, background: r.met ? 'var(--accent)' : 'var(--protein)' }} />
               )}
             </span>
-            <span className={`muted small ${aged && met ? 'set-met' : ''}`}>
-              {r.hits}/{r.days}
+            <span className={`muted small ${r.met ? 'set-met' : ''}`} style={{ whiteSpace: 'nowrap' }}>
+              {r.avg == null ? '–' : fmtNum(r.avg)}/{r.goal}
             </span>
           </div>
         )
@@ -61,88 +80,70 @@ function NutritionBars({ rows, aged = false }: { rows: NutritionRow[]; aged?: bo
   )
 }
 
-const MARK: Record<NutritionVerdict, { mark: string; label: string }> = {
-  good: { mark: '✓', label: 'On track' },
-  close: { mark: '◐', label: 'Close' },
-  behind: { mark: '✗', label: 'Behind' },
-}
-const shortDate = (d: string) => new Date(`${d}T12:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-const range = (a: string, b: string) => (a.slice(0, 7) === b.slice(0, 7) ? `${shortDate(a)}–${Number(b.slice(8))}` : `${shortDate(a)} – ${shortDate(b)}`)
-const fmtDay = (d: string) => new Date(`${d}T12:00:00`).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
-
-/** Today's card: days the deficit and each macro hit their goal over the last 7 finished days, and the plan's weeks. */
+/** Today's card: average deficit and protein over the last 7 finished days, against 500+ kcal and 150+ g. */
 export function NutritionWeekCard({ day, profile, targets }: { day: string; profile: Profile; targets: Targets }) {
-  const { logsOn, exercisesOn, activity } = useData()
   const today = localDate()
-  const goals: NutritionGoals = { proteinG: targets.proteinG, netCarbsG: targets.netCarbsG, fatMinG: targets.fatMinG }
-  const bmr = targets.bmr
-
-  const nutritionDay = useMemo(() => {
-    const cache = new Map<string, NutritionDay>()
-    return (d: string): NutritionDay => {
-      const hit = cache.get(d)
-      if (hit) return hit
-      const logs = logsOn(d)
-      const n = addNutrients(logs.map((l) => l.nutrients))
-      const e = bmr == null ? null : dayEnergy({ day: d, bmr, logs, exercises: exercisesOn(d), activity: activity[d] && !activity[d].deleted_at ? activity[d] : null })
-      const out = {
-        day: d,
-        logged: logs.length > 0,
-        refeed: profile.refeedDate === d,
-        deficit: e?.deficit ?? 0,
-        burned: e?.burned ?? 0,
-        kcal: n.kcal,
-        protein: n.protein,
-        netCarbs: n.netCarbs,
-        fat: n.fat,
-      }
-      cache.set(d, out)
-      return out
-    }
-  }, [logsOn, exercisesOn, activity, bmr, profile.refeedDate])
-
+  const nutritionDay = useNutritionDay(targets.bmr, profile.refeedDate)
   const days = useMemo(() => windowDays(day, today).map(nutritionDay), [day, today, nutritionDay])
   // Without a burn there's no deficit to judge.
-  const rows = useMemo(() => nutritionRows(days, goals).filter((r) => bmr != null || r.key !== 'deficit'), [days, goals.proteinG, goals.netCarbsG, goals.fatMinG, bmr]) // eslint-disable-line react-hooks/exhaustive-deps
-  const short = rows.filter((r) => r.hits < r.need).length
-
-  const plan = usePlanStatus(profile.goalPlan, bmr)
-  const planWeeks = useMemo(() => {
-    if (!plan) return []
-    return plan.weeks
-      .filter((w) => w.state !== 'ahead' && w.actualFatLb != null)
-      .map((w) => {
-        const start = shiftDay(w.end, -6)
-        const last = w.end < today ? w.end : shiftDay(today, -1)
-        const weekDays: string[] = []
-        for (let d = start; d <= last; d = shiftDay(d, 1)) weekDays.push(d)
-        const wRows = nutritionRows(weekDays.map(nutritionDay), goals)
-        const aheadLb = w.targetFatLb - w.actualFatLb!
-        const met = judgeNutrition(wRows).met
-        return { week: w.week, start, end: w.end, aheadLb, verdict: planWeekVerdict(aheadLb, met === wRows.length), rows: wRows, met }
-      })
-      .reverse()
-  }, [plan, today, nutritionDay]) // eslint-disable-line react-hooks/exhaustive-deps
-  const [open, setOpen] = useState<number | null>(null)
-
+  const rows = useMemo(() => foodRows(days).filter((r) => targets.bmr != null || r.key !== 'deficit'), [days, targets.bmr])
+  const short = rows.filter((r) => !r.met).length
   return (
     <section className="card">
       <div className="page-header" style={{ marginBottom: 8 }}>
-        <h2>Macros & deficit, last 7 days</h2>
-        <span className={`badge ${short ? '' : 'ok'}`}>{short ? `${short} short` : 'All on target'}</span>
+        <h2>Deficit & protein, last 7 days</h2>
+        <span className={`badge ${short ? '' : 'ok'}`}>{short ? `${short} short` : 'Both on target'}</span>
       </div>
-      <NutritionBars rows={rows} aged />
+      <FoodBars rows={rows} aged />
       <p className="muted small" style={{ marginBottom: 0 }}>
-        Days on target, {fmtDay(days[0].day)} to {days[6].day === shiftDay(today, -1) ? 'yesterday' : fmtDay(days[6].day)}: a goal is met on 5 of 7 days. Today joins
-        tomorrow, once it's finished. Deficit {rows.find((r) => r.key === 'deficit')?.goal ?? ''} kcal: less barely burns fat, more starts costing
-        muscle.
+        Daily averages, {fmtDay(days[0].day)} to {days[6].day === shiftDay(today, -1) ? 'yesterday' : fmtDay(days[6].day)}, over the days with food
+        logged. Goals: a deficit of 500+ kcal and 150+ g of protein a day. Today joins tomorrow, once it's finished.
       </p>
+    </section>
+  )
+}
 
-      {planWeeks.length > 0 && <div className="section-label">12-week plan, week by week</div>}
+const MARK: Record<WeekVerdict, { mark: string; label: string }> = {
+  good: { mark: '✓', label: 'Week done' },
+  close: { mark: '◐', label: 'Partly done' },
+  behind: { mark: '✗', label: 'Behind' },
+}
+
+/** Each week of the 12-week plan so far: muscle groups that got their sets, and the two food goals, on one line. */
+export function PlanWeeksCard({ profile, targets }: { profile: Profile; targets: Targets }) {
+  const today = localDate()
+  const { exercises } = useData()
+  const { custom } = useCustomLifts()
+  const library = useMemo(() => libraryFor(undefined, custom), [custom])
+  const nutritionDay = useNutritionDay(targets.bmr, profile.refeedDate)
+  const plan = usePlanStatus(profile.goalPlan, targets.bmr)
+  const weeks = useMemo(() => {
+    if (!plan) return []
+    return plan.weeks
+      .filter((w) => w.state !== 'ahead')
+      .map((w) => {
+        const start = shiftDay(w.end, -6)
+        // Lifting counts today's sets; food only finished days.
+        const lifting = weekCoverage(exercises, library, w.end < today ? w.end : today, start, profile.weightKg)
+        const foodDays: NutritionDay[] = []
+        for (let d = start; d <= w.end && d < today; d = shiftDay(d, 1)) foodDays.push(nutritionDay(d))
+        const food = foodRows(foodDays)
+        const groupsMet = lifting.filter((g) => g.sets >= g.target).length
+        const foodMet = food.filter((r) => r.met).length
+        return { week: w.week, start, end: w.end, now: w.state === 'now', lifting, groupsMet, food, foodMet, verdict: judgePlanWeek(groupsMet, lifting.length, foodMet, food.length) }
+      })
+      .reverse()
+  }, [plan, exercises, library, today, nutritionDay, profile.weightKg])
+  const [open, setOpen] = useState<number | null>(null)
+  if (!weeks.length) return null
+  return (
+    <section className="card">
+      <div className="page-header" style={{ marginBottom: 8 }}>
+        <h2>12-week plan, week by week</h2>
+      </div>
       <div className="past-weeks">
-        {planWeeks.map((w) => {
+        {weeks.map((w) => {
           const v = MARK[w.verdict]
-          const ahead = Math.abs(w.aheadLb) < 0.3 ? 'on track' : w.aheadLb > 0 ? `${w.aheadLb.toFixed(1)} lb ahead` : `${Math.abs(w.aheadLb).toFixed(1)} lb behind`
           return (
             <div key={w.week}>
               <button type="button" className={`past-week ${w.verdict}`} aria-expanded={open === w.week} onClick={() => setOpen(open === w.week ? null : w.week)}>
@@ -152,25 +153,26 @@ export function NutritionWeekCard({ day, profile, targets }: { day: string; prof
                 <span>
                   Week {w.week} · {range(w.start, w.end)}
                 </span>
-                <span className="muted small">
-                  {ahead} · {w.met}/{w.rows.length}
+                <span className="muted small" style={{ whiteSpace: 'nowrap' }}>
+                  Lift {w.groupsMet}/{w.lifting.length} · Food {w.foodMet}/{w.food.length}
                 </span>
               </button>
               {open === w.week && (
                 <div className="past-week-detail">
-                  {w.rows[0]?.days ? <NutritionBars rows={w.rows} /> : <p className="muted small" style={{ margin: 0 }}>No finished days yet.</p>}
+                  <div className="section-label" style={{ marginTop: 0 }}>Lifting: sets per muscle group</div>
+                  <WeeklySetsBars coverage={w.lifting} />
+                  <div className="section-label">Food: daily averages</div>
+                  {w.food.some((r) => r.days) ? <FoodBars rows={w.food} /> : <p className="muted small" style={{ margin: 0 }}>No finished days with food logged yet.</p>}
                 </div>
               )}
             </div>
           )
         })}
       </div>
-      {planWeeks.length > 0 && (
-        <p className="muted small" style={{ marginBottom: 0 }}>
-          ✓ fat on target and every goal met (5 of 7 days) · ◐ on target with goals short, or within half a pound · ✗ more than half a pound
-          behind. The count is goals met that week (so far, for this one). Tap a week for its bars.
-        </p>
-      )}
+      <p className="muted small" style={{ marginBottom: 0 }}>
+        Lift: muscle groups that got their weekly sets. Food: average deficit 500+ kcal and protein 150+ g a day (finished days only). ✓ all done · ◐
+        partly · ✗ under 5 groups and no food goal. Tap a week for its bars{weeks[0]?.now ? '; this week is still counting' : ''}.
+      </p>
     </section>
   )
 }
