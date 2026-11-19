@@ -18,7 +18,12 @@ export interface LibraryExercise {
    * Missing means 1; lifts you added yourself count 0.75 (see setCredit).
    */
   credit?: number
+  /** A second group it trains hard enough to count, at this share of each set (step-ups and split squats load the glutes). */
+  also?: { group: string; share: number }
 }
+
+/** Single-leg moves work the glutes a lot as well as the quads: half of each set also counts for glutes. */
+const GLUTES_TOO = { group: 'Hamstrings / glutes', share: 0.5 }
 
 export const LIBRARY_GROUPS = ['Legs', 'Hamstrings / glutes', 'Chest', 'Shoulders', 'Back', 'Arms', 'Abs / core', 'Cardio', 'Other'] as const
 
@@ -29,9 +34,9 @@ export const EXERCISE_LIBRARY: LibraryExercise[] = [
   { id: 'legpress', name: 'Leg press (Matrix)', group: 'Legs', gyms: ['41'], muscles: 'quads, glutes', photos: { '41': 'legpress-41' } },
   { id: 'bsquat', name: 'Barbell back squat', group: 'Legs', gyms: ['41', 'MP2'], muscles: 'quads, glutes, core', photos: { any: 'bsquat' } },
   { id: 'kbsquat', credit: 0.75, name: 'Goblet squat (kettlebell)', group: 'Legs', gyms: ['MP2'], muscles: 'quads, glutes, core', photos: KB },
-  { id: 'kbsplit', credit: 0.9, name: 'Double kettlebell split squat', group: 'Legs', gyms: ['any'], muscles: 'quads, glutes', photos: KB },
-  { id: 'lunge', credit: 0.9, name: 'Split squat / lunge', group: 'Legs', gyms: ['any'], muscles: 'quads, glutes' },
-  { id: 'stepup', credit: 0.9, name: 'Box step-up', group: 'Legs', gyms: ['any'], muscles: 'quads, glutes' },
+  { id: 'kbsplit', credit: 0.9, name: 'Double kettlebell split squat', group: 'Legs', gyms: ['any'], muscles: 'quads, glutes', photos: KB, also: GLUTES_TOO },
+  { id: 'lunge', credit: 0.9, name: 'Split squat / lunge', group: 'Legs', gyms: ['any'], muscles: 'quads, glutes', also: GLUTES_TOO },
+  { id: 'stepup', credit: 0.9, name: 'Box step-up', group: 'Legs', gyms: ['any'], muscles: 'quads, glutes', also: GLUTES_TOO },
   { id: 'legcurl', name: 'Seated leg curl', group: 'Hamstrings / glutes', gyms: ['41'], muscles: 'hamstrings', photos: { '41': 'legcurl-41' } },
   { id: 'hipthrust', name: 'Barbell hip thrust', group: 'Hamstrings / glutes', gyms: ['41', 'MP2'], muscles: 'glutes, hamstrings', photos: { any: 'hipthrust' } },
   { id: 'kbswing', credit: 0.5, name: 'Kettlebell swing', group: 'Hamstrings / glutes', gyms: ['MP2'], muscles: 'glutes, hamstrings, lower back', photos: { any: 'kbswing' } },

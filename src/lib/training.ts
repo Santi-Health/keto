@@ -211,6 +211,13 @@ export function weekStart(day: string): string {
 /** Days left in the Monday–Sunday week after `day` (0 on Sunday). */
 export const daysLeftInWeek = (day: string) => 6 - daysBetween(weekStart(day), day)
 
+/** How much of a lift's sets count toward a group: all for its own group, a share for a second one it also trains. */
+export function groupShare(l: Pick<Lift, 'name' | 'group'>, group: string, library: LibraryExercise[]): number {
+  if (groupOf(l.name, library, l.group) === group) return 1
+  const also = findLift(l.name, library)?.also
+  return also?.group === group ? also.share : 0
+}
+
 /**
  * Sets per muscle group from `from` (default: the rolling 7 days ending today) through `today`, and days since
  * each was last trained. Past weeks are judged on fixed Monday–Sunday weeks instead (see pastWeeks).
@@ -220,12 +227,14 @@ export function weekCoverage(exercises: Exercise[], library: LibraryExercise[], 
   const recent = scoreLifts(exercises, library, bodyKg).filter((d) => d.day >= recentFrom)
   const weekFrom = from ?? shift(today, -6)
   return Object.entries(WEEKLY_SETS).map(([group, target]) => {
-    const mine = recent.filter((d) => groupOf(d.lift.name, library, d.lift.group) === group)
-    // Effective sets: each set counts its exercise's tier times how it compared with last time.
+    const mine = recent.filter((d) => groupShare(d.lift, group, library) > 0)
+    // Effective sets: each set counts its exercise's tier times how it compared with last time (and its share, for a
+    // second group it also trains).
     const inWindow = mine.filter((d) => d.day >= weekFrom && d.day <= today)
-    const sets = round1(inWindow.reduce((s, d) => s + (d.lift.sets ?? 1) * d.perSet, 0))
+    const count = (d: ScoredLift) => (d.lift.sets ?? 1) * d.perSet * groupShare(d.lift, group, library)
+    const sets = round1(inWindow.reduce((s, d) => s + count(d), 0))
     const byAge = Array.from({ length: daysBetween(weekFrom, today) + 1 }, () => 0)
-    for (const d of inWindow) byAge[daysBetween(d.day, today)] += (d.lift.sets ?? 1) * d.perSet
+    for (const d of inWindow) byAge[daysBetween(d.day, today)] += count(d)
     const last = mine.length ? mine[mine.length - 1].day : null
     return { group, sets, target, byAge: byAge.map(round1), daysSince: last ? daysBetween(last, today) : null }
   })

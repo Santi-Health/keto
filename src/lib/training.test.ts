@@ -33,6 +33,16 @@ describe('weekly coverage', () => {
     expect(due[0]).toBe('Abs / core')
     expect(due).not.toContain('Back')
   })
+  it('counts half of each step-up set for glutes too, and squats only for legs', () => {
+    const w = weekCoverage(
+      [session('2026-11-18', [{ name: 'Box step-up', weight: 14, unit: 'kg', reps: 15, sets: 4 }, { name: 'Goblet squat (kettlebell)', weight: 18, reps: 12, sets: 4 }])],
+      EXERCISE_LIBRARY,
+      '2026-11-18',
+    )
+    // Step-up: 4 sets × 0.9 tier = 3.6 for legs, half of it (1.8) for glutes. Goblet squat: 4 × 0.75 = 3, legs only.
+    expect(w.find((g) => g.group === 'Legs')).toMatchObject({ sets: 6.6, daysSince: 0 })
+    expect(w.find((g) => g.group === 'Hamstrings / glutes')).toMatchObject({ sets: 1.8, daysSince: 0 })
+  })
 })
 
 describe('progression', () => {
