@@ -475,7 +475,7 @@ export function Today({ profile, targets, onOpenSettings, onToggleRefeed, onNavi
 
           <NutritionWeekCard day={day} profile={profile} targets={targets} />
 
-          <PlanWeeksCard profile={profile} targets={targets} />
+          <PlanWeeksCard profile={profile} targets={targets} onUpdateProfile={onUpdateProfile} />
 
           {/* First until something is logged (the morning mate cocido), then the macros lead. Moved with order so its Undo survives. */}
           <div style={{ order: isToday && dayLogs.length === 0 ? -1 : 0 }}>

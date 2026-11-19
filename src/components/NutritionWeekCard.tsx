@@ -110,7 +110,7 @@ const MARK: Record<WeekVerdict, { mark: string; label: string }> = {
 }
 
 /** Each week of the 12-week plan so far: muscle groups that got their sets, and the two food goals, on one line. */
-export function PlanWeeksCard({ profile, targets }: { profile: Profile; targets: Targets }) {
+export function PlanWeeksCard({ profile, targets, onUpdateProfile }: { profile: Profile; targets: Targets; onUpdateProfile: (changes: Partial<Profile>) => void }) {
   const today = localDate()
   const { exercises } = useData()
   const { custom } = useCustomLifts()
@@ -128,12 +128,13 @@ export function PlanWeeksCard({ profile, targets }: { profile: Profile; targets:
         const foodDays: NutritionDay[] = []
         for (let d = start; d <= w.end && d < today; d = shiftDay(d, 1)) foodDays.push(nutritionDay(d))
         const food = foodRows(foodDays)
-        const groupsMet = lifting.filter((g) => g.sets >= g.target).length
+        const liftMarked = (profile.liftDoneWeeks ?? []).includes(w.week)
+        const groupsMet = liftMarked ? lifting.length : lifting.filter((g) => g.sets >= g.target).length
         const foodMet = food.filter((r) => r.met).length
-        return { week: w.week, start, end: w.end, now: w.state === 'now', lifting, groupsMet, food, foodMet, verdict: judgePlanWeek(groupsMet, lifting.length, foodMet, food.length) }
+        return { week: w.week, start, end: w.end, now: w.state === 'now', lifting, liftMarked, groupsMet, food, foodMet, verdict: judgePlanWeek(groupsMet, lifting.length, foodMet, food.length) }
       })
       .reverse()
-  }, [plan, exercises, library, today, nutritionDay, profile.weightKg])
+  }, [plan, exercises, library, today, nutritionDay, profile.weightKg, profile.liftDoneWeeks])
   const [open, setOpen] = useState<number | null>(null)
   if (!weeks.length) return null
   return (
@@ -154,13 +155,25 @@ export function PlanWeeksCard({ profile, targets }: { profile: Profile; targets:
                   Week {w.week} · {range(w.start, w.end)}
                 </span>
                 <span className="muted small" style={{ whiteSpace: 'nowrap' }}>
-                  Lift {w.groupsMet}/{w.lifting.length} · Food {w.foodMet}/{w.food.length}
+                  Lift {w.liftMarked ? '✓' : `${w.groupsMet}/${w.lifting.length}`} · Food {w.foodMet}/{w.food.length}
                 </span>
               </button>
               {open === w.week && (
                 <div className="past-week-detail">
-                  <div className="section-label" style={{ marginTop: 0 }}>Lifting: sets per muscle group</div>
+                  <div className="section-label" style={{ marginTop: 0 }}>
+                    Lifting: sets per muscle group{w.liftMarked ? ' (you marked it done)' : ''}
+                  </div>
                   <WeeklySetsBars coverage={w.lifting} />
+                  <button
+                    type="button"
+                    className="link-btn small"
+                    onClick={() => {
+                      const marked = profile.liftDoneWeeks ?? []
+                      onUpdateProfile({ liftDoneWeeks: w.liftMarked ? marked.filter((n) => n !== w.week) : [...marked, w.week] })
+                    }}
+                  >
+                    {w.liftMarked ? 'Undo: count lifting from the sets again' : 'Mark lifting done for this week'}
+                  </button>
                   <div className="section-label">Food: daily averages</div>
                   {w.food.some((r) => r.days) ? <FoodBars rows={w.food} /> : <p className="muted small" style={{ margin: 0 }}>No finished days with food logged yet.</p>}
                 </div>
