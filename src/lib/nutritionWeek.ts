@@ -54,11 +54,20 @@ export function windowDays(viewDay: string, today: string, n = 7): string[] {
   return Array.from({ length: n }, (_, i) => shiftDay(end, i - (n - 1)))
 }
 
-export type WeekVerdict = 'good' | 'close' | 'behind'
+/** Green: met. Yellow: short by 10% or less. Red: short by more. Grey: nothing to judge yet. */
+export type Light = 'green' | 'yellow' | 'red' | 'none'
 
-/** ✓ every muscle group and both food goals met; ✗ under 5 groups and no food goal; ◐ anything between. */
-export function judgePlanWeek(groupsMet: number, groups: number, foodMet: number, foodGoals = 2): WeekVerdict {
-  if (groupsMet >= groups && foodMet >= foodGoals) return 'good'
-  if (groupsMet < 5 && foodMet === 0) return 'behind'
-  return 'close'
+const lightOf = (share: number | null): Light => (share == null ? 'none' : share >= 1 - 1e-9 ? 'green' : share >= 0.9 ? 'yellow' : 'red')
+
+/** Lifting: the share of the week's target sets done, each group capped at its own target (so extra chest can't cover legs). */
+export function liftLight(groups: { sets: number; target: number }[], marked = false): Light {
+  if (marked) return 'green'
+  const target = groups.reduce((s, g) => s + g.target, 0)
+  return lightOf(target ? groups.reduce((s, g) => s + Math.min(g.sets, g.target), 0) / target : null)
+}
+
+/** Food: the weaker of the two goals, as a share of its goal (deficit average over 500, protein over 150). */
+export function foodLight(rows: FoodRow[]): Light {
+  const shares = rows.filter((r) => r.avg != null).map((r) => Math.max(0, r.avg!) / r.goal)
+  return lightOf(shares.length ? Math.min(...shares) : null)
 }

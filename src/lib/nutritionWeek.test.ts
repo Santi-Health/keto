@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { foodRows, judgePlanWeek, windowDays, type NutritionDay } from './nutritionWeek'
+import { foodLight, foodRows, liftLight, windowDays, type NutritionDay } from './nutritionWeek'
 
 const day = (i: number, o: Partial<NutritionDay> = {}): NutritionDay => ({
   day: `2026-11-${String(10 + i).padStart(2, '0')}`,
@@ -28,15 +28,22 @@ describe('food week', () => {
     expect(rows.protein).toMatchObject({ avg: 150, days: 2, met: true })
   })
 
-  it('marks a plan week from lifting and food together', () => {
-    expect(judgePlanWeek(7, 7, 2)).toBe('good')
-    expect(judgePlanWeek(5, 7, 2)).toBe('close')
-    expect(judgePlanWeek(7, 7, 1)).toBe('close')
-    expect(judgePlanWeek(4, 7, 0)).toBe('behind')
-  })
-
   it('uses the 7 finished days before today', () => {
     expect(windowDays('2026-11-18', '2026-11-18')).toEqual(['2026-11-11', '2026-11-12', '2026-11-13', '2026-11-14', '2026-11-15', '2026-11-16', '2026-11-17'])
     expect(windowDays('2026-11-15', '2026-11-18').at(-1)).toBe('2026-11-15')
+  })
+
+  it('lights lifting and food green when met, yellow within 10%, red beyond', () => {
+    const g = (sets: number, target: number) => ({ sets, target })
+    expect(liftLight([g(12, 12), g(10, 10)])).toBe('green')
+    expect(liftLight([g(11, 12), g(10, 10)])).toBe('yellow')
+    // Extra chest doesn't make up for missing legs.
+    expect(liftLight([g(20, 12), g(5, 10)])).toBe('red')
+    expect(liftLight([g(0, 12)], true)).toBe('green')
+    const food = (deficit: number, protein: number) => foodLight(foodRows([day(0, { deficit, protein })]))
+    expect(food(600, 160)).toBe('green')
+    expect(food(460, 160)).toBe('yellow')
+    expect(food(600, 130)).toBe('red')
+    expect(foodLight(foodRows([day(0, { logged: false })]))).toBe('none')
   })
 })

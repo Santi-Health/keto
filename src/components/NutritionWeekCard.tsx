@@ -4,7 +4,7 @@ import { dayEnergy } from '../lib/deficit'
 import { shiftDay } from '../lib/goalPlan'
 import { libraryFor, useCustomLifts } from '../lib/library'
 import { addNutrients } from '../lib/nutrients'
-import { foodRows, judgePlanWeek, windowDays, type FoodRow, type NutritionDay, type WeekVerdict } from '../lib/nutritionWeek'
+import { foodLight, foodRows, liftLight, windowDays, type FoodRow, type Light, type NutritionDay } from '../lib/nutritionWeek'
 import { localDate, type Targets } from '../lib/targets'
 import { weekCoverage } from '../lib/training'
 import type { Profile } from '../lib/types'
@@ -103,10 +103,67 @@ export function NutritionWeekCard({ day, profile, targets }: { day: string; prof
   )
 }
 
-const MARK: Record<WeekVerdict, { mark: string; label: string }> = {
-  good: { mark: '✓', label: 'Week done' },
-  close: { mark: '◐', label: 'Partly done' },
-  behind: { mark: '✗', label: 'Behind' },
+/** ✓ met, ◐ short by 10% or less, ✗ short by more; a dash when there's nothing to judge yet. */
+const MARK: Record<Light, { mark: string; word: string; bg: string }> = {
+  green: { mark: '✓', word: 'met', bg: 'var(--accent)' },
+  yellow: { mark: '◐', word: 'almost (within 10%)', bg: 'var(--carbs)' },
+  red: { mark: '✗', word: 'missed by more than 10%', bg: 'var(--warn)' },
+  none: { mark: '–', word: 'nothing to judge yet', bg: 'var(--border)' },
+}
+const VERDICT_CLS: Record<Light, string> = { green: 'good', yellow: 'close', red: 'behind', none: '' }
+
+/** The week overall: ✓ when lifting and food are both met, ✗ when both missed by more than 10%, ◐ between. */
+function overall(lift: Light, eat: Light): Light {
+  const parts = [lift, eat].filter((l) => l !== 'none')
+  if (!parts.length) return 'none'
+  if (parts.every((l) => l === 'green')) return 'green'
+  if (parts.every((l) => l === 'red')) return 'red'
+  return 'yellow'
+}
+
+/** A small ✓ / ◐ / ✗ badge. */
+function Mark({ light, label }: { light: Light; label: string }) {
+  const m = MARK[light]
+  return (
+    <span
+      aria-label={`${label}: ${m.word}`}
+      title={`${label}: ${m.word}`}
+      style={{ display: 'inline-grid', placeItems: 'center', width: '1.25em', height: '1.25em', borderRadius: '50%', background: m.bg, color: 'var(--surface)', fontSize: '0.8rem', fontWeight: 700 }}
+    >
+      {m.mark}
+    </span>
+  )
+}
+
+/** Plain dumbbell (lifting), in the text color. */
+function Dumbbell() {
+  return (
+    <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="currentColor">
+      <rect x="7" y="10.5" width="10" height="3" rx="1" />
+      <rect x="3.5" y="6" width="3.5" height="12" rx="1.2" />
+      <rect x="17" y="6" width="3.5" height="12" rx="1.2" />
+      <rect x="1" y="9" width="2.5" height="6" rx="1" />
+      <rect x="20.5" y="9" width="2.5" height="6" rx="1" />
+    </svg>
+  )
+}
+
+/** Plain strawberry (food), in the text color. */
+function Strawberry() {
+  return (
+    <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="currentColor">
+      <path d="M12 7.2c-4.6 0-7.6 2.3-7.6 5.6 0 4.1 3.9 9.2 7.6 9.2s7.6-5.1 7.6-9.2c0-3.3-3-5.6-7.6-5.6Z" />
+      <path d="M12 7.6 9 4.6l2.2.4L12 2.6l.8 2.4 2.2-.4-3 3Z" />
+      <g fill="var(--surface)">
+        <circle cx="9" cy="11.5" r=".7" />
+        <circle cx="12" cy="11" r=".7" />
+        <circle cx="15" cy="11.5" r=".7" />
+        <circle cx="10.4" cy="14.6" r=".7" />
+        <circle cx="13.6" cy="14.6" r=".7" />
+        <circle cx="12" cy="17.8" r=".7" />
+      </g>
+    </svg>
+  )
 }
 
 /** Each week of the 12-week plan so far: muscle groups that got their sets, and the two food goals, on one line. */
@@ -131,7 +188,7 @@ export function PlanWeeksCard({ profile, targets, onUpdateProfile }: { profile: 
         const liftMarked = (profile.liftDoneWeeks ?? []).includes(w.week)
         const groupsMet = liftMarked ? lifting.length : lifting.filter((g) => g.sets >= g.target).length
         const foodMet = food.filter((r) => r.met).length
-        return { week: w.week, start, end: w.end, now: w.state === 'now', lifting, liftMarked, groupsMet, food, foodMet, verdict: judgePlanWeek(groupsMet, lifting.length, foodMet, food.length) }
+        return { week: w.week, start, end: w.end, now: w.state === 'now', lifting, liftMarked, groupsMet, food, foodMet, lift: liftLight(lifting, liftMarked), eat: foodLight(food) }
       })
       .reverse()
   }, [plan, exercises, library, today, nutritionDay, profile.weightKg, profile.liftDoneWeeks])
@@ -144,18 +201,26 @@ export function PlanWeeksCard({ profile, targets, onUpdateProfile }: { profile: 
       </div>
       <div className="past-weeks">
         {weeks.map((w) => {
-          const v = MARK[w.verdict]
           return (
             <div key={w.week}>
-              <button type="button" className={`past-week ${w.verdict}`} aria-expanded={open === w.week} onClick={() => setOpen(open === w.week ? null : w.week)}>
-                <span className="past-mark" aria-label={v.label}>
-                  {v.mark}
+              <button
+                type="button"
+                className={`past-week ${VERDICT_CLS[overall(w.lift, w.eat)]}`}
+                aria-expanded={open === w.week}
+                onClick={() => setOpen(open === w.week ? null : w.week)}
+              >
+                <span className="past-mark" aria-label={`Week ${w.week}: ${MARK[overall(w.lift, w.eat)].word}`}>
+                  {MARK[overall(w.lift, w.eat)].mark}
                 </span>
                 <span>
                   Week {w.week} · {range(w.start, w.end)}
                 </span>
-                <span className="muted small" style={{ whiteSpace: 'nowrap' }}>
-                  Lift {w.liftMarked ? '✓' : `${w.groupsMet}/${w.lifting.length}`} · Food {w.foodMet}/{w.food.length}
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                  <Dumbbell />
+                  <Mark light={w.lift} label="Lifting" />
+                  <span style={{ width: 6 }} />
+                  <Strawberry />
+                  <Mark light={w.eat} label="Food" />
                 </span>
               </button>
               {open === w.week && (
@@ -183,8 +248,8 @@ export function PlanWeeksCard({ profile, targets, onUpdateProfile }: { profile: 
         })}
       </div>
       <p className="muted small" style={{ marginBottom: 0 }}>
-        Lift: muscle groups that got their weekly sets. Food: average deficit 500+ kcal and protein 150+ g a day (finished days only). ✓ all done · ◐
-        partly · ✗ under 5 groups and no food goal. Tap a week for its bars{weeks[0]?.now ? '; this week is still counting' : ''}.
+        Dumbbell: the week's sets per muscle group. Strawberry: average deficit 500+ kcal and protein 150+ g a day (finished days only). ✓ met · ◐
+        short by 10% or less · ✗ short by more. The left mark is the week overall: ✓ both met, ✗ both missed, ◐ between. Tap a week for its bars{weeks[0]?.now ? '; this week is still counting' : ''}.
       </p>
     </section>
   )
